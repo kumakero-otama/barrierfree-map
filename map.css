@@ -1,0 +1,39 @@
+.map-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 220px;
+  gap: 16px;
+  width: min(96vw, 1100px);
+  align-items: start;
+}
+
+#map {
+  width: 100%;
+  height: min(70vh, 600px);
+  border: 2px solid #222;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+}
+
+.map-side {
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.meta {
+  display: grid;
+  gap: 12px;
+}
+
+#last-updated {
+  font-size: 14px;
+  color: #222;
+}
+
+@media (max-width: 720px) {
+  .map-row {
+    grid-template-columns: 1fr;
+  }
+}

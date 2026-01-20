@@ -1,0 +1,20 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 40px;
+  line-height: 1.6;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 16px;
+  border: 1px solid #222;
+  border-radius: 999px;
+  color: #222;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
