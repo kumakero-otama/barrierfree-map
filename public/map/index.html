@@ -4,8 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Draggable Map</title>
+    <meta name="theme-color" content="#222222" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="map.css" />
   </head>
   <body>
@@ -19,15 +21,17 @@
             <div id="match-count">Match calls: 0</div>
             <button id="reload-location" class="btn" type="button">Reload location</button>
             <button id="toggle-fit" class="btn" type="button">Fitting: OFF</button>
+            <button id="toggle-record" class="btn" type="button">Record: OFF</button>
           </div>
         </aside>
       </div>
       <p id="coords">Lat: --, Lng: --</p>
       <p id="raw-coords">Raw: --, --</p>
       <p id="snapped-coords">Snapped: --, --</p>
-      <p><a class="btn" href="index.html">Back</a></p>
+      <p><a class="btn" href="../index.html">Back</a></p>
     </main>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="map.js"></script>
+    <script src="/pwa.js"></script>
   </body>
 </html>

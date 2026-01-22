@@ -2,13 +2,17 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const createMatchHandler = require("./server/api/match");
+const createCountHandler = require("./server/api/count");
+const createRecordHandlers = require("./server/api/record");
+const { createDbPool } = require("./server/db");
 
-const HTTPS_PORT = 3000;
-const HTTP_PORT = 3001;
+const HTTP_PORT = 3000;
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || "";
-const MIN_INTERVAL_MS = 5000;
+const MIN_INTERVAL_MS = 4000;
 const MAX_MATCH_CALLS_PER_MONTH = 100000;
-const COUNT_FILE = path.join(__dirname, "mapbox-count.json");
+const COUNT_FILE = path.join(__dirname, "data", "mapbox-count.json");
+const PUBLIC_DIR = path.join(__dirname, "public");
 let monthlyCounts = {};
 
 function getCurrentMonth() {
@@ -61,11 +65,12 @@ const CONTENT_TYPES = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json",
 };
 
 function handleStatic(req, res) {
   const requestPath = req.url === "/" ? "/index.html" : req.url;
-  const filePath = path.join(__dirname, requestPath);
+  const filePath = path.join(PUBLIC_DIR, requestPath);
   const ext = path.extname(filePath).toLowerCase();
   const contentType = CONTENT_TYPES[ext] || "application/octet-stream";
 
@@ -85,120 +90,33 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function handleMatch(req, res) {
-  if (req.method !== "GET") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return;
-  }
-  if (!MAPBOX_TOKEN) {
-    sendJson(res, 500, { error: "missing_mapbox_token" });
-    return;
-  }
-  const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
-  const lat = parseFloat(url.searchParams.get("lat"));
-  const lng = parseFloat(url.searchParams.get("lng"));
+const handleMatch = createMatchHandler({
+  https,
+  MAPBOX_TOKEN,
+  MIN_INTERVAL_MS,
+  MAX_MATCH_CALLS_PER_MONTH,
+  lastRequestByIp,
+  getCurrentMonth,
+  getMonthlyCount,
+  incrementMonthlyCount,
+  sendJson,
+});
 
-  const currentMonth = getCurrentMonth();
-  const currentCount = getMonthlyCount(currentMonth);
+const handleCount = createCountHandler({
+  MAX_MATCH_CALLS_PER_MONTH,
+  getCurrentMonth,
+  getMonthlyCount,
+  monthlyCounts,
+  sendJson,
+});
 
-  if (currentCount >= MAX_MATCH_CALLS_PER_MONTH) {
-    sendJson(res, 200, { lat, lng, skipped: "quota_reached", count: currentCount, month: currentMonth });
-    return;
-  }
-  const prevLat = parseFloat(url.searchParams.get("prevLat"));
-  const prevLng = parseFloat(url.searchParams.get("prevLng"));
+const { pool: dbPool } = createDbPool();
+const { handleStart, handlePoint, handleStop } = createRecordHandlers({
+  pool: dbPool,
+  sendJson,
+});
 
-  const ip = req.socket.remoteAddress || "unknown";
-  console.log(`raw_lat=${lat}, raw_lng=${lng}, ip=${ip}`);
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    sendJson(res, 400, { error: "invalid_coordinates" });
-    return;
-  }
-
-  const now = Date.now();
-  const last = lastRequestByIp.get(ip) || 0;
-  if (now - last < MIN_INTERVAL_MS) {
-    sendJson(res, 429, { error: "rate_limited", retryAfterMs: MIN_INTERVAL_MS - (now - last) });
-    return;
-  }
-  lastRequestByIp.set(ip, now);
-
-  let coords;
-  if (!Number.isFinite(prevLat) || !Number.isFinite(prevLng)) {
-    // 初回リクエスト時は、同じ座標を2回送信して道路にスナップ
-    coords = `${lng},${lat};${lng},${lat}`;
-    console.log(`match request (first time): lat=${lat}, lng=${lng}`);
-  } else {
-    coords = `${prevLng},${prevLat};${lng},${lat}`;
-    console.log(`match request: lat=${lat}, lng=${lng}, prevLat=${prevLat}, prevLng=${prevLng}`);
-  }
-
-  console.log(`send_lat=${lat}, send_lng=${lng}`);
-  const matchUrl = new URL(
-    `https://api.mapbox.com/matching/v5/mapbox/driving/${coords}`
-  );
-  matchUrl.searchParams.set("access_token", MAPBOX_TOKEN);
-  matchUrl.searchParams.set("geometries", "geojson");
-  matchUrl.searchParams.set("overview", "full");
-  matchUrl.searchParams.set("steps", "false");
-  matchUrl.searchParams.set("radiuses", "25;25");
-  matchUrl.searchParams.set("tidy", "false");
-  console.log(`mapbox_request_url=${matchUrl.toString()}`);
-
-  incrementMonthlyCount(currentMonth);
-  const newCount = getMonthlyCount(currentMonth);
-  https
-    .get(matchUrl, (apiRes) => {
-      let body = "";
-      apiRes.on("data", (chunk) => {
-        body += chunk;
-      });
-      apiRes.on("end", () => {
-        console.log(`mapbox_response_status=${apiRes.statusCode || 0}`);
-        console.log(`mapbox_response_body=${body}`);
-        try {
-          const data = JSON.parse(body);
-          const tracepoints = Array.isArray(data.tracepoints) ? data.tracepoints : [];
-          const lastPoint = tracepoints[tracepoints.length - 1];
-          if (lastPoint && Array.isArray(lastPoint.location)) {
-            const [snappedLng, snappedLat] = lastPoint.location;
-            sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });
-            return;
-          }
-        } catch {
-          // fall through to fallback
-        }
-        sendJson(res, 200, { lat, lng, count: newCount, month: currentMonth });
-      });
-    })
-    .on("error", (err) => {
-      console.log(`mapbox_response_error=${err.message}`);
-      sendJson(res, 200, { lat, lng, count: newCount, month: currentMonth });
-    });
-}
-
-function handleCount(req, res) {
-  if (req.method !== "GET") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return;
-  }
-  const currentMonth = getCurrentMonth();
-  const currentCount = getMonthlyCount(currentMonth);
-  sendJson(res, 200, { 
-    count: currentCount, 
-    max: MAX_MATCH_CALLS_PER_MONTH,
-    month: currentMonth,
-    allMonths: monthlyCounts
-  });
-}
-
-const tlsOptions = {
-  key: fs.readFileSync(path.join(__dirname, "localhost-key.pem")),
-  cert: fs.readFileSync(path.join(__dirname, "localhost-cert.pem")),
-};
-
-https.createServer(tlsOptions, (req, res) => {
+http.createServer((req, res) => {
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
     return;
@@ -207,15 +125,19 @@ https.createServer(tlsOptions, (req, res) => {
     handleCount(req, res);
     return;
   }
+  if (req.url && req.url.startsWith("/api/record/start")) {
+    handleStart(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/record/point")) {
+    handlePoint(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/record/stop")) {
+    handleStop(req, res);
+    return;
+  }
   handleStatic(req, res);
-}).listen(HTTPS_PORT, () => {
-  console.log(`https://localhost:${HTTPS_PORT}`);
-});
-
-http.createServer((req, res) => {
-  const host = (req.headers.host || "localhost").split(":")[0];
-  res.writeHead(301, { Location: `https://${host}:${HTTPS_PORT}${req.url}` });
-  res.end();
 }).listen(HTTP_PORT, () => {
-  console.log(`http://localhost:${HTTP_PORT} -> https://localhost:${HTTPS_PORT}`);
+  console.log(`http://localhost:${HTTP_PORT}`);
 });
