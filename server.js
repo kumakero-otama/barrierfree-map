@@ -13,7 +13,74 @@ const MIN_INTERVAL_MS = 4000;
 const MAX_MATCH_CALLS_PER_MONTH = 100000;
 const COUNT_FILE = path.join(__dirname, "data", "mapbox-count.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const LOG_DIR = path.join(__dirname, "logs");
+const SERVER_LOG = path.join(LOG_DIR, "server.csv");
 let monthlyCounts = {};
+
+function ensureLogDir() {
+  try {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  } catch {
+    // ignore
+  }
+}
+
+function toCsv(fields) {
+  return fields
+    .map((field) => {
+      const value = String(field ?? "");
+      const escaped = value.replace(/"/g, '""');
+      return `"${escaped}"`;
+    })
+    .join(",");
+}
+
+function appendLog(level, message) {
+  const timestamp = new Date().toISOString();
+  const line = `${toCsv([timestamp, level, message])}\n`;
+  try {
+    fs.appendFileSync(SERVER_LOG, line, "utf8");
+  } catch {
+    // ignore write errors
+  }
+}
+
+function formatMessage(args) {
+  return args
+    .map((arg) => {
+      if (typeof arg === "string") {
+        return arg;
+      }
+      try {
+        return JSON.stringify(arg);
+      } catch {
+        return String(arg);
+      }
+    })
+    .join(" ");
+}
+
+ensureLogDir();
+appendLog("INFO", "server_start");
+
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+console.log = (...args) => {
+  appendLog("INFO", formatMessage(args));
+  originalLog(...args);
+};
+
+console.warn = (...args) => {
+  appendLog("WARN", formatMessage(args));
+  originalWarn(...args);
+};
+
+console.error = (...args) => {
+  appendLog("ERROR", formatMessage(args));
+  originalError(...args);
+};
 
 function getCurrentMonth() {
   const now = new Date();

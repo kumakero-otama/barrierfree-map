@@ -1,5 +1,7 @@
-﻿# Secrets / local certs
+﻿# Secrets / local certs7
 トークン管理方法.md
 localhost-key.pem
 localhost-cert.pem
 config.yaml
+logs/
+node_modules/

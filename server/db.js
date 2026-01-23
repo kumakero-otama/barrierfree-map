@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const yaml = require("yaml");
-const mariadb = require("mariadb");
+const mysql = require("mysql2/promise");
 
 const CONFIG_PATH = path.join(__dirname, "..", "config.yaml");
 
@@ -18,13 +18,15 @@ function createDbPool() {
   try {
     const dbConfig = loadConfig();
     return {
-      pool: mariadb.createPool({
+      pool: mysql.createPool({
         host: dbConfig.host,
         port: dbConfig.port || 3306,
         user: dbConfig.user,
         password: dbConfig.password,
         database: dbConfig.database,
+        waitForConnections: true,
         connectionLimit: 5,
+        queueLimit: 0,
       }),
       error: null,
     };

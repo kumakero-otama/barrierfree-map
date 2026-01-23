@@ -9,9 +9,9 @@ module.exports = {
     },
     {
       name: "barrierfree-map-loophole",
-      script: "loophole",
-      args: ["http", "3000", "--hostname", "barrierfree-map"],
-      cwd: "loophole-cli_1.0.0-beta.15_linux_64bit",
+      script: "scripts/loophole_logger.js",
+      interpreter: "node",
+      cwd: __dirname,
       autorestart: true,
     },
   ],
