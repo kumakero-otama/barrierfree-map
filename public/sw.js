@@ -1,4 +1,4 @@
-const CACHE_VERSION = "1.0.1"; // コード更新時にこのバージョンを変更してください
+const CACHE_VERSION = "1.0.2"; // コード更新時にこのバージョンを変更してください
 const CACHE_NAME = `barrierfree-map-v${CACHE_VERSION}-${Date.now()}`;
 const CORE_ASSETS = [
   "/",
