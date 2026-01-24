@@ -28,6 +28,17 @@ const MAX_TRAIL = 100;
 let lastDot = null;
 let lastSent = null;
 let fitEnabled = false;
+let currentSessionUuid = null;
+let sessionPointSeq = 0;
+
+// UUID v4 生成関数
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 function updateFitButton() {
   toggleFitBtn.textContent = fitEnabled ? "Fitting: ON" : "Fitting: OFF";
@@ -65,6 +76,12 @@ function requestSnappedLocation(latitude, longitude) {
     params.set("prevLat", lastSent.latitude.toString());
     params.set("prevLng", lastSent.longitude.toString());
   }
+  
+  // セッションUUIDとseqを追加
+  if (currentSessionUuid) {
+    params.set("sessionUuid", currentSessionUuid);
+    params.set("seq", sessionPointSeq.toString());
+  }
 
   fetch(`/api/match?${params.toString()}`)
     .then((res) => {
@@ -84,6 +101,10 @@ function requestSnappedLocation(latitude, longitude) {
         updateDisplay(latitude, longitude, data.lat, data.lng);
         // スナップされた座標を次回の基準点として保存
         lastSent = { latitude: data.lat, longitude: data.lng };
+        // セッションポイントのseqをインクリメント
+        if (fitEnabled && currentSessionUuid) {
+          sessionPointSeq++;
+        }
       } else {
         return;
       }
@@ -181,6 +202,18 @@ if ("geolocation" in navigator) {
   toggleFitBtn.addEventListener("click", () => {
     fitEnabled = !fitEnabled;
     updateFitButton();
+    
+    if (fitEnabled) {
+      // フィッティングON時に新しいセッションUUIDを生成
+      currentSessionUuid = generateUUID();
+      sessionPointSeq = 0;
+      console.log('Session started:', currentSessionUuid);
+    } else {
+      // フィッティングOFF時にセッションUUIDをクリア
+      console.log('Session ended:', currentSessionUuid);
+      currentSessionUuid = null;
+      sessionPointSeq = 0;
+    }
   });
   updateCount();
   setInterval(updateCount, 5000);

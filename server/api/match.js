@@ -1,3 +1,7 @@
+const { createDbPool } = require("../db");
+const { createLogger } = require("../logger");
+const path = require("path");
+
 function createMatchHandler({
   https,
   MAPBOX_TOKEN,
@@ -9,7 +13,73 @@ function createMatchHandler({
   incrementMonthlyCount,
   sendJson,
 }) {
+  // DB接続とロガー
+  const dbResult = createDbPool();
+  const pool = dbResult.pool;
+  
+  const LOG_DIR = path.join(__dirname, "..", "..", "logs");
+  const SESSION_LOG = path.join(LOG_DIR, "sessions.csv");
+  const POINTS_LOG = path.join(LOG_DIR, "session_points.csv");
+  
+  const sessionLogger = createLogger(SESSION_LOG);
+  const pointsLogger = createLogger(POINTS_LOG);
+  
+  // セッション更新関数（存在しなければ作成、存在すれば終了時刻を更新）
+  async function updateSession(sessionUuid, snappedLat, snappedLng, seq) {
+    if (!sessionUuid || !pool) {
+      return; // sessionUuidがないまたはDBが利用不可の場合はスキップ
+    }
+    
+    const userId = 'anonymous';
+    
+    // CSVログに記録
+    sessionLogger.appendLog("SESSION_UPDATE", `${sessionUuid},${userId}`);
+    pointsLogger.appendLog("POINT", `${sessionUuid},${seq},${snappedLat},${snappedLng}`);
+    
+    try {
+      // セッションが存在するかチェック
+      const [sessions] = await pool.query(
+        "SELECT id FROM sessions WHERE session_uuid = ?",
+        [sessionUuid]
+      );
+      
+      if (sessions.length === 0) {
+        // 新規セッション作成
+        const [result] = await pool.query(
+          "INSERT INTO sessions (session_uuid, user_id, started_at, ended_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+          [sessionUuid, userId]
+        );
+        
+        const sessionId = result.insertId;
+        sessionLogger.appendLog("SESSION_START", `${sessionUuid},${userId},session_id=${sessionId}`);
+        
+        // ポイントを保存
+        await pool.query(
+          "INSERT INTO session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
+          [sessionId, seq, snappedLat, snappedLng]
+        );
+      } else {
+        // 既存セッションの終了時刻を更新
+        const sessionId = sessions[0].id;
+        await pool.query(
+          "UPDATE sessions SET ended_at = CURRENT_TIMESTAMP WHERE id = ?",
+          [sessionId]
+        );
+        
+        // ポイントを保存
+        await pool.query(
+          "INSERT INTO session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
+          [sessionId, seq, snappedLat, snappedLng]
+        );
+      }
+    } catch (err) {
+      const errorMsg = `セッション更新エラー[${sessionUuid}]: ${err.message}`;
+      sessionLogger.appendLog("ERROR", errorMsg);
+    }
+  }
+  
   function sendNoContent(res) {
+
     res.writeHead(204);
     res.end();
   }
@@ -26,6 +96,8 @@ function createMatchHandler({
     const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
     const lat = parseFloat(url.searchParams.get("lat"));
     const lng = parseFloat(url.searchParams.get("lng"));
+    const sessionUuid = url.searchParams.get("sessionUuid");
+    const seq = parseInt(url.searchParams.get("seq"), 10);
 
     const currentMonth = getCurrentMonth();
     const currentCount = getMonthlyCount(currentMonth);
@@ -93,6 +165,14 @@ function createMatchHandler({
             const lastPoint = tracepoints[tracepoints.length - 1];
           if (lastPoint && Array.isArray(lastPoint.location)) {
             const [snappedLng, snappedLat] = lastPoint.location;
+            
+            // セッション更新（非同期だが待たない）
+            if (sessionUuid && Number.isFinite(seq)) {
+              updateSession(sessionUuid, snappedLat, snappedLng, seq).catch(err => {
+                console.error('updateSession error:', err);
+              });
+            }
+            
             sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });
             return;
           }
