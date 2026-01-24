@@ -85,7 +85,8 @@ function createMatchHandler({
         });
         apiRes.on("end", () => {
           console.log(`mapbox_response_status=${apiRes.statusCode || 0}`);
-          console.log(`mapbox_response_body=${body}`);
+          // mapbox_response_bodyログを削除（500バイト超のJSON出力によるI/O負荷削減）
+          // console.log(`mapbox_response_body=${body}`);
           try {
             const data = JSON.parse(body);
             const tracepoints = Array.isArray(data.tracepoints) ? data.tracepoints : [];

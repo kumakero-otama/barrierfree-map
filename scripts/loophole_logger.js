@@ -34,11 +34,10 @@ function toCsv(fields) {
 function appendLog(level, message) {
   const timestamp = new Date().toISOString();
   const line = `${toCsv([timestamp, level, message])}\n`;
-  try {
-    fs.appendFileSync(LOG_FILE, line, "utf8");
-  } catch {
+  // 非同期書き込みでI/Oブロッキングを回避
+  fs.appendFile(LOG_FILE, line, "utf8", (err) => {
     // ignore write errors
-  }
+  });
 }
 
 ensureLogDir();
