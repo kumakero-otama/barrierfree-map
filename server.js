@@ -4,11 +4,12 @@ const fs = require("fs");
 const path = require("path");
 const createMatchHandler = require("./server/api/match");
 const createCountHandler = require("./server/api/count");
-const createRecordHandlers = require("./server/api/record");
-const { createDbPool } = require("./server/db");
 
 const HTTP_PORT = 3000;
+const HTTPS_PORT = 3001;
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || "";
+const TLS_KEY_PATH = process.env.TLS_KEY_PATH || "";
+const TLS_CERT_PATH = process.env.TLS_CERT_PATH || "";
 const MIN_INTERVAL_MS = 4000;
 const MAX_MATCH_CALLS_PER_MONTH = 100000;
 const COUNT_FILE = path.join(__dirname, "data", "mapbox-count.json");
@@ -177,13 +178,7 @@ const handleCount = createCountHandler({
   sendJson,
 });
 
-const { pool: dbPool } = createDbPool();
-const { handleStart, handlePoint, handleStop } = createRecordHandlers({
-  pool: dbPool,
-  sendJson,
-});
-
-http.createServer((req, res) => {
+function handleRequest(req, res) {
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
     return;
@@ -192,19 +187,23 @@ http.createServer((req, res) => {
     handleCount(req, res);
     return;
   }
-  if (req.url && req.url.startsWith("/api/record/start")) {
-    handleStart(req, res);
-    return;
-  }
-  if (req.url && req.url.startsWith("/api/record/point")) {
-    handlePoint(req, res);
-    return;
-  }
-  if (req.url && req.url.startsWith("/api/record/stop")) {
-    handleStop(req, res);
-    return;
-  }
   handleStatic(req, res);
-}).listen(HTTP_PORT, () => {
+}
+
+http.createServer(handleRequest).listen(HTTP_PORT, () => {
   console.log(`http://localhost:${HTTP_PORT}`);
 });
+
+if (TLS_KEY_PATH && TLS_CERT_PATH) {
+  try {
+    const key = fs.readFileSync(TLS_KEY_PATH);
+    const cert = fs.readFileSync(TLS_CERT_PATH);
+    https.createServer({ key, cert }, handleRequest).listen(HTTPS_PORT, () => {
+      console.log(`https://localhost:${HTTPS_PORT}`);
+    });
+  } catch (err) {
+    console.warn("https_start_failed", err.message);
+  }
+} else {
+  console.warn("https_disabled_missing_tls");
+}

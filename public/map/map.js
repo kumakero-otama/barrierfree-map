@@ -6,7 +6,6 @@ const lastUpdatedEl = document.getElementById("last-updated");
 const matchCountEl = document.getElementById("match-count");
 const reloadBtn = document.getElementById("reload-location");
 const toggleFitBtn = document.getElementById("toggle-fit");
-const toggleRecordBtn = document.getElementById("toggle-record");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -29,70 +28,9 @@ const MAX_TRAIL = 100;
 let lastDot = null;
 let lastSent = null;
 let fitEnabled = false;
-let recordEnabled = false;
-let recordSessionId = null;
-let recordSeq = 0;
-let recordPending = false;
-const recordUserId = "anonymous";
 
 function updateFitButton() {
   toggleFitBtn.textContent = fitEnabled ? "Fitting: ON" : "Fitting: OFF";
-}
-
-function updateRecordButton() {
-  toggleRecordBtn.textContent = recordEnabled ? "Record: ON" : "Record: OFF";
-}
-
-function postJson(url, payload) {
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-}
-
-function recordPoint(snappedLat, snappedLng) {
-  if (!recordEnabled || !fitEnabled || !recordSessionId) {
-    return;
-  }
-  recordSeq += 1;
-  postJson("/api/record/point", {
-    sessionId: recordSessionId,
-    lat: snappedLat,
-    lng: snappedLng,
-    seq: recordSeq,
-  }).catch(() => {
-    // ignore record errors
-  });
-}
-
-async function startRecording() {
-  const res = await postJson("/api/record/start", { userId: recordUserId });
-  if (!res.ok) {
-    throw new Error("record_start_failed");
-  }
-  const data = await res.json();
-  if (!data || !data.sessionId) {
-    throw new Error("record_start_invalid");
-  }
-  recordSessionId = data.sessionId;
-  recordSeq = 0;
-  recordEnabled = true;
-  updateRecordButton();
-}
-
-async function stopRecording() {
-  if (!recordSessionId) {
-    recordEnabled = false;
-    updateRecordButton();
-    return;
-  }
-  await postJson("/api/record/stop", { sessionId: recordSessionId }).catch(() => {
-    // ignore stop errors
-  });
-  recordSessionId = null;
-  recordEnabled = false;
-  updateRecordButton();
 }
 
 function updateCount() {
@@ -218,7 +156,6 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
   }
   lastDot = dot;
 
-  recordPoint(snappedLat, snappedLng);
 }
 
 if ("geolocation" in navigator) {
@@ -244,26 +181,6 @@ if ("geolocation" in navigator) {
   toggleFitBtn.addEventListener("click", () => {
     fitEnabled = !fitEnabled;
     updateFitButton();
-  });
-  updateRecordButton();
-  toggleRecordBtn.addEventListener("click", async () => {
-    if (recordPending) {
-      return;
-    }
-    recordPending = true;
-    try {
-      if (recordEnabled) {
-        await stopRecording();
-      } else {
-        await startRecording();
-      }
-    } catch {
-      recordEnabled = false;
-      recordSessionId = null;
-      updateRecordButton();
-    } finally {
-      recordPending = false;
-    }
   });
   updateCount();
   setInterval(updateCount, 5000);
