@@ -26,8 +26,30 @@ body {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
+.version-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+  text-align: center;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+#app-version {
+  font-family: 'Courier New', monospace;
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
 @media (max-width: 720px) {
   body {
     padding: 16px;
+  }
+
+  .version-footer {
+    margin-top: 30px;
+    padding-top: 15px;
   }
 }

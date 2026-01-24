@@ -1,9 +1,11 @@
-const CACHE_NAME = "barrierfree-map-v1";
+const CACHE_VERSION = "1.0.1"; // コード更新時にこのバージョンを変更してください
+const CACHE_NAME = `barrierfree-map-v${CACHE_VERSION}-${Date.now()}`;
 const CORE_ASSETS = [
   "/",
   "/index.html",
   "/style.css",
   "/app.js",
+  "/version.js",
   "/analog/index.html",
   "/analog/analog.css",
   "/analog/analog.js",
@@ -16,16 +18,30 @@ const CORE_ASSETS = [
 ];
 
 self.addEventListener("install", (event) => {
+  console.log("[SW] Installing new service worker...");
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
   );
+  // 新しいService Workerをすぐにアクティブにする
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
+  console.log("[SW] Activating new service worker...");
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.map((key) => (key === CACHE_NAME ? null : caches.delete(key))))
-    )
+    caches.keys().then((keys) => {
+      // 古いキャッシュをすべて削除
+      const deletePromises = keys
+        .filter((key) => key.startsWith("barrierfree-map-v") && key !== CACHE_NAME)
+        .map((key) => {
+          console.log("[SW] Deleting old cache:", key);
+          return caches.delete(key);
+        });
+      return Promise.all(deletePromises);
+    }).then(() => {
+      // 既存のクライアントをすべて制御下に置く
+      return self.clients.claim();
+    })
   );
 });
 
@@ -65,4 +81,12 @@ self.addEventListener("fetch", (event) => {
       });
     })
   );
+});
+
+// メッセージを受け取ってskipWaitingを実行
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    console.log("[SW] Received SKIP_WAITING message");
+    self.skipWaiting();
+  }
 });
