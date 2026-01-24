@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const createMatchHandler = require("./server/api/match");
 const createCountHandler = require("./server/api/count");
+const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
 const HTTPS_PORT = 3001;
@@ -18,32 +19,8 @@ const LOG_DIR = path.join(__dirname, "logs");
 const SERVER_LOG = path.join(LOG_DIR, "server.csv");
 let monthlyCounts = {};
 
-function ensureLogDir() {
-  try {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-  } catch {
-    // ignore
-  }
-}
-
-function toCsv(fields) {
-  return fields
-    .map((field) => {
-      const value = String(field ?? "");
-      const escaped = value.replace(/"/g, '""');
-      return `"${escaped}"`;
-    })
-    .join(",");
-}
-
-function appendLog(level, message) {
-  const timestamp = new Date().toISOString();
-  const line = `${toCsv([timestamp, level, message])}\n`;
-  // 非同期書き込みでI/Oブロッキングを回避
-  fs.appendFile(SERVER_LOG, line, "utf8", (err) => {
-    // ignore write errors
-  });
-}
+const logger = createLogger(SERVER_LOG);
+const { appendLog } = logger;
 
 function formatMessage(args) {
   return args
@@ -60,7 +37,6 @@ function formatMessage(args) {
     .join(" ");
 }
 
-ensureLogDir();
 appendLog("INFO", "server_start");
 
 const originalLog = console.log;
