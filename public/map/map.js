@@ -13,10 +13,11 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 const redPinIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
 
@@ -340,25 +341,58 @@ function showAllRecordsOnMap(points) {
   
   console.log(`[showAllRecordsOnMap] Showing ${points.length} points`);
   
-  // すべてのポイントを小さな円マーカーとして表示
+  // セッションごとにポイントをグループ化
+  const sessionMap = new Map();
   points.forEach((point) => {
-    const lat = parseFloat(point.lat);
-    const lng = parseFloat(point.lng);
+    const sessionUuid = point.session_uuid;
+    if (!sessionMap.has(sessionUuid)) {
+      sessionMap.set(sessionUuid, []);
+    }
+    sessionMap.get(sessionUuid).push(point);
+  });
+  
+  console.log(`[showAllRecordsOnMap] Found ${sessionMap.size} sessions`);
+  
+  // 各セッションごとに処理
+  sessionMap.forEach((sessionPoints, sessionUuid) => {
+    // seqでソート
+    sessionPoints.sort((a, b) => a.seq - b.seq);
     
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      const marker = L.circleMarker([lat, lng], {
-        radius: 2,
+    // ポイントの座標を抽出
+    const coordinates = [];
+    sessionPoints.forEach((point) => {
+      const lat = parseFloat(point.lat);
+      const lng = parseFloat(point.lng);
+      
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        coordinates.push([lat, lng]);
+        
+        // 小さな点を表示
+        const marker = L.circleMarker([lat, lng], {
+          radius: 2,
+          color: "#0066ff",
+          fillColor: "#0066ff",
+          fillOpacity: 0.5,
+          weight: 1,
+        }).addTo(map);
+        
+        allRecordsMarkers.push(marker);
+      }
+    });
+    
+    // セッションの軌跡を青い線で描画
+    if (coordinates.length > 1) {
+      const polyline = L.polyline(coordinates, {
         color: "#0066ff",
-        fillColor: "#0066ff",
-        fillOpacity: 0.5,
-        weight: 1,
+        weight: 2,
+        opacity: 0.6,
       }).addTo(map);
       
-      allRecordsMarkers.push(marker);
+      allRecordsMarkers.push(polyline);
     }
   });
   
-  console.log(`[showAllRecordsOnMap] Displayed ${allRecordsMarkers.length} markers`);
+  console.log(`[showAllRecordsOnMap] Displayed ${allRecordsMarkers.length} items (markers + lines)`);
 }
 
 // 全レコードを地図から削除
