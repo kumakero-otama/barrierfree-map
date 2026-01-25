@@ -5,6 +5,7 @@ const lastUpdatedEl = document.getElementById("last-updated");
 const matchCountEl = document.getElementById("match-count");
 const reloadBtn = document.getElementById("reload-location");
 const toggleRecordBtn = document.getElementById("toggle-record");
+const toggleShowAllBtn = document.getElementById("toggle-show-all");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -32,6 +33,8 @@ let recordEnabled = false;
 let currentSessionUuid = null;
 let sessionPointSeq = 0;
 const deviceUuid = getOrCreateDeviceUuid();
+let showAllRecords = false;
+let allRecordsMarkers = [];
 
 // UUID v4 生成関数
 function generateUUID() {
@@ -308,6 +311,65 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
   console.log('[updateDisplay] Display update complete');
 }
 
+// 全レコードを取得して表示
+function loadAndShowAllRecords() {
+  console.log("[loadAndShowAllRecords] Fetching all records...");
+  fetch("/api/records")
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`records fetch failed: ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      console.log(`[loadAndShowAllRecords] Loaded ${data.count} points`);
+      if (data.success && Array.isArray(data.points)) {
+        showAllRecordsOnMap(data.points);
+      }
+    })
+    .catch((err) => {
+      console.error("[loadAndShowAllRecords] Error:", err);
+      alert("全レコードの取得に失敗しました。");
+    });
+}
+
+// 全レコードを地図上に表示
+function showAllRecordsOnMap(points) {
+  // 既存のマーカーをクリア
+  clearAllRecordsFromMap();
+  
+  console.log(`[showAllRecordsOnMap] Showing ${points.length} points`);
+  
+  // すべてのポイントを小さな円マーカーとして表示
+  points.forEach((point) => {
+    const lat = parseFloat(point.lat);
+    const lng = parseFloat(point.lng);
+    
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const marker = L.circleMarker([lat, lng], {
+        radius: 2,
+        color: "#0066ff",
+        fillColor: "#0066ff",
+        fillOpacity: 0.5,
+        weight: 1,
+      }).addTo(map);
+      
+      allRecordsMarkers.push(marker);
+    }
+  });
+  
+  console.log(`[showAllRecordsOnMap] Displayed ${allRecordsMarkers.length} markers`);
+}
+
+// 全レコードを地図から削除
+function clearAllRecordsFromMap() {
+  console.log(`[clearAllRecordsFromMap] Removing ${allRecordsMarkers.length} markers`);
+  allRecordsMarkers.forEach((marker) => {
+    map.removeLayer(marker);
+  });
+  allRecordsMarkers = [];
+}
+
 // サーバーから設定を取得
 function loadConfig() {
   return fetch("/api/config")
@@ -386,6 +448,18 @@ if ("geolocation" in navigator) {
       if (document.hidden && recordEnabled && currentSessionUuid) {
         console.log("[visibilitychange] Saving record state");
         saveRecordState();
+      }
+    });
+    
+    // 全レコード表示トグルのイベントリスナー
+    toggleShowAllBtn.addEventListener("change", () => {
+      showAllRecords = toggleShowAllBtn.checked;
+      if (showAllRecords) {
+        console.log("[toggleShowAll] Showing all records");
+        loadAndShowAllRecords();
+      } else {
+        console.log("[toggleShowAll] Hiding all records");
+        clearAllRecordsFromMap();
       }
     });
     

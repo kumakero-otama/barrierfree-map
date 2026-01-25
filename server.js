@@ -6,6 +6,7 @@ const createMatchHandler = require("./server/api/match");
 const createCountHandler = require("./server/api/count");
 const createSessionHandler = require("./server/api/session");
 const createConfigHandler = require("./server/api/config");
+const createRecordsHandler = require("./server/api/records");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -170,6 +171,10 @@ const handleConfig = createConfigHandler({
   sendJson,
 });
 
+const handleRecords = createRecordsHandler({
+  sendJson,
+});
+
 function handleRequest(req, res) {
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
@@ -185,6 +190,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/config")) {
     handleConfig(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/records")) {
+    handleRecords(req, res);
     return;
   }
   handleStatic(req, res);
