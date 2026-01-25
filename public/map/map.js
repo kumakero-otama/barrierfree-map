@@ -41,7 +41,7 @@ function generateUUID() {
 }
 
 function updateRecordButton() {
-  toggleRecordBtn.textContent = recordEnabled ? "Record: ON" : "Record: OFF";
+  toggleRecordBtn.checked = recordEnabled;
 }
 
 function updateCount() {
@@ -194,8 +194,8 @@ if ("geolocation" in navigator) {
   setInterval(requestPosition, 5000);
   reloadBtn.addEventListener("click", requestPosition);
   updateRecordButton();
-  toggleRecordBtn.addEventListener("click", () => {
-    recordEnabled = !recordEnabled;
+  toggleRecordBtn.addEventListener("change", () => {
+    recordEnabled = toggleRecordBtn.checked;
     updateRecordButton();
 
     if (recordEnabled) {

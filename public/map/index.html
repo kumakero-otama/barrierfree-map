@@ -20,13 +20,20 @@
             <div id="last-updated">Last update: --:--:--</div>
             <div id="match-count">Match calls: 0</div>
             <button id="reload-location" class="btn" type="button">Reload location</button>
-            <button id="toggle-record" class="btn" type="button">Record: OFF</button>
+            <div class="record-toggle" role="group" aria-label="Record toggle">
+              <span class="record-title">Record:</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input id="toggle-record" type="checkbox" aria-label="Record" />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
           </div>
         </aside>
       </div>
       <p id="coords">Lat: --, Lng: --</p>
       <p id="raw-coords">Raw: --, --</p>
-      <p id="snapped-coords">Snapped: --, --</p>
       <p><a class="btn" href="../index.html">Back</a></p>
       <footer class="version-footer">
         <span id="app-version">v1.0.1</span>

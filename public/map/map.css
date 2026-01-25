@@ -29,6 +29,67 @@
   gap: 12px;
 }
 
+.record-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #222;
+}
+
+.record-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #ddd;
+  border: 1px solid #222;
+  transition: 0.2s ease;
+  border-radius: 999px;
+}
+
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  top: 2px;
+  background-color: #222;
+  transition: 0.2s ease;
+  border-radius: 50%;
+}
+
+.switch input:checked + .slider {
+  background-color: #b9f5c5;
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(22px);
+}
+
 #last-updated {
   font-size: 14px;
   color: #222;
