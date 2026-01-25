@@ -61,13 +61,53 @@ function updateRecordButton() {
   toggleRecordBtn.checked = recordEnabled;
 }
 
+// レコード状態をlocalStorageに保存
+function saveRecordState() {
+  try {
+    if (recordEnabled && currentSessionUuid) {
+      localStorage.setItem("recordState", JSON.stringify({
+        sessionUuid: currentSessionUuid,
+        userId: deviceUuid,
+        timestamp: Date.now()
+      }));
+    } else {
+      localStorage.removeItem("recordState");
+    }
+  } catch (err) {
+    console.warn("[saveRecordState] failed:", err);
+  }
+}
+
+// アプリ起動時に前回のレコード状態をチェックして自動クリーンアップ
+function checkAndCleanupRecordState() {
+  try {
+    const savedState = localStorage.getItem("recordState");
+    if (savedState) {
+      const state = JSON.parse(savedState);
+      console.log("[checkAndCleanupRecordState] Found previous recording session:", state);
+      
+      // 前回のセッションを自動的に保存（アプリが異常終了したと判断）
+      // セッションは既にDBに記録されているので、削除しない
+      localStorage.removeItem("recordState");
+      console.log("[checkAndCleanupRecordState] Previous session auto-saved");
+    }
+  } catch (err) {
+    console.warn("[checkAndCleanupRecordState] failed:", err);
+    localStorage.removeItem("recordState");
+  }
+}
+
 function finalizeSession(sessionUuid, userId, shouldSave) {
   if (!sessionUuid || !userId) {
     return Promise.resolve();
   }
   if (shouldSave) {
+    // 保存する場合もlocalStorageをクリア
+    localStorage.removeItem("recordState");
     return Promise.resolve();
   }
+  // 削除する場合
+  localStorage.removeItem("recordState");
   const endpoint = "/api/session/delete";
   const payload = { sessionUuid, userId };
   return fetch(endpoint, {
@@ -77,6 +117,28 @@ function finalizeSession(sessionUuid, userId, shouldSave) {
   }).catch((err) => {
     console.warn("[finalizeSession] request failed:", err);
   });
+}
+
+// ページアンロード時の処理（アプリ閉じ、電源OFF時など）
+function handleBeforeUnload(event) {
+  if (recordEnabled && currentSessionUuid) {
+    console.log("[beforeunload] Auto-saving recording session");
+    // セッションを自動保存（削除しない）
+    // navigator.sendBeaconを使用して確実に送信
+    const endpoint = "/api/session/end";
+    const payload = JSON.stringify({
+      sessionUuid: currentSessionUuid,
+      note: "auto_closed"
+    });
+    
+    // sendBeaconで送信を試みる
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(endpoint, new Blob([payload], { type: "application/json" }));
+    }
+    
+    // localStorageもクリア
+    localStorage.removeItem("recordState");
+  }
 }
 
 function updateCount() {
@@ -284,6 +346,9 @@ if ("geolocation" in navigator) {
 
   // 設定を読み込んでから位置情報取得を開始
   loadConfig().then(() => {
+    // アプリ起動時に前回のレコード状態をチェック
+    checkAndCleanupRecordState();
+    
     requestPosition();
     setInterval(requestPosition, 5000);
     reloadBtn.addEventListener("click", requestPosition);
@@ -297,6 +362,8 @@ if ("geolocation" in navigator) {
         currentSessionUuid = generateUUID();
         sessionPointSeq = 0;
         console.log("Session started:", currentSessionUuid);
+        // レコード状態を保存
+        saveRecordState();
       } else {
         const sessionUuid = currentSessionUuid;
         recordEnabled = false;
@@ -309,6 +376,19 @@ if ("geolocation" in navigator) {
         sessionPointSeq = 0;
       }
     });
+    
+    // ページアンロード時のイベントリスナーを追加
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handleBeforeUnload);
+    
+    // バックグラウンド移行時にも状態を保存
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && recordEnabled && currentSessionUuid) {
+        console.log("[visibilitychange] Saving record state");
+        saveRecordState();
+      }
+    });
+    
     updateCount();
     setInterval(updateCount, 5000);
   });
