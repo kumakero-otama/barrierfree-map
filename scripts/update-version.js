@@ -1,5 +1,40 @@
-const CACHE_VERSION = "1.0.8"; // このバージョンはpackage.jsonから自動生成されます
-const CACHE_NAME = `barrierfree-map-v${CACHE_VERSION}-${Date.now()}`;
+const fs = require("fs");
+const path = require("path");
+
+// package.jsonからバージョンを読み込む
+const packageJson = require("../package.json");
+const VERSION = packageJson.version;
+
+console.log(`Updating version to ${VERSION}...`);
+
+// 1. public/version.js を更新
+const versionJsPath = path.join(__dirname, "..", "public", "version.js");
+const versionJsContent = `// アプリケーションバージョン
+const APP_VERSION = "${VERSION}";
+
+// バージョン番号を表示する関数
+function displayVersion() {
+  const versionElement = document.getElementById("app-version");
+  if (versionElement) {
+    versionElement.textContent = \`v\${APP_VERSION}\`;
+  }
+}
+
+// DOMContentLoadedイベントで実行
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", displayVersion);
+} else {
+  displayVersion();
+}
+`;
+
+fs.writeFileSync(versionJsPath, versionJsContent, "utf8");
+console.log(`✓ Updated ${versionJsPath}`);
+
+// 2. public/sw.js を更新
+const swJsPath = path.join(__dirname, "..", "public", "sw.js");
+const swJsContent = `const CACHE_VERSION = "${VERSION}"; // このバージョンはpackage.jsonから自動生成されます
+const CACHE_NAME = \`barrierfree-map-v\${CACHE_VERSION}-\${Date.now()}\`;
 const CORE_ASSETS = [
   "/",
   "/index.html",
@@ -90,3 +125,9 @@ self.addEventListener("message", (event) => {
     self.skipWaiting();
   }
 });
+`;
+
+fs.writeFileSync(swJsPath, swJsContent, "utf8");
+console.log(`✓ Updated ${swJsPath}`);
+
+console.log(`\n✓ All version files updated to ${VERSION}`);

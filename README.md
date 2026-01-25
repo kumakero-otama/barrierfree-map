@@ -1,5 +1,32 @@
 # Barrierfree Map
 
+## バージョン管理
+
+アプリケーションのバージョンは`package.json`で一元管理されています。
+
+### バージョンの更新方法
+
+1. **package.jsonのversionを変更**
+   ```json
+   {
+     "version": "1.0.8"
+   }
+   ```
+
+2. **更新スクリプトを実行**
+   ```bash
+   npm run version:update
+   ```
+
+このスクリプトにより、以下のファイルが自動的に更新されます：
+- `public/version.js` - 画面に表示されるバージョン番号
+- `public/sw.js` - Service Workerのキャッシュバージョン
+
+**注意:** バージョン更新後は、PM2でサーバーを再起動してください。
+```bash
+pm2 restart barrierfree-map-server
+```
+
 ## 環境変数の設定
 
 アプリケーションの動作を制御するために、環境変数を設定できます。
