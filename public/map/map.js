@@ -61,6 +61,24 @@ function updateRecordButton() {
   toggleRecordBtn.checked = recordEnabled;
 }
 
+function finalizeSession(sessionUuid, userId, shouldSave) {
+  if (!sessionUuid || !userId) {
+    return Promise.resolve();
+  }
+  if (shouldSave) {
+    return Promise.resolve();
+  }
+  const endpoint = "/api/session/delete";
+  const payload = { sessionUuid, userId };
+  return fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch((err) => {
+    console.warn("[finalizeSession] request failed:", err);
+  });
+}
+
 function updateCount() {
   fetch("/api/count")
     .then((res) => {
@@ -92,16 +110,18 @@ function requestSnappedLocation(latitude, longitude) {
   const params = new URLSearchParams({
     lat: latitude.toString(),
     lng: longitude.toString(),
+    deviceUuid: deviceUuid,
   });
-  params.set("deviceUuid", deviceUuid);
+  
   if (lastSent) {
     params.set("prevLat", lastSent.latitude.toString());
     params.set("prevLng", lastSent.longitude.toString());
   }
   
-  // セッションUUIDとseqを追加
+  // レコードON時のみセッションUUID、userId、seqを追加
   if (recordEnabled && currentSessionUuid) {
     params.set("sessionUuid", currentSessionUuid);
+    params.set("userId", deviceUuid);
     params.set("seq", sessionPointSeq.toString());
   }
 
@@ -269,17 +289,22 @@ if ("geolocation" in navigator) {
     reloadBtn.addEventListener("click", requestPosition);
     updateRecordButton();
     toggleRecordBtn.addEventListener("change", () => {
-      recordEnabled = toggleRecordBtn.checked;
-      updateRecordButton();
-
-      if (recordEnabled) {
+      const nextEnabled = toggleRecordBtn.checked;
+      if (nextEnabled) {
+        recordEnabled = true;
+        updateRecordButton();
         // レコードON時に新しいセッションUUIDを生成
         currentSessionUuid = generateUUID();
         sessionPointSeq = 0;
         console.log("Session started:", currentSessionUuid);
       } else {
+        const sessionUuid = currentSessionUuid;
+        recordEnabled = false;
+        updateRecordButton();
+        const shouldSave = window.confirm("記録を保存しますか？");
+        finalizeSession(sessionUuid, deviceUuid, shouldSave);
         // レコードOFF時にセッションUUIDをクリア
-        console.log("Session ended:", currentSessionUuid);
+        console.log("Session ended:", sessionUuid, "saved:", shouldSave);
         currentSessionUuid = null;
         sessionPointSeq = 0;
       }

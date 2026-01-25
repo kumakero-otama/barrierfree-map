@@ -11,6 +11,7 @@ function createMatchHandler({
   getCurrentMonth,
   getMonthlyCount,
   incrementMonthlyCount,
+  deletedSessionKeys,
   sendJson,
 }) {
   // DB接続とロガー
@@ -26,14 +27,24 @@ function createMatchHandler({
   
   // セッション更新関数（存在しなければ作成、存在すれば終了時刻を更新）
   async function updateSession(sessionUuid, userId, snappedLat, snappedLng, seq) {
-    if (!sessionUuid || !pool) {
+    console.log(`[updateSession] Called with: sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
+    
+    if (!sessionUuid || !userId || !pool) {
+      console.log(`[updateSession] Skipped: sessionUuid=${!!sessionUuid}, userId=${!!userId}, pool=${!!pool}`);
       return; // sessionUuidがないまたはDBが利用不可の場合はスキップ
+    }
+    const deleteKey = `${sessionUuid}:${userId}`;
+    if (deletedSessionKeys && deletedSessionKeys.has(deleteKey)) {
+      sessionLogger.appendLog("SESSION_SKIP_DELETED", deleteKey);
+      console.log(`[updateSession] Session was deleted: ${deleteKey}`);
+      return;
     }
     const safeUserId = userId || "unknown";
     
     // CSVログに記録
     sessionLogger.appendLog("SESSION_UPDATE", `${sessionUuid},${safeUserId}`);
     pointsLogger.appendLog("POINT", `${sessionUuid},${seq},${snappedLat},${snappedLng}`);
+    console.log(`[updateSession] Logged to CSV: sessionUuid=${sessionUuid}, seq=${seq}`);
     
     try {
       // セッションが存在するかチェック
@@ -96,7 +107,8 @@ function createMatchHandler({
     const lat = parseFloat(url.searchParams.get("lat"));
     const lng = parseFloat(url.searchParams.get("lng"));
     const sessionUuid = url.searchParams.get("sessionUuid");
-    const deviceUuid = url.searchParams.get("deviceUuid");
+    const userId = url.searchParams.get("userId");
+    const deviceUuid = url.searchParams.get("deviceUuid") || userId;
     const seq = parseInt(url.searchParams.get("seq"), 10);
 
     const currentMonth = getCurrentMonth();
@@ -173,11 +185,18 @@ function createMatchHandler({
             const [snappedLng, snappedLat] = lastPoint.location;
             console.log(`mapbox_snapped_lat=${snappedLat}, mapbox_snapped_lng=${snappedLng}`);
             
+            // デバッグログ追加
+            console.log(`[DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
+            console.log(`[DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
+            
             // セッション更新（非同期だが待たない）
-            if (sessionUuid && Number.isFinite(seq)) {
-              updateSession(sessionUuid, deviceUuid, snappedLat, snappedLng, seq).catch(err => {
+            if (sessionUuid && userId && Number.isFinite(seq)) {
+              console.log(`[DEBUG] Calling updateSession...`);
+              updateSession(sessionUuid, userId, snappedLat, snappedLng, seq).catch(err => {
                 console.error('updateSession error:', err);
               });
+            } else {
+              console.log(`[DEBUG] updateSession NOT called: sessionUuid=${!!sessionUuid}, userId=${!!userId}, seq=${seq}`);
             }
             
             sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });

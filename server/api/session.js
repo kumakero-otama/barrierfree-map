@@ -2,7 +2,7 @@ const { createDbPool } = require("../db");
 const { createLogger } = require("../logger");
 const path = require("path");
 
-function createSessionHandler({ sendJson }) {
+function createSessionHandler({ deletedSessionKeys, sendJson }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
   const dbError = dbResult.error;
@@ -53,6 +53,8 @@ function createSessionHandler({ sendJson }) {
           await handleSessionPoint(data, res);
         } else if (action === "end") {
           await handleSessionEnd(data, res);
+        } else if (action === "delete") {
+          await handleSessionDelete(data, res);
         } else {
           sendJson(res, 404, { error: "unknown_action" });
         }
@@ -199,6 +201,50 @@ function createSessionHandler({ sendJson }) {
       console.error("session_end_error", errorMsg);
       sessionLogger.appendLog("ERROR", errorMsg);
       
+      // DBエラーでもCSVには記録されているので成功として扱う
+      sendJson(res, 200, { success: true, dbError: true });
+    }
+  }
+
+  async function handleSessionDelete(data, res) {
+    const { sessionUuid, userId } = data;
+
+    if (!sessionUuid || !userId) {
+      sendJson(res, 400, { error: "missing_params" });
+      return;
+    }
+
+    // CSVログに記録（DBの状態に関わらず）
+    sessionLogger.appendLog("SESSION_DELETE", `${sessionUuid},${userId}`);
+
+    if (deletedSessionKeys) {
+      deletedSessionKeys.add(`${sessionUuid}:${userId}`);
+    }
+
+    // DB接続がない場合はCSVのみ
+    if (!pool) {
+      sendJson(res, 200, { success: true, dbDisabled: true });
+      return;
+    }
+
+    try {
+      const [result] = await pool.query(
+        "DELETE FROM sessions WHERE session_uuid = ? AND user_id = ?",
+        [sessionUuid, userId]
+      );
+
+      if (result.affectedRows === 0) {
+        // DBで見つからなくてもCSVには記録されているので成功として扱う
+        sendJson(res, 200, { success: true, dbError: true });
+        return;
+      }
+
+      sendJson(res, 200, { success: true });
+    } catch (err) {
+      const errorMsg = `セッション削除DBエラー[${sessionUuid},${userId}]: ${err.message} (code: ${err.code})`;
+      console.error("session_delete_error", errorMsg);
+      sessionLogger.appendLog("ERROR", errorMsg);
+
       // DBエラーでもCSVには記録されているので成功として扱う
       sendJson(res, 200, { success: true, dbError: true });
     }

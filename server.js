@@ -136,6 +136,8 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+const deletedSessionKeys = new Set();
+
 const handleMatch = createMatchHandler({
   https,
   MAPBOX_TOKEN,
@@ -145,6 +147,7 @@ const handleMatch = createMatchHandler({
   getCurrentMonth,
   getMonthlyCount,
   incrementMonthlyCount,
+  deletedSessionKeys,
   sendJson,
 });
 
@@ -157,6 +160,7 @@ const handleCount = createCountHandler({
 });
 
 const handleSession = createSessionHandler({
+  deletedSessionKeys,
   sendJson,
 });
 
