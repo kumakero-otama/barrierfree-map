@@ -1,3 +1,4 @@
+
 if ("serviceWorker" in navigator) {
   let refreshing = false;
 
@@ -15,21 +16,22 @@ if ("serviceWorker" in navigator) {
       .then((registration) => {
         console.log("[PWA] Service Worker registered");
 
-        // 定期的に更新をチェック（1分ごと）
+        // 定期的に更新をチェック（1時間ごと）
         setInterval(() => {
+          console.log("[PWA] Checking for updates...");
           registration.update().catch(() => {
             // ignore update errors
           });
-        }, 60000);
+        }, 60 * 60 * 1000);
 
         // ページ表示時に即座に更新をチェック
         registration.update().catch(() => {
           // ignore update errors
         });
 
-        // 新しいService Workerが待機中の場合
+        // 新しいService Workerが待機中の場合（ページロード時）
         if (registration.waiting) {
-          console.log("[PWA] New service worker waiting, activating...");
+          console.log("[PWA] New service worker waiting, activating automatically...");
           registration.waiting.postMessage({ type: "SKIP_WAITING" });
         }
 
@@ -40,7 +42,8 @@ if ("serviceWorker" in navigator) {
 
           newWorker.addEventListener("statechange", () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              console.log("[PWA] New service worker installed, activating...");
+              console.log("[PWA] New service worker installed, activating automatically...");
+              // 自動的に新しいService Workerに切り替え
               newWorker.postMessage({ type: "SKIP_WAITING" });
             }
           });

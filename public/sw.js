@@ -1,4 +1,4 @@
-const CACHE_VERSION = "1.0.8"; // このバージョンはpackage.jsonから自動生成されます
+const CACHE_VERSION = "1.1.0"; // このバージョンはpackage.jsonから自動生成されます
 const CACHE_NAME = `barrierfree-map-v${CACHE_VERSION}-${Date.now()}`;
 const CORE_ASSETS = [
   "/",
