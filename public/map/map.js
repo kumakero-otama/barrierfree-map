@@ -5,7 +5,7 @@ const snappedCoordsEl = document.getElementById("snapped-coords");
 const lastUpdatedEl = document.getElementById("last-updated");
 const matchCountEl = document.getElementById("match-count");
 const reloadBtn = document.getElementById("reload-location");
-const toggleFitBtn = document.getElementById("toggle-fit");
+const toggleRecordBtn = document.getElementById("toggle-record");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -27,7 +27,7 @@ const trail = [];
 const MAX_TRAIL = 100;
 let lastDot = null;
 let lastSent = null;
-let fitEnabled = false;
+let recordEnabled = false;
 let currentSessionUuid = null;
 let sessionPointSeq = 0;
 
@@ -40,8 +40,8 @@ function generateUUID() {
   });
 }
 
-function updateFitButton() {
-  toggleFitBtn.textContent = fitEnabled ? "Fitting: ON" : "Fitting: OFF";
+function updateRecordButton() {
+  toggleRecordBtn.textContent = recordEnabled ? "Record: ON" : "Record: OFF";
 }
 
 function updateCount() {
@@ -63,11 +63,6 @@ function updateCount() {
 }
 
 function requestSnappedLocation(latitude, longitude) {
-  if (!fitEnabled) {
-    updateDisplay(latitude, longitude, latitude, longitude);
-    lastSent = { latitude, longitude };
-    return;
-  }
   const params = new URLSearchParams({
     lat: latitude.toString(),
     lng: longitude.toString(),
@@ -78,7 +73,7 @@ function requestSnappedLocation(latitude, longitude) {
   }
   
   // セッションUUIDとseqを追加
-  if (currentSessionUuid) {
+  if (recordEnabled && currentSessionUuid) {
     params.set("sessionUuid", currentSessionUuid);
     params.set("seq", sessionPointSeq.toString());
   }
@@ -102,7 +97,7 @@ function requestSnappedLocation(latitude, longitude) {
         // スナップされた座標を次回の基準点として保存
         lastSent = { latitude: data.lat, longitude: data.lng };
         // セッションポイントのseqをインクリメント
-        if (fitEnabled && currentSessionUuid) {
+        if (recordEnabled && currentSessionUuid) {
           sessionPointSeq++;
         }
       } else {
@@ -198,19 +193,19 @@ if ("geolocation" in navigator) {
   requestPosition();
   setInterval(requestPosition, 5000);
   reloadBtn.addEventListener("click", requestPosition);
-  updateFitButton();
-  toggleFitBtn.addEventListener("click", () => {
-    fitEnabled = !fitEnabled;
-    updateFitButton();
-    
-    if (fitEnabled) {
-      // フィッティングON時に新しいセッションUUIDを生成
+  updateRecordButton();
+  toggleRecordBtn.addEventListener("click", () => {
+    recordEnabled = !recordEnabled;
+    updateRecordButton();
+
+    if (recordEnabled) {
+      // レコードON時に新しいセッションUUIDを生成
       currentSessionUuid = generateUUID();
       sessionPointSeq = 0;
-      console.log('Session started:', currentSessionUuid);
+      console.log("Session started:", currentSessionUuid);
     } else {
-      // フィッティングOFF時にセッションUUIDをクリア
-      console.log('Session ended:', currentSessionUuid);
+      // レコードOFF時にセッションUUIDをクリア
+      console.log("Session ended:", currentSessionUuid);
       currentSessionUuid = null;
       sessionPointSeq = 0;
     }
