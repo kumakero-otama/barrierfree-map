@@ -7,7 +7,7 @@ function createMatchHandler({
   MAPBOX_TOKEN,
   MIN_INTERVAL_MS,
   MAX_MATCH_CALLS_PER_MONTH,
-  lastRequestByIp,
+  lastRequestByDevice,
   getCurrentMonth,
   getMonthlyCount,
   incrementMonthlyCount,
@@ -25,15 +25,14 @@ function createMatchHandler({
   const pointsLogger = createLogger(POINTS_LOG);
   
   // セッション更新関数（存在しなければ作成、存在すれば終了時刻を更新）
-  async function updateSession(sessionUuid, snappedLat, snappedLng, seq) {
+  async function updateSession(sessionUuid, userId, snappedLat, snappedLng, seq) {
     if (!sessionUuid || !pool) {
       return; // sessionUuidがないまたはDBが利用不可の場合はスキップ
     }
-    
-    const userId = 'anonymous';
+    const safeUserId = userId || "unknown";
     
     // CSVログに記録
-    sessionLogger.appendLog("SESSION_UPDATE", `${sessionUuid},${userId}`);
+    sessionLogger.appendLog("SESSION_UPDATE", `${sessionUuid},${safeUserId}`);
     pointsLogger.appendLog("POINT", `${sessionUuid},${seq},${snappedLat},${snappedLng}`);
     
     try {
@@ -47,11 +46,11 @@ function createMatchHandler({
         // 新規セッション作成
         const [result] = await pool.query(
           "INSERT INTO sessions (session_uuid, user_id, started_at, ended_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-          [sessionUuid, userId]
+          [sessionUuid, safeUserId]
         );
         
         const sessionId = result.insertId;
-        sessionLogger.appendLog("SESSION_START", `${sessionUuid},${userId},session_id=${sessionId}`);
+        sessionLogger.appendLog("SESSION_START", `${sessionUuid},${safeUserId},session_id=${sessionId}`);
         
         // ポイントを保存
         await pool.query(
@@ -97,6 +96,7 @@ function createMatchHandler({
     const lat = parseFloat(url.searchParams.get("lat"));
     const lng = parseFloat(url.searchParams.get("lng"));
     const sessionUuid = url.searchParams.get("sessionUuid");
+    const deviceUuid = url.searchParams.get("deviceUuid");
     const seq = parseInt(url.searchParams.get("seq"), 10);
 
     const currentMonth = getCurrentMonth();
@@ -118,12 +118,13 @@ function createMatchHandler({
     }
 
     const now = Date.now();
-    const last = lastRequestByIp.get(ip) || 0;
+    const rateLimitKey = deviceUuid || ip;
+    const last = lastRequestByDevice.get(rateLimitKey) || 0;
     if (now - last < MIN_INTERVAL_MS) {
       sendJson(res, 429, { error: "rate_limited", retryAfterMs: MIN_INTERVAL_MS - (now - last) });
       return;
     }
-    lastRequestByIp.set(ip, now);
+    lastRequestByDevice.set(rateLimitKey, now);
 
     let coords;
     if (!Number.isFinite(prevLat) || !Number.isFinite(prevLng)) {
@@ -163,12 +164,18 @@ function createMatchHandler({
             const data = JSON.parse(body);
             const tracepoints = Array.isArray(data.tracepoints) ? data.tracepoints : [];
             const lastPoint = tracepoints[tracepoints.length - 1];
+            console.log(
+              `mapbox_tracepoints_count=${tracepoints.length}, has_last_point=${Boolean(
+                lastPoint && Array.isArray(lastPoint.location)
+              )}`
+            );
           if (lastPoint && Array.isArray(lastPoint.location)) {
             const [snappedLng, snappedLat] = lastPoint.location;
+            console.log(`mapbox_snapped_lat=${snappedLat}, mapbox_snapped_lng=${snappedLng}`);
             
             // セッション更新（非同期だが待たない）
             if (sessionUuid && Number.isFinite(seq)) {
-              updateSession(sessionUuid, snappedLat, snappedLng, seq).catch(err => {
+              updateSession(sessionUuid, deviceUuid, snappedLat, snappedLng, seq).catch(err => {
                 console.error('updateSession error:', err);
               });
             }

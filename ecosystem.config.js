@@ -6,6 +6,7 @@ module.exports = {
       interpreter: "node",
       cwd: __dirname,
       autorestart: true,
+      env_file: ".env", // .envファイルから環境変数を読み込む
     },
     {
       name: "barrierfree-map-loophole",
@@ -13,6 +14,7 @@ module.exports = {
       interpreter: "node",
       cwd: __dirname,
       autorestart: true,
+      env_file: ".env", // .envファイルから環境変数を読み込む
     },
   ],
 };

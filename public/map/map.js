@@ -1,7 +1,6 @@
 const map = L.map("map", { zoomControl: true }).setView([35.681236, 139.767125], 13);
 const coordsEl = document.getElementById("coords");
 const rawCoordsEl = document.getElementById("raw-coords");
-const snappedCoordsEl = document.getElementById("snapped-coords");
 const lastUpdatedEl = document.getElementById("last-updated");
 const matchCountEl = document.getElementById("match-count");
 const reloadBtn = document.getElementById("reload-location");
@@ -21,15 +20,18 @@ const redPinIcon = L.icon({
 });
 
 const MAX_SAMPLES = 5;
+let MIN_REQUEST_INTERVAL_MS = 5000; // デフォルト値、サーバーから取得して上書き
 const samples = [];
 let marker = null;
 const trail = [];
 const MAX_TRAIL = 100;
 let lastDot = null;
 let lastSent = null;
+let lastRequestTime = 0;
 let recordEnabled = false;
 let currentSessionUuid = null;
 let sessionPointSeq = 0;
+const deviceUuid = getOrCreateDeviceUuid();
 
 // UUID v4 生成関数
 function generateUUID() {
@@ -38,6 +40,21 @@ function generateUUID() {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+function getOrCreateDeviceUuid() {
+  const key = "deviceUuid";
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) {
+      return existing;
+    }
+    const created = generateUUID();
+    localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return generateUUID();
+  }
 }
 
 function updateRecordButton() {
@@ -63,10 +80,20 @@ function updateCount() {
 }
 
 function requestSnappedLocation(latitude, longitude) {
+  // クライアント側のレート制限チェック
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
+    console.log(`[requestSnappedLocation] Rate limited (client-side): ${timeSinceLastRequest}ms < ${MIN_REQUEST_INTERVAL_MS}ms`);
+    return;
+  }
+  lastRequestTime = now;
+
   const params = new URLSearchParams({
     lat: latitude.toString(),
     lng: longitude.toString(),
   });
+  params.set("deviceUuid", deviceUuid);
   if (lastSent) {
     params.set("prevLat", lastSent.latitude.toString());
     params.set("prevLng", lastSent.longitude.toString());
@@ -78,21 +105,28 @@ function requestSnappedLocation(latitude, longitude) {
     params.set("seq", sessionPointSeq.toString());
   }
 
+  console.log(`[requestSnappedLocation] Requesting: lat=${latitude}, lng=${longitude}`);
+
   fetch(`/api/match?${params.toString()}`)
     .then((res) => {
+      console.log(`[requestSnappedLocation] Response status: ${res.status}`);
       if (res.status === 204) {
+        console.log('[requestSnappedLocation] Received 204 No Content - no update');
         return null;
       }
       if (!res.ok) {
-        throw new Error("match failed");
+        throw new Error(`match failed with status ${res.status}`);
       }
       return res.json();
     })
     .then((data) => {
+      console.log('[requestSnappedLocation] Response data:', data);
       if (!data) {
+        console.log('[requestSnappedLocation] No data received (204 response)');
         return;
       }
       if (typeof data.lat === "number" && typeof data.lng === "number") {
+        console.log(`[requestSnappedLocation] Valid snapped coordinates: lat=${data.lat}, lng=${data.lng}`);
         updateDisplay(latitude, longitude, data.lat, data.lng);
         // スナップされた座標を次回の基準点として保存
         lastSent = { latitude: data.lat, longitude: data.lng };
@@ -101,13 +135,15 @@ function requestSnappedLocation(latitude, longitude) {
           sessionPointSeq++;
         }
       } else {
+        console.warn('[requestSnappedLocation] Invalid data format:', data);
         return;
       }
       if (typeof data.count === "number" && data.month) {
         matchCountEl.textContent = `Match calls (${data.month}): ${data.count}`;
       }
     })
-    .catch(() => {
+    .catch((error) => {
+      console.error('[requestSnappedLocation] Error:', error);
       // keep current display on failure
     });
 }
@@ -133,20 +169,35 @@ function updateAverageLocation(latitude, longitude) {
 }
 
 function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
+  console.log(`[updateDisplay] Updating display: raw=(${rawLat}, ${rawLng}), snapped=(${snappedLat}, ${snappedLng})`);
+  
+  // 座標の妥当性チェック
+  if (!Number.isFinite(snappedLat) || !Number.isFinite(snappedLng)) {
+    console.error('[updateDisplay] Invalid snapped coordinates:', snappedLat, snappedLng);
+    return;
+  }
+  
   coordsEl.textContent = `Lat: ${snappedLat.toFixed(6)}, Lng: ${snappedLng.toFixed(6)}`;
   rawCoordsEl.textContent = `Raw: ${rawLat.toFixed(6)}, ${rawLng.toFixed(6)}`;
-  snappedCoordsEl.textContent = `Snapped: ${snappedLat.toFixed(6)}, ${snappedLng.toFixed(6)}`;
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   const ss = String(now.getSeconds()).padStart(2, "0");
   lastUpdatedEl.textContent = `Last update: ${hh}:${mm}:${ss}`;
+  
+  // マーカーの更新
   if (!marker) {
+    console.log('[updateDisplay] Creating new marker');
     marker = L.marker([snappedLat, snappedLng], { icon: redPinIcon }).addTo(map);
   } else {
+    console.log('[updateDisplay] Updating existing marker position');
     marker.setLatLng([snappedLat, snappedLng]);
   }
-  map.setView([snappedLat, snappedLng], map.getZoom(), { animate: true });
+  
+  // 地図の表示位置を更新
+  const currentZoom = map.getZoom();
+  console.log(`[updateDisplay] Moving map to (${snappedLat}, ${snappedLng}) with zoom ${currentZoom}`);
+  map.setView([snappedLat, snappedLng], currentZoom, { animate: true });
 
   const dot = L.circleMarker([snappedLat, snappedLng], {
     radius: 3,
@@ -171,7 +222,28 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
     map.removeLayer(trail.shift());
   }
   lastDot = dot;
+  
+  console.log('[updateDisplay] Display update complete');
+}
 
+// サーバーから設定を取得
+function loadConfig() {
+  return fetch("/api/config")
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error("config fetch failed");
+      }
+      return res.json();
+    })
+    .then((config) => {
+      if (typeof config.clientMinIntervalMs === "number") {
+        MIN_REQUEST_INTERVAL_MS = config.clientMinIntervalMs;
+        console.log(`[Config] Client min interval set to: ${MIN_REQUEST_INTERVAL_MS}ms`);
+      }
+    })
+    .catch((err) => {
+      console.warn("[Config] Failed to load config, using default:", err);
+    });
 }
 
 if ("geolocation" in navigator) {
@@ -190,28 +262,31 @@ if ("geolocation" in navigator) {
     );
   }
 
-  requestPosition();
-  setInterval(requestPosition, 5000);
-  reloadBtn.addEventListener("click", requestPosition);
-  updateRecordButton();
-  toggleRecordBtn.addEventListener("change", () => {
-    recordEnabled = toggleRecordBtn.checked;
+  // 設定を読み込んでから位置情報取得を開始
+  loadConfig().then(() => {
+    requestPosition();
+    setInterval(requestPosition, 5000);
+    reloadBtn.addEventListener("click", requestPosition);
     updateRecordButton();
+    toggleRecordBtn.addEventListener("change", () => {
+      recordEnabled = toggleRecordBtn.checked;
+      updateRecordButton();
 
-    if (recordEnabled) {
-      // レコードON時に新しいセッションUUIDを生成
-      currentSessionUuid = generateUUID();
-      sessionPointSeq = 0;
-      console.log("Session started:", currentSessionUuid);
-    } else {
-      // レコードOFF時にセッションUUIDをクリア
-      console.log("Session ended:", currentSessionUuid);
-      currentSessionUuid = null;
-      sessionPointSeq = 0;
-    }
+      if (recordEnabled) {
+        // レコードON時に新しいセッションUUIDを生成
+        currentSessionUuid = generateUUID();
+        sessionPointSeq = 0;
+        console.log("Session started:", currentSessionUuid);
+      } else {
+        // レコードOFF時にセッションUUIDをクリア
+        console.log("Session ended:", currentSessionUuid);
+        currentSessionUuid = null;
+        sessionPointSeq = 0;
+      }
+    });
+    updateCount();
+    setInterval(updateCount, 5000);
   });
-  updateCount();
-  setInterval(updateCount, 5000);
 } else {
   coordsEl.textContent = "Lat: unavailable, Lng: unavailable";
   lastUpdatedEl.textContent = "Last update: --:--:--";

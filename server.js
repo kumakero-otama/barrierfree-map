@@ -5,6 +5,7 @@ const path = require("path");
 const createMatchHandler = require("./server/api/match");
 const createCountHandler = require("./server/api/count");
 const createSessionHandler = require("./server/api/session");
+const createConfigHandler = require("./server/api/config");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -12,7 +13,8 @@ const HTTPS_PORT = 3001;
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || "";
 const TLS_KEY_PATH = process.env.TLS_KEY_PATH || "";
 const TLS_CERT_PATH = process.env.TLS_CERT_PATH || "";
-const MIN_INTERVAL_MS = 4000;
+const MIN_INTERVAL_MS = parseInt(process.env.MIN_INTERVAL_MS, 10) || 4000;
+const CLIENT_MIN_INTERVAL_MS = parseInt(process.env.CLIENT_MIN_INTERVAL_MS, 10) || 5000;
 const MAX_MATCH_CALLS_PER_MONTH = 100000;
 const COUNT_FILE = path.join(__dirname, "data", "mapbox-count.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -97,7 +99,7 @@ function incrementMonthlyCount(month) {
 }
 
 loadCount();
-const lastRequestByIp = new Map();
+const lastRequestByDevice = new Map();
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -139,7 +141,7 @@ const handleMatch = createMatchHandler({
   MAPBOX_TOKEN,
   MIN_INTERVAL_MS,
   MAX_MATCH_CALLS_PER_MONTH,
-  lastRequestByIp,
+  lastRequestByDevice,
   getCurrentMonth,
   getMonthlyCount,
   incrementMonthlyCount,
@@ -158,6 +160,12 @@ const handleSession = createSessionHandler({
   sendJson,
 });
 
+const handleConfig = createConfigHandler({
+  MIN_INTERVAL_MS,
+  CLIENT_MIN_INTERVAL_MS,
+  sendJson,
+});
+
 function handleRequest(req, res) {
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
@@ -169,6 +177,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/session")) {
     handleSession(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/config")) {
+    handleConfig(req, res);
     return;
   }
   handleStatic(req, res);
