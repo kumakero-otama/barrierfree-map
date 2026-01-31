@@ -31,8 +31,8 @@ let lastDot = null;
 let lastSent = null;
 let lastRequestTime = 0;
 let recordEnabled = false;
-let currentSessionUuid = null;
-let sessionPointSeq = 0;
+let recordedRawPoints = []; // レコード中のrawデータをメモリに保存
+let tracePolyline = null; // trace_attributesの結果を表示する黄緑線
 const deviceUuid = getOrCreateDeviceUuid();
 let showAllRecords = false;
 let allRecordsMarkers = [];
@@ -65,83 +65,69 @@ function updateRecordButton() {
   toggleRecordBtn.checked = recordEnabled;
 }
 
-// レコード状態をlocalStorageに保存
-function saveRecordState() {
-  try {
-    if (recordEnabled && currentSessionUuid) {
-      localStorage.setItem("recordState", JSON.stringify({
-        sessionUuid: currentSessionUuid,
-        userId: deviceUuid,
-        timestamp: Date.now()
-      }));
-    } else {
-      localStorage.removeItem("recordState");
-    }
-  } catch (err) {
-    console.warn("[saveRecordState] failed:", err);
+// trace_attributesでフィッティングしてマップに表示
+function processAndDisplayTrace() {
+  if (recordedRawPoints.length < 2) {
+    console.log('[processAndDisplayTrace] Not enough points:', recordedRawPoints.length);
+    alert('記録されたポイントが少なすぎます（最低2点必要）');
+    return;
   }
-}
-
-// アプリ起動時に前回のレコード状態をチェックして自動クリーンアップ
-function checkAndCleanupRecordState() {
-  try {
-    const savedState = localStorage.getItem("recordState");
-    if (savedState) {
-      const state = JSON.parse(savedState);
-      console.log("[checkAndCleanupRecordState] Found previous recording session:", state);
+  
+  console.log(`[processAndDisplayTrace] Processing ${recordedRawPoints.length} points`);
+  
+  // rawデータをValhalla trace_attributes形式に変換
+  const shape = recordedRawPoints.map(p => ({ lat: p.lat, lon: p.lng }));
+  
+  const requestBody = {
+    shape: shape,
+    costing: "pedestrian",
+    shape_match: "map_snap",
+    filters: {
+      attributes: ["shape"],
+      action: "include"
+    }
+  };
+  
+  fetch('http://localhost:8002/trace_attributes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody)
+  })
+    .then(res => res.json())
+    .then(data => {
+      console.log('[processAndDisplayTrace] Valhalla response:', data);
       
-      // 前回のセッションを自動的に保存（アプリが異常終了したと判断）
-      // セッションは既にDBに記録されているので、削除しない
-      localStorage.removeItem("recordState");
-      console.log("[checkAndCleanupRecordState] Previous session auto-saved");
-    }
-  } catch (err) {
-    console.warn("[checkAndCleanupRecordState] failed:", err);
-    localStorage.removeItem("recordState");
-  }
-}
-
-function finalizeSession(sessionUuid, userId, shouldSave) {
-  if (!sessionUuid || !userId) {
-    return Promise.resolve();
-  }
-  if (shouldSave) {
-    // 保存する場合もlocalStorageをクリア
-    localStorage.removeItem("recordState");
-    return Promise.resolve();
-  }
-  // 削除する場合
-  localStorage.removeItem("recordState");
-  const endpoint = "/api/session/delete";
-  const payload = { sessionUuid, userId };
-  return fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  }).catch((err) => {
-    console.warn("[finalizeSession] request failed:", err);
-  });
-}
-
-// ページアンロード時の処理（アプリ閉じ、電源OFF時など）
-function handleBeforeUnload(event) {
-  if (recordEnabled && currentSessionUuid) {
-    console.log("[beforeunload] Auto-saving recording session");
-    // セッションを自動保存（削除しない）
-    // navigator.sendBeaconを使用して確実に送信
-    const endpoint = "/api/session/end";
-    const payload = JSON.stringify({
-      sessionUuid: currentSessionUuid,
-      note: "auto_closed"
+      // shapeをデコード（簡易実装：matched_pointsがあればそれを使用）
+      if (data.matched_points && data.matched_points.length > 0) {
+        const coords = data.matched_points.map(p => [p.lat, p.lon]);
+        displayTraceLine(coords);
+      } else if (shape.length > 0) {
+        // matched_pointsがない場合は元のshapeを使用
+        const coords = shape.map(p => [p.lat, p.lon]);
+        displayTraceLine(coords);
+      }
+    })
+    .catch(err => {
+      console.error('[processAndDisplayTrace] Error:', err);
+      alert('トレース処理に失敗しました');
     });
-    
-    // sendBeaconで送信を試みる
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(endpoint, new Blob([payload], { type: "application/json" }));
-    }
-    
-    // localStorageもクリア
-    localStorage.removeItem("recordState");
+}
+
+// 黄緑の線を表示
+function displayTraceLine(coordinates) {
+  // 前回の線を削除
+  if (tracePolyline) {
+    map.removeLayer(tracePolyline);
+    tracePolyline = null;
+  }
+  
+  if (coordinates.length > 1) {
+    tracePolyline = L.polyline(coordinates, {
+      color: "#9acd32",  // 黄緑色
+      weight: 4,
+      opacity: 0.8,
+    }).addTo(map);
+    console.log(`[displayTraceLine] Displayed trace with ${coordinates.length} points`);
   }
 }
 
@@ -183,13 +169,6 @@ function requestSnappedLocation(latitude, longitude) {
     params.set("prevLat", lastSent.latitude.toString());
     params.set("prevLng", lastSent.longitude.toString());
   }
-  
-  // レコードON時のみセッションUUID、userId、seqを追加
-  if (recordEnabled && currentSessionUuid) {
-    params.set("sessionUuid", currentSessionUuid);
-    params.set("userId", deviceUuid);
-    params.set("seq", sessionPointSeq.toString());
-  }
 
   console.log(`[requestSnappedLocation] Requesting: lat=${latitude}, lng=${longitude}`);
 
@@ -216,10 +195,6 @@ function requestSnappedLocation(latitude, longitude) {
         updateDisplay(latitude, longitude, data.lat, data.lng);
         // スナップされた座標を次回の基準点として保存
         lastSent = { latitude: data.lat, longitude: data.lng };
-        // セッションポイントのseqをインクリメント
-        if (recordEnabled && currentSessionUuid) {
-          sessionPointSeq++;
-        }
       } else {
         console.warn('[requestSnappedLocation] Invalid data format:', data);
         return;
@@ -250,6 +225,12 @@ function updateAverageLocation(latitude, longitude) {
   );
   const avgLat = sum.lat / samples.length;
   const avgLng = sum.lng / samples.length;
+
+  // レコードON時はrawデータをメモリに保存
+  if (recordEnabled) {
+    recordedRawPoints.push({ lat: avgLat, lng: avgLng });
+    console.log(`[Record] Saved raw point: ${recordedRawPoints.length} points`);
+  }
 
   requestSnappedLocation(avgLat, avgLng);
 }
@@ -432,46 +413,30 @@ if ("geolocation" in navigator) {
 
   // 設定を読み込んでから位置情報取得を開始
   loadConfig().then(() => {
-    // アプリ起動時に前回のレコード状態をチェック
-    checkAndCleanupRecordState();
-    
     requestPosition();
     setInterval(requestPosition, 5000);
     reloadBtn.addEventListener("click", requestPosition);
     updateRecordButton();
+    
+    // レコードボタンのイベントハンドラー
     toggleRecordBtn.addEventListener("change", () => {
       const nextEnabled = toggleRecordBtn.checked;
       if (nextEnabled) {
+        // レコードON：前回の黄緑線を削除し、新しいセッション開始
+        if (tracePolyline) {
+          map.removeLayer(tracePolyline);
+          tracePolyline = null;
+        }
+        recordedRawPoints = [];
         recordEnabled = true;
         updateRecordButton();
-        // レコードON時に新しいセッションUUIDを生成
-        currentSessionUuid = generateUUID();
-        sessionPointSeq = 0;
-        console.log("Session started:", currentSessionUuid);
-        // レコード状態を保存
-        saveRecordState();
+        console.log("[Record] Started recording");
       } else {
-        const sessionUuid = currentSessionUuid;
+        // レコードOFF：trace_attributesでフィッティングして黄緑線表示
         recordEnabled = false;
         updateRecordButton();
-        const shouldSave = window.confirm("記録を保存しますか？");
-        finalizeSession(sessionUuid, deviceUuid, shouldSave);
-        // レコードOFF時にセッションUUIDをクリア
-        console.log("Session ended:", sessionUuid, "saved:", shouldSave);
-        currentSessionUuid = null;
-        sessionPointSeq = 0;
-      }
-    });
-    
-    // ページアンロード時のイベントリスナーを追加
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", handleBeforeUnload);
-    
-    // バックグラウンド移行時にも状態を保存
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden && recordEnabled && currentSessionUuid) {
-        console.log("[visibilitychange] Saving record state");
-        saveRecordState();
+        console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected`);
+        processAndDisplayTrace();
       }
     });
     
