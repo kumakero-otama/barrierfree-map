@@ -137,32 +137,13 @@ function createMatchHandler({
     }
     lastRequestByDevice.set(rateLimitKey, now);
 
-    // Valhallaのtrace_attributesエンドポイントにPOSTリクエストを送る
-    let shapePoints;
-    if (!Number.isFinite(prevLat) || !Number.isFinite(prevLng)) {
-      // 初回リクエスト時は、同じ座標を2回送信して道路にスナップ
-      shapePoints = [
-        { lat, lon: lng },
-        { lat, lon: lng }
-      ];
-      console.log(`valhalla match request (first time): lat=${lat}, lng=${lng}`);
-    } else {
-      shapePoints = [
-        { lat: prevLat, lon: prevLng },
-        { lat, lon: lng }
-      ];
-      console.log(`valhalla match request: lat=${lat}, lng=${lng}, prevLat=${prevLat}, prevLng=${prevLng}`);
-    }
+    // Valhallaのlocateエンドポイントにリクエストを送る
+    console.log(`valhalla locate request: lat=${lat}, lng=${lng}`);
 
-    // Valhallaのリクエストボディ
+    // Valhallaのリクエストボディ（locateエンドポイント用）
     const valhallaRequest = {
-      shape: shapePoints,
-      costing: "pedestrian",
-      shape_match: "map_snap",
-      filters: {
-        attributes: ["edge.id", "shape"],
-        action: "include"
-      }
+      locations: [{ lat, lon: lng }],
+      costing: "pedestrian"
     };
 
     const requestBody = JSON.stringify(valhallaRequest);
@@ -171,7 +152,7 @@ function createMatchHandler({
     const options = {
       hostname: VALHALLA_HOST,
       port: VALHALLA_PORT,
-      path: "/trace_attributes",
+      path: "/locate",
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -193,33 +174,38 @@ function createMatchHandler({
           const data = JSON.parse(body);
           console.log(`valhalla_response_body=${body}`);
           
-          // trace_attributesのレスポンスから座標を取得
-          // レスポンスにedgesがあれば、マッチングが成功している
-          if (data.edges && Array.isArray(data.edges) && data.edges.length > 0) {
-            // マッチングが成功したので、入力座標を使用
-            const snappedLat = lat;
-            const snappedLng = lng;
-            console.log(`valhalla_matched with ${data.edges.length} edges, using input coords: lat=${snappedLat}, lng=${snappedLng}`);
-            
-            // デバッグログ追加
-            console.log(`[DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
-            console.log(`[DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
-            
-            // セッション更新（非同期だが待たない）
-            if (sessionUuid && userId && Number.isFinite(seq)) {
-              console.log(`[DEBUG] Calling updateSession...`);
-              updateSession(sessionUuid, userId, snappedLat, snappedLng, seq).catch(err => {
-                console.error('updateSession error:', err);
-              });
-            } else {
-              console.log(`[DEBUG] updateSession NOT called: sessionUuid=${!!sessionUuid}, userId=${!!userId}, seq=${seq}`);
+          // locateのレスポンスから座標を取得
+          // locateは配列を返し、edges[0]にスナップされた座標が含まれる
+          if (Array.isArray(data) && data.length > 0 && data[0]) {
+            const result = data[0];
+            if (result.edges && Array.isArray(result.edges) && result.edges.length > 0) {
+              const edge = result.edges[0];
+              if (typeof edge.correlated_lat === "number" && typeof edge.correlated_lon === "number") {
+                const snappedLat = edge.correlated_lat;
+                const snappedLng = edge.correlated_lon;
+                console.log(`valhalla_snapped: lat=${snappedLat}, lng=${snappedLng} (input: ${result.input_lat}, ${result.input_lon})`);
+                
+                // デバッグログ追加
+                console.log(`[DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
+                console.log(`[DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
+                
+                // セッション更新（非同期だが待たない）
+                if (sessionUuid && userId && Number.isFinite(seq)) {
+                  console.log(`[DEBUG] Calling updateSession...`);
+                  updateSession(sessionUuid, userId, snappedLat, snappedLng, seq).catch(err => {
+                    console.error('updateSession error:', err);
+                  });
+                } else {
+                  console.log(`[DEBUG] updateSession NOT called: sessionUuid=${!!sessionUuid}, userId=${!!userId}, seq=${seq}`);
+                }
+                
+                sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });
+                return;
+              }
             }
-            
-            sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });
-            return;
           }
           
-          console.log(`valhalla_response: no edges found or matching failed`);
+          console.log(`valhalla_response: no valid location found`);
         } catch (err) {
           console.log(`valhalla_parse_error=${err.message}`);
         }
