@@ -33,6 +33,53 @@ let lastRequestTime = 0;
 let recordEnabled = false;
 let recordedRawPoints = []; // レコード中のrawデータをメモリに保存
 let tracePolyline = null; // trace_attributesの結果を表示する黄緑線
+
+// Valhallaの6桁精度ポリラインをデコードする関数
+function decodePolyline(str, precision) {
+  let index = 0,
+    lat = 0,
+    lng = 0,
+    coordinates = [],
+    shift = 0,
+    result = 0,
+    byte = null,
+    latitude_change,
+    longitude_change,
+    factor = Math.pow(10, precision || 6);
+
+  while (index < str.length) {
+    byte = null;
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    latitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    longitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+
+    lat += latitude_change;
+    lng += longitude_change;
+
+    coordinates.push([lat / factor, lng / factor]);
+  }
+
+  return coordinates;
+}
+
 const deviceUuid = getOrCreateDeviceUuid();
 let showAllRecords = false;
 let allRecordsMarkers = [];
@@ -81,11 +128,8 @@ function processAndDisplayTrace() {
   const requestBody = {
     shape: shape,
     costing: "pedestrian",
-    shape_match: "map_snap",
-    filters: {
-      attributes: ["shape"],
-      action: "include"
-    }
+    shape_match: "map_snap"
+    // フィルタを外して必要なデータをすべて取得
   };
   
   fetch('/api/trace', {
@@ -93,23 +137,63 @@ function processAndDisplayTrace() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(requestBody)
   })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      return res.json();
+    })
     .then(data => {
       console.log('[processAndDisplayTrace] Valhalla response:', data);
       
-      // shapeをデコード（簡易実装：matched_pointsがあればそれを使用）
-      if (data.matched_points && data.matched_points.length > 0) {
+      // 1. edgesがある場合、それぞれのshapeをつなぎ合わせる (way上の線を表示するため)
+      if (data.edges && data.edges.length > 0) {
+        console.log('[processAndDisplayTrace] Using edges shape');
+        let allCoords = [];
+        data.edges.forEach(edge => {
+          if (edge.shape) {
+            const edgeCoords = decodePolyline(edge.shape, 6);
+            // 重複する点を除去しつつ結合
+            if (allCoords.length > 0 && edgeCoords.length > 0) {
+              const lastPoint = allCoords[allCoords.length - 1];
+              const firstPoint = edgeCoords[0];
+              if (lastPoint[0] === firstPoint[0] && lastPoint[1] === firstPoint[1]) {
+                allCoords = allCoords.concat(edgeCoords.slice(1));
+              } else {
+                allCoords = allCoords.concat(edgeCoords);
+              }
+            } else {
+              allCoords = allCoords.concat(edgeCoords);
+            }
+          }
+        });
+        
+        if (allCoords.length > 0) {
+          displayTraceLine(allCoords);
+          return;
+        }
+      }
+
+      // 2. レスポンスの shape (エンコードされたポリライン) がある場合 (trace_route用)
+      if (data.shape) {
+        console.log('[processAndDisplayTrace] Decoding top-level shape geometry');
+        const coords = decodePolyline(data.shape, 6);
+        displayTraceLine(coords);
+      } 
+      // 3. matched_points がある場合 (バックアップ)
+      else if (data.matched_points && data.matched_points.length > 0) {
+        console.log('[processAndDisplayTrace] Using matched_points');
         const coords = data.matched_points.map(p => [p.lat, p.lon]);
         displayTraceLine(coords);
-      } else if (shape.length > 0) {
-        // matched_pointsがない場合は元のshapeを使用
+      } 
+      // 4. どちらもない場合は生の座標を表示
+      else {
+        console.warn('[processAndDisplayTrace] No fitting data found, using raw points');
         const coords = shape.map(p => [p.lat, p.lon]);
         displayTraceLine(coords);
       }
     })
     .catch(err => {
       console.error('[processAndDisplayTrace] Error:', err);
-      alert('トレース処理に失敗しました');
+      alert('トレース処理に失敗しました: ' + err.message);
     });
 }
 

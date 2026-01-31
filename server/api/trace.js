@@ -29,12 +29,14 @@ function createTraceHandler({ sendJson }) {
       const valhallaRequest = {
         shape: requestData.shape,
         costing: requestData.costing || "pedestrian",
-        shape_match: requestData.shape_match || "map_snap",
-        filters: requestData.filters || {
-          attributes: ["shape"],
-          action: "include"
-        }
+        shape_match: requestData.shape_match || "map_snap"
       };
+
+      // クライアントからの明示的なフィルタがあればそれを使う。
+      // なければフィルタを設定せず、Valhallaのデフォルト（全ての属性）を返すようにする。
+      if (requestData.filters) {
+        valhallaRequest.filters = requestData.filters;
+      }
 
       const requestBody = JSON.stringify(valhallaRequest);
 
