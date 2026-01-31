@@ -285,6 +285,7 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
   console.log(`[updateDisplay] Moving map to (${snappedLat}, ${snappedLng}) with zoom ${currentZoom}`);
   map.setView([snappedLat, snappedLng], currentZoom, { animate: true });
 
+  // ドット（点）だけを表示
   const dot = L.circleMarker([snappedLat, snappedLng], {
     radius: 3,
     color: "#111",
@@ -292,22 +293,11 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
     fillOpacity: 0.7,
     weight: 0,
   }).addTo(map);
-  if (lastDot) {
-    const line = L.polyline([lastDot.getLatLng(), dot.getLatLng()], {
-      color: "#111",
-      weight: 3,
-      opacity: 0.6,
-    }).addTo(map);
-    trail.push(line);
-    if (trail.length > MAX_TRAIL) {
-      map.removeLayer(trail.shift());
-    }
-  }
+  
   trail.push(dot);
   if (trail.length > MAX_TRAIL) {
     map.removeLayer(trail.shift());
   }
-  lastDot = dot;
   
   console.log('[updateDisplay] Display update complete');
 }
