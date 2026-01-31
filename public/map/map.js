@@ -20,7 +20,8 @@ const redPinIcon = L.icon({
   shadowSize: [41, 41],
 });
 
-let MIN_REQUEST_INTERVAL_MS = 100; // 制限なし
+let MIN_REQUEST_INTERVAL_MS = 2000; // 2秒間隔
+let latestLocation = null; // OSからの最新位置情報を保持する変数
 let marker = null;
 const trail = [];
 const MAX_TRAIL = 100;
@@ -286,18 +287,24 @@ function requestSnappedLocation(latitude, longitude) {
     });
 }
 
-function handleNewLocation(latitude, longitude, force = false) {
-  // 平均化は行わず、取得したrawデータを直接使用
-  const rawLat = latitude;
-  const rawLng = longitude;
+function handleNewLocation(latitude, longitude) {
+  // 位置情報を変数に保存するだけ（書き込み）
+  latestLocation = { lat: latitude, lng: longitude };
+}
+
+function pollAndSendLocation() {
+  if (!latestLocation) return;
+
+  const { lat, lng } = latestLocation;
 
   // レコードON時はrawデータをメモリに保存
   if (recordEnabled) {
-    recordedRawPoints.push({ lat: rawLat, lng: rawLng });
+    recordedRawPoints.push({ lat, lng });
     console.log(`[Record] Saved raw point: ${recordedRawPoints.length} points`);
   }
 
-  requestSnappedLocation(rawLat, rawLng, force);
+  // サーバーへ送信（読み取り）
+  requestSnappedLocation(lat, lng);
 }
 
 function updateTimestamp() {
@@ -510,6 +517,9 @@ if ("geolocation" in navigator) {
     // 監視を開始
     startWatching();
     
+    // 2秒おきに最新の位置情報を読み取って送信する（ポーリング）
+    setInterval(pollAndSendLocation, 2000);
+
     updateRecordButton();
     
     // レコードボタンのイベントハンドラー
