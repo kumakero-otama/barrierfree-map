@@ -16,14 +16,11 @@ const redPinIcon = L.icon({
   iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41],
-  iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
 
-const MAX_SAMPLES = 5;
-let MIN_REQUEST_INTERVAL_MS = 5000; // デフォルト値、サーバーから取得して上書き
-const samples = [];
+let MIN_REQUEST_INTERVAL_MS = 100; // 制限なし
 let marker = null;
 const trail = [];
 const MAX_TRAIL = 100;
@@ -234,14 +231,8 @@ function updateCount() {
 }
 
 function requestSnappedLocation(latitude, longitude) {
-  // クライアント側のレート制限チェック
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
-    console.log(`[requestSnappedLocation] Rate limited (client-side): ${timeSinceLastRequest}ms < ${MIN_REQUEST_INTERVAL_MS}ms`);
-    return;
-  }
-  lastRequestTime = now;
+  // 時刻表示を更新
+  updateTimestamp();
 
   const params = new URLSearchParams({
     lat: latitude.toString(),
@@ -261,6 +252,8 @@ function requestSnappedLocation(latitude, longitude) {
       console.log(`[requestSnappedLocation] Response status: ${res.status}`);
       if (res.status === 204) {
         console.log('[requestSnappedLocation] Received 204 No Content - no update');
+        // 変化がなくても現在値を表示更新（時刻などは変わる）
+        updateDisplay(latitude, longitude, latitude, longitude, true);
         return null;
       }
       if (!res.ok) {
@@ -293,33 +286,29 @@ function requestSnappedLocation(latitude, longitude) {
     });
 }
 
-function updateAverageLocation(latitude, longitude) {
-  samples.push({ latitude, longitude });
-  if (samples.length > MAX_SAMPLES) {
-    samples.shift();
-  }
-
-  const sum = samples.reduce(
-    (acc, cur) => {
-      acc.lat += cur.latitude;
-      acc.lng += cur.longitude;
-      return acc;
-    },
-    { lat: 0, lng: 0 }
-  );
-  const avgLat = sum.lat / samples.length;
-  const avgLng = sum.lng / samples.length;
+function handleNewLocation(latitude, longitude, force = false) {
+  // 平均化は行わず、取得したrawデータを直接使用
+  const rawLat = latitude;
+  const rawLng = longitude;
 
   // レコードON時はrawデータをメモリに保存
   if (recordEnabled) {
-    recordedRawPoints.push({ lat: avgLat, lng: avgLng });
+    recordedRawPoints.push({ lat: rawLat, lng: rawLng });
     console.log(`[Record] Saved raw point: ${recordedRawPoints.length} points`);
   }
 
-  requestSnappedLocation(avgLat, avgLng);
+  requestSnappedLocation(rawLat, rawLng, force);
 }
 
-function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
+function updateTimestamp() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  lastUpdatedEl.textContent = `Last update: ${hh}:${mm}:${ss}`;
+}
+
+function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = false) {
   console.log(`[updateDisplay] Updating display: raw=(${rawLat}, ${rawLng}), snapped=(${snappedLat}, ${snappedLng})`);
   
   // 座標の妥当性チェック
@@ -330,11 +319,9 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng) {
   
   coordsEl.textContent = `Lat: ${snappedLat.toFixed(6)}, Lng: ${snappedLng.toFixed(6)}`;
   rawCoordsEl.textContent = `Raw: ${rawLat.toFixed(6)}, ${rawLng.toFixed(6)}`;
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-  lastUpdatedEl.textContent = `Last update: ${hh}:${mm}:${ss}`;
+  updateTimestamp();
+
+  if (skipMarker) return;
   
   // マーカーの更新
   if (!marker) {
@@ -482,24 +469,51 @@ function loadConfig() {
 if ("geolocation" in navigator) {
   const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
 
-  function requestPosition() {
+  function requestPosition(force = false) {
+    // 手動リクエスト用
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        updateAverageLocation(pos.coords.latitude, pos.coords.longitude);
+        handleNewLocation(pos.coords.latitude, pos.coords.longitude, force);
       },
-      () => {
+      (err) => {
+        console.error("[Geolocation] getCurrentPosition error:", err);
         coordsEl.textContent = "Lat: unavailable, Lng: unavailable";
-        lastUpdatedEl.textContent = "Last update: --:--:--";
+        lastUpdatedEl.textContent = "Last update: error";
       },
       options
     );
   }
 
+  let watchId = null;
+
+  function startWatching() {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        // OSから位置情報が届くたびに処理
+        handleNewLocation(pos.coords.latitude, pos.coords.longitude, false);
+      },
+      (err) => {
+        console.error("[Geolocation] watchPosition error:", err);
+      },
+      options
+    );
+  }
+
+  // 初期化中の表示
+  coordsEl.textContent = "Lat: locating..., Lng: locating...";
+
   // 設定を読み込んでから位置情報取得を開始
   loadConfig().then(() => {
-    requestPosition();
-    setInterval(requestPosition, 5000);
-    reloadBtn.addEventListener("click", requestPosition);
+    // 監視を開始
+    startWatching();
+    
+    reloadBtn.addEventListener("click", () => {
+      console.log("[Reload] Manual reload triggered");
+      requestPosition(true);
+    });
     updateRecordButton();
     
     // レコードボタンのイベントハンドラー
