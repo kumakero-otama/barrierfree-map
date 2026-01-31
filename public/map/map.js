@@ -3,7 +3,6 @@ const coordsEl = document.getElementById("coords");
 const rawCoordsEl = document.getElementById("raw-coords");
 const lastUpdatedEl = document.getElementById("last-updated");
 const matchCountEl = document.getElementById("match-count");
-const reloadBtn = document.getElementById("reload-location");
 const toggleRecordBtn = document.getElementById("toggle-record");
 const toggleShowAllBtn = document.getElementById("toggle-show-all");
 
@@ -511,10 +510,6 @@ if ("geolocation" in navigator) {
     // 監視を開始
     startWatching();
     
-    reloadBtn.addEventListener("click", () => {
-      console.log("[Reload] Manual reload triggered");
-      requestPosition(true);
-    });
     updateRecordButton();
     
     // レコードボタンのイベントハンドラー
