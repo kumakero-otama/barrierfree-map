@@ -7,6 +7,7 @@ const createCountHandler = require("./server/api/count");
 const createSessionHandler = require("./server/api/session");
 const createConfigHandler = require("./server/api/config");
 const createRecordsHandler = require("./server/api/records");
+const createTraceHandler = require("./server/api/trace");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -175,6 +176,10 @@ const handleRecords = createRecordsHandler({
   sendJson,
 });
 
+const handleTrace = createTraceHandler({
+  sendJson,
+});
+
 function handleRequest(req, res) {
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
@@ -194,6 +199,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/records")) {
     handleRecords(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/trace")) {
+    handleTrace(req, res);
     return;
   }
   handleStatic(req, res);
