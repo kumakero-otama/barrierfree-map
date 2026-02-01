@@ -322,10 +322,11 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
   map.setView([snappedLat, snappedLng], currentZoom, { animate: true });
 
   // ドット（点）だけを表示
+  const dotColor = recordEnabled ? "#9acd32" : "#111";
   const dot = L.circleMarker([snappedLat, snappedLng], {
     radius: 3,
-    color: "#111",
-    fillColor: "#111",
+    color: dotColor,
+    fillColor: dotColor,
     fillOpacity: 0.7,
     weight: 0,
   }).addTo(map);
@@ -515,6 +516,12 @@ if ("geolocation" in navigator) {
       } else {
         // レコードOFF：trace_attributesでフィッティングして黄緑線表示
         recordEnabled = false;
+        
+        // 過去のドットをすべて黒色に変更
+        trail.forEach(dot => {
+          dot.setStyle({ color: "#111", fillColor: "#111" });
+        });
+
         updateRecordButton();
         console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected`);
         processAndDisplayTrace();
