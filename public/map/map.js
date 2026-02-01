@@ -2,7 +2,6 @@ const map = L.map("map", { zoomControl: true }).setView([35.681236, 139.767125],
 const coordsEl = document.getElementById("coords");
 const rawCoordsEl = document.getElementById("raw-coords");
 const lastUpdatedEl = document.getElementById("last-updated");
-const matchCountEl = document.getElementById("match-count");
 const toggleRecordBtn = document.getElementById("toggle-record");
 const toggleShowAllBtn = document.getElementById("toggle-show-all");
 
@@ -213,24 +212,6 @@ function displayTraceLine(coordinates) {
   }
 }
 
-function updateCount() {
-  fetch("/api/count")
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error("count failed");
-      }
-      return res.json();
-    })
-    .then((data) => {
-      if (typeof data.count === "number" && data.month) {
-        matchCountEl.textContent = `Match calls (${data.month}): ${data.count}`;
-      }
-    })
-    .catch(() => {
-      // leave as-is on failure
-    });
-}
-
 function requestSnappedLocation(latitude, longitude) {
   const params = new URLSearchParams({
     lat: latitude.toString(),
@@ -273,9 +254,6 @@ function requestSnappedLocation(latitude, longitude) {
       } else {
         console.warn('[requestSnappedLocation] Invalid data format:', data);
         return;
-      }
-      if (typeof data.count === "number" && data.month) {
-        matchCountEl.textContent = `Match calls (${data.month}): ${data.count}`;
       }
     })
     .catch((error) => {
@@ -555,8 +533,6 @@ if ("geolocation" in navigator) {
       }
     });
     
-    updateCount();
-    setInterval(updateCount, 5000);
   });
 } else {
   coordsEl.textContent = "Lat: unavailable, Lng: unavailable";
