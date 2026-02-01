@@ -232,9 +232,6 @@ function updateCount() {
 }
 
 function requestSnappedLocation(latitude, longitude) {
-  // 時刻表示を更新
-  updateTimestamp();
-
   const params = new URLSearchParams({
     lat: latitude.toString(),
     lng: longitude.toString(),
@@ -324,9 +321,11 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
     return;
   }
   
+  // 地図の再描画に合わせて時刻を更新
+  updateTimestamp();
+
   coordsEl.textContent = `Lat: ${snappedLat.toFixed(6)}, Lng: ${snappedLng.toFixed(6)}`;
   rawCoordsEl.textContent = `Raw: ${rawLat.toFixed(6)}, ${rawLng.toFixed(6)}`;
-  updateTimestamp();
 
   if (skipMarker) return;
   

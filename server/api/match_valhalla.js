@@ -29,11 +29,11 @@ function createMatchHandler({
   const pointsLogger = createLogger(POINTS_LOG);
   
   // セッション更新関数（存在しなければ作成、存在すれば終了時刻を更新）
-  async function updateSession(sessionUuid, userId, snappedLat, snappedLng, seq) {
-    console.log(`[updateSession] Called with: sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
+  async function updateSession(sessionUuid, userId, snappedLat, snappedLng, seq, logPrefix = "") {
+    console.log(`${logPrefix} [updateSession] Called with: sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
     
     if (!sessionUuid || !userId || !pool) {
-      console.log(`[updateSession] Skipped: sessionUuid=${!!sessionUuid}, userId=${!!userId}, pool=${!!pool}`);
+      console.log(`${logPrefix} [updateSession] Skipped: sessionUuid=${!!sessionUuid}, userId=${!!userId}, pool=${!!pool}`);
       return; // sessionUuidがないまたはDBが利用不可の場合はスキップ
     }
     const deleteKey = `${sessionUuid}:${userId}`;
@@ -120,8 +120,9 @@ function createMatchHandler({
     const prevLat = parseFloat(url.searchParams.get("prevLat"));
     const prevLng = parseFloat(url.searchParams.get("prevLng"));
 
-    const ip = req.socket.remoteAddress || "unknown";
-    console.log(`raw_lat=${lat}, raw_lng=${lng}, ip=${ip}`);
+    const ip = req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || req.socket.remoteAddress || "unknown";
+    const logPrefix = `[User:${deviceUuid || userId || "unknown"} / IP:${ip}]`;
+    console.log(`${logPrefix} raw_lat=${lat}, raw_lng=${lng}`);
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       sendJson(res, 400, { error: "invalid_coordinates" });
@@ -138,7 +139,7 @@ function createMatchHandler({
     lastRequestByDevice.set(rateLimitKey, now);
 
     // Valhallaのlocateエンドポイントにリクエストを送る
-    console.log(`valhalla locate request: lat=${lat}, lng=${lng}`);
+    console.log(`${logPrefix} valhalla locate request: lat=${lat}, lng=${lng}`);
 
     // Valhallaのリクエストボディ（locateエンドポイント用）
     const valhallaRequest = {
@@ -147,7 +148,7 @@ function createMatchHandler({
     };
 
     const requestBody = JSON.stringify(valhallaRequest);
-    console.log(`valhalla_request_body=${requestBody}`);
+    console.log(`${logPrefix} valhalla_request_body=${requestBody}`);
 
     const options = {
       hostname: VALHALLA_HOST,
@@ -169,10 +170,10 @@ function createMatchHandler({
         body += chunk;
       });
       apiRes.on("end", () => {
-        console.log(`valhalla_response_status=${apiRes.statusCode || 0}`);
+        console.log(`${logPrefix} valhalla_response_status=${apiRes.statusCode || 0}`);
         try {
           const data = JSON.parse(body);
-          console.log(`valhalla_response_body=${body}`);
+          console.log(`${logPrefix} valhalla_response_body=${body}`);
           
           // locateのレスポンスから座標を取得
           // locateは配列を返し、edges[0]にスナップされた座標が含まれる
@@ -183,17 +184,17 @@ function createMatchHandler({
               if (typeof edge.correlated_lat === "number" && typeof edge.correlated_lon === "number") {
                 const snappedLat = edge.correlated_lat;
                 const snappedLng = edge.correlated_lon;
-                console.log(`valhalla_snapped: lat=${snappedLat}, lng=${snappedLng} (input: ${result.input_lat}, ${result.input_lon})`);
+                console.log(`${logPrefix} valhalla_snapped: lat=${snappedLat}, lng=${snappedLng} (input: ${result.input_lat}, ${result.input_lon})`);
                 
                 // デバッグログ追加
-                console.log(`[DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
-                console.log(`[DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
+                console.log(`${logPrefix} [DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
+                console.log(`${logPrefix} [DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
                 
                 // セッション更新（非同期だが待たない）
                 if (sessionUuid && userId && Number.isFinite(seq)) {
-                  console.log(`[DEBUG] Calling updateSession...`);
-                  updateSession(sessionUuid, userId, snappedLat, snappedLng, seq).catch(err => {
-                    console.error('updateSession error:', err);
+                  console.log(`${logPrefix} [DEBUG] Calling updateSession...`);
+                  updateSession(sessionUuid, userId, snappedLat, snappedLng, seq, logPrefix).catch(err => {
+                    console.error(`${logPrefix} updateSession error:`, err);
                   });
                 } else {
                   console.log(`[DEBUG] updateSession NOT called: sessionUuid=${!!sessionUuid}, userId=${!!userId}, seq=${seq}`);
@@ -205,16 +206,16 @@ function createMatchHandler({
             }
           }
           
-          console.log(`valhalla_response: no valid location found`);
+          console.log(`${logPrefix} valhalla_response: no valid location found`);
         } catch (err) {
-          console.log(`valhalla_parse_error=${err.message}`);
+          console.log(`${logPrefix} valhalla_parse_error=${err.message}`);
         }
         sendNoContent(res);
       });
     });
 
     valhallaReq.on("error", (err) => {
-      console.log(`valhalla_request_error=${err.message}`);
+      console.log(`${logPrefix} valhalla_request_error=${err.message}`);
       sendNoContent(res);
     });
 

@@ -24,7 +24,10 @@ function createTraceHandler({ sendJson }) {
         return;
       }
 
-      console.log(`[Trace] Received ${requestData.shape?.length || 0} points`);
+      const ip = req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || req.socket.remoteAddress || "unknown";
+      const userId = requestData.userId || "unknown";
+      const logPrefix = `[Trace][User:${userId} / IP:${ip}]`;
+      console.log(`${logPrefix} Received ${requestData.shape?.length || 0} points`);
 
       const valhallaRequest = {
         shape: requestData.shape,
@@ -57,20 +60,20 @@ function createTraceHandler({ sendJson }) {
           responseBody += chunk;
         });
         apiRes.on("end", () => {
-          console.log(`[Trace] Valhalla response status: ${apiRes.statusCode}`);
+          console.log(`${logPrefix} Valhalla response status: ${apiRes.statusCode}`);
           try {
             const data = JSON.parse(responseBody);
-            console.log(`[Trace] Response: edges=${data.edges?.length || 0}, matched_points=${data.matched_points?.length || 0}`);
+            console.log(`${logPrefix} Response: edges=${data.edges?.length || 0}, matched_points=${data.matched_points?.length || 0}`);
             sendJson(res, 200, data);
           } catch (err) {
-            console.error("[Trace] Parse error:", err.message);
+            console.error(`${logPrefix} Parse error:`, err.message);
             sendJson(res, 500, { error: "valhalla_parse_error" });
           }
         });
       });
 
       valhallaReq.on("error", (err) => {
-        console.error("[Trace] Request error:", err.message);
+        console.error(`${logPrefix} Request error:`, err.message);
         sendJson(res, 500, { error: "valhalla_request_error", message: err.message });
       });
 
