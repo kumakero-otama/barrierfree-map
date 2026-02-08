@@ -10,7 +10,9 @@
 
 #map {
   width: 100%;
-  height: min(70vh, 600px);
+  aspect-ratio: 1 / 1;
+  height: auto;
+  max-height: min(60vh, 520px);
   border: 2px solid #222;
   border-radius: 12px;
   overflow: hidden;
