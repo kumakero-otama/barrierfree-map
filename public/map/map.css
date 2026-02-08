@@ -26,6 +26,37 @@
   background: #fff;
 }
 
+.assist-action {
+  margin: 14px 0 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.assist-btn {
+  display: inline-block;
+  border-radius: 999px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.assist-btn img {
+  display: block;
+  height: 44px;
+  width: auto;
+}
+
+.assist-btn:focus-visible {
+  outline: 3px solid #222;
+  outline-offset: 3px;
+}
+
 .meta {
   display: grid;
   gap: 12px;
