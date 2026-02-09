@@ -4,6 +4,7 @@ const rawCoordsEl = document.getElementById("raw-coords");
 const lastUpdatedEl = document.getElementById("last-updated");
 const toggleRecordBtn = document.getElementById("toggle-record");
 const toggleShowAllBtn = document.getElementById("toggle-show-all");
+const toggleCenterCurrentBtn = document.getElementById("toggle-center-current");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -290,6 +291,11 @@ function updateTimestamp() {
   lastUpdatedEl.textContent = `Last update: ${hh}:${mm}:${ss}`;
 }
 
+function isCenterCurrentEnabled() {
+  // DOM上の現在値を都度参照して、内部状態とのズレを防ぐ
+  return toggleCenterCurrentBtn ? toggleCenterCurrentBtn.checked : true;
+}
+
 function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = false) {
   console.log(`[updateDisplay] Updating display: raw=(${rawLat}, ${rawLng}), snapped=(${snappedLat}, ${snappedLng})`);
   
@@ -316,10 +322,12 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
     marker.setLatLng([snappedLat, snappedLng]);
   }
   
-  // 地図の表示位置を更新
-  const currentZoom = map.getZoom();
-  console.log(`[updateDisplay] Moving map to (${snappedLat}, ${snappedLng}) with zoom ${currentZoom}`);
-  map.setView([snappedLat, snappedLng], currentZoom, { animate: true });
+  // 「現在地の中央表示」がONのときのみ地図の表示位置を更新
+  if (isCenterCurrentEnabled()) {
+    const currentZoom = map.getZoom();
+    console.log(`[updateDisplay] Moving map to (${snappedLat}, ${snappedLng}) with zoom ${currentZoom}`);
+    map.setView([snappedLat, snappedLng], currentZoom, { animate: true });
+  }
 
   // ドット（点）だけを表示
   const dotColor = recordEnabled ? "#9acd32" : "#111";
@@ -539,6 +547,13 @@ if ("geolocation" in navigator) {
         clearAllRecordsFromMap();
       }
     });
+
+    // 現在地の中央表示トグル（ログのみ）
+    if (toggleCenterCurrentBtn) {
+      toggleCenterCurrentBtn.addEventListener("change", () => {
+        console.log(`[toggleCenterCurrent] centerCurrentLocation=${toggleCenterCurrentBtn.checked}`);
+      });
+    }
     
   });
 } else {

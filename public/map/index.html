@@ -19,7 +19,7 @@
           <div class="meta">
             <div id="last-updated">Last update: --:--:--</div>
             <div class="record-toggle" role="group" aria-label="Record toggle">
-              <span class="record-title">Record:</span>
+              <span class="record-title">点字ブロック記録:</span>
               <span class="record-label">OFF</span>
               <label class="switch">
                 <input id="toggle-record" type="checkbox" aria-label="Record" />
@@ -28,10 +28,24 @@
               <span class="record-label">ON</span>
             </div>
             <div class="record-toggle" role="group" aria-label="Show all records toggle">
-              <span class="record-title">Show All Records:</span>
+              <span class="record-title">点字ブロック表示:</span>
               <span class="record-label">OFF</span>
               <label class="switch">
                 <input id="toggle-show-all" type="checkbox" aria-label="Show All Records" />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
+            <div class="record-toggle" role="group" aria-label="現在地の中央表示 toggle">
+              <span class="record-title">現在地の中央表示:</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input
+                  id="toggle-center-current"
+                  type="checkbox"
+                  aria-label="現在地の中央表示"
+                  checked
+                />
                 <span class="slider"></span>
               </label>
               <span class="record-label">ON</span>
@@ -48,7 +62,7 @@
       <p id="raw-coords">Raw: --, --</p>
       <p><a class="btn" href="../index.html">Back</a></p>
       <footer class="version-footer">
-        <span id="app-version">v1.7.1</span>
+        <span id="app-version">v1.7.2</span>
       </footer>
     </main>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
