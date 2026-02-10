@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const yaml = require("yaml");
-const mysql = require("mysql2/promise");
+const { Pool } = require("pg");
 const { createLogger } = require("./logger");
 
 const CONFIG_PATH = path.join(__dirname, "..", "config.yaml");
@@ -19,6 +19,83 @@ function loadConfig() {
   return parsed.db;
 }
 
+function toPgSql(sql) {
+  let index = 0;
+  return sql.replace(/\?/g, () => `$${++index}`);
+}
+
+function needsReturningId(sql) {
+  return /^\s*insert\s+/i.test(sql) && !/\breturning\b/i.test(sql);
+}
+
+function makeCompatResult(sql, result) {
+  if (/^\s*select\s+/i.test(sql) || /^\s*with\s+/i.test(sql)) {
+    return [result.rows];
+  }
+  if (/^\s*insert\s+/i.test(sql)) {
+    return [
+      {
+        insertId: result.rows[0] && result.rows[0].id ? result.rows[0].id : null,
+        affectedRows: result.rowCount,
+        rowCount: result.rowCount,
+      },
+    ];
+  }
+  return [
+    {
+      affectedRows: result.rowCount,
+      rowCount: result.rowCount,
+    },
+  ];
+}
+
+class PgCompatConnection {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async query(sql, params = []) {
+    const baseSql = toPgSql(sql);
+    const pgSql = needsReturningId(baseSql) ? `${baseSql} RETURNING id` : baseSql;
+    const result = await this.client.query(pgSql, params);
+    return makeCompatResult(baseSql, result);
+  }
+
+  async beginTransaction() {
+    await this.client.query("BEGIN");
+  }
+
+  async commit() {
+    await this.client.query("COMMIT");
+  }
+
+  async rollback() {
+    await this.client.query("ROLLBACK");
+  }
+
+  release() {
+    this.client.release();
+  }
+}
+
+class PgCompatPool {
+  constructor(pool) {
+    this.pool = pool;
+  }
+
+  async query(sql, params = []) {
+    const baseSql = toPgSql(sql);
+    const pgSql = needsReturningId(baseSql) ? `${baseSql} RETURNING id` : baseSql;
+    const result = await this.pool.query(pgSql, params);
+    return makeCompatResult(baseSql, result);
+  }
+
+  async getConnection() {
+    const client = await this.pool.connect();
+    return new PgCompatConnection(client);
+  }
+}
+
 function createDbPool() {
   try {
     const dbConfig = loadConfig();
@@ -27,24 +104,21 @@ function createDbPool() {
     const pwd = dbConfig.password || '';
     const firstChar = pwd.length > 0 ? pwd.charCodeAt(0) : 0;
     const lastChar = pwd.length > 0 ? pwd.charCodeAt(pwd.length - 1) : 0;
-    const configInfo = `host=${dbConfig.host},port=${dbConfig.port || 3306},user=${dbConfig.user},database=${dbConfig.database},passwordLength=${pwd.length},passwordExists=${!!dbConfig.password},firstCharCode=${firstChar},lastCharCode=${lastChar}`;
+    const configInfo = `host=${dbConfig.host},port=${dbConfig.port || 5432},user=${dbConfig.user},database=${dbConfig.database},passwordLength=${pwd.length},passwordExists=${!!dbConfig.password},firstCharCode=${firstChar},lastCharCode=${lastChar}`;
     dbLogger.appendLog("INFO", `DB設定読み込み: ${configInfo}`);
-    
-    const pool = mysql.createPool({
+
+    const pool = new Pool({
       host: dbConfig.host,
-      port: dbConfig.port || 3306,
+      port: dbConfig.port || 5432,
       user: dbConfig.user,
       password: dbConfig.password,
       database: dbConfig.database,
-      waitForConnections: true,
-      connectionLimit: 5,
-      queueLimit: 0,
-      charset: 'utf8mb4',
-      insecureAuth: true,
+      max: 5,
+      ssl: dbConfig.ssl ? { rejectUnauthorized: false } : undefined,
     });
-    
+
     // 接続テスト
-    pool.query('SELECT 1')
+    pool.query("SELECT 1")
       .then(() => {
         dbLogger.appendLog("INFO", "DB接続テスト成功");
       })
@@ -53,7 +127,7 @@ function createDbPool() {
       });
     
     return {
-      pool,
+      pool: new PgCompatPool(pool),
       error: null,
     };
   } catch (err) {

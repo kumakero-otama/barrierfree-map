@@ -1,13 +1,13 @@
 {
   "name": "barrierfree-map",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "private": true,
   "scripts": {
     "start": "node server.js",
     "version:update": "node scripts/update-version.js"
   },
   "dependencies": {
-    "mysql2": "^3.11.0",
+    "pg": "^8.18.0",
     "yaml": "^2.5.0"
   }
 }

@@ -27,6 +27,7 @@ function createMatchHandler({
   
   const sessionLogger = createLogger(SESSION_LOG);
   const pointsLogger = createLogger(POINTS_LOG);
+  let realtimeSchemaChecked = false;
   
   // セッション更新関数（存在しなければ作成、存在すれば終了時刻を更新）
   async function updateSession(sessionUuid, userId, snappedLat, snappedLng, seq, logPrefix = "") {
@@ -90,6 +91,49 @@ function createMatchHandler({
       sessionLogger.appendLog("ERROR", errorMsg);
     }
   }
+
+  async function ensureRealtimeSchema() {
+    if (!pool || realtimeSchemaChecked) {
+      return;
+    }
+    try {
+      await pool.query("SELECT session_id, ts, geom, accuracy FROM gps_raw LIMIT 1");
+      await pool.query("SELECT session_id, ts, geom, edge_id, confidence FROM gps_matched LIMIT 1");
+      realtimeSchemaChecked = true;
+      console.log("[realtime_record] schema check passed: gps_raw, gps_matched");
+    } catch (err) {
+      console.error("[realtime_record] schema check failed:", err.message);
+    }
+  }
+
+  async function persistRealtimePoints({ sessionUuid, rawLat, rawLng, snappedLat, snappedLng, edgeId, confidence }) {
+    if (!pool) {
+      return;
+    }
+    await ensureRealtimeSchema();
+    if (!realtimeSchemaChecked) {
+      return;
+    }
+    const safeSessionUuid = sessionUuid || null;
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [rawResult] = await conn.query(
+        "INSERT INTO gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
+        [safeSessionUuid, rawLng, rawLat, null]
+      );
+      await conn.query(
+        "INSERT INTO gps_matched (session_id, ts, geom, edge_id, confidence) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?, ?)",
+        [safeSessionUuid, snappedLng, snappedLat, edgeId || null, confidence ?? null]
+      );
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
   
   function sendNoContent(res) {
     res.writeHead(204);
@@ -108,6 +152,7 @@ function createMatchHandler({
     const sessionUuid = url.searchParams.get("sessionUuid");
     const userId = url.searchParams.get("userId");
     const deviceUuid = url.searchParams.get("deviceUuid") || userId;
+    const shouldRecordRealtime = url.searchParams.get("record") === "1";
     const seq = parseInt(url.searchParams.get("seq"), 10);
 
     const currentMonth = getCurrentMonth();
@@ -198,6 +243,20 @@ function createMatchHandler({
                   });
                 } else {
                   console.log(`[DEBUG] updateSession NOT called: sessionUuid=${!!sessionUuid}, userId=${!!userId}, seq=${seq}`);
+                }
+
+                if (shouldRecordRealtime) {
+                  persistRealtimePoints({
+                    sessionUuid,
+                    rawLat: lat,
+                    rawLng: lng,
+                    snappedLat,
+                    snappedLng,
+                    edgeId: edge.way_id,
+                    confidence: null,
+                  }).catch((err) => {
+                    console.error(`${logPrefix} realtime_record_error:`, err.message);
+                  });
                 }
                 
                 sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });

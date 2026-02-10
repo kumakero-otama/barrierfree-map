@@ -219,6 +219,9 @@ function requestSnappedLocation(latitude, longitude) {
     lng: longitude.toString(),
     deviceUuid: deviceUuid,
   });
+  if (recordEnabled) {
+    params.set("record", "1");
+  }
   
   if (lastSent) {
     params.set("prevLat", lastSent.latitude.toString());
