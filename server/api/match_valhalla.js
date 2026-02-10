@@ -106,7 +106,7 @@ function createMatchHandler({
     }
   }
 
-  async function persistRealtimePoints({ sessionUuid, rawLat, rawLng, snappedLat, snappedLng, edgeId, confidence }) {
+  async function persistRealtimePoints({ sessionUuid, rawLat, rawLng, snappedLat, snappedLng, edgeId, confidence, logPrefix }) {
     if (!pool) {
       return;
     }
@@ -114,7 +114,11 @@ function createMatchHandler({
     if (!realtimeSchemaChecked) {
       return;
     }
-    const safeSessionUuid = sessionUuid || null;
+    if (!sessionUuid) {
+      console.warn(`${logPrefix || ""} [realtime_record] skipped: missing session_id`);
+      return;
+    }
+    const safeSessionUuid = sessionUuid;
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -149,7 +153,7 @@ function createMatchHandler({
     const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
     const lat = parseFloat(url.searchParams.get("lat"));
     const lng = parseFloat(url.searchParams.get("lng"));
-    const sessionUuid = url.searchParams.get("sessionUuid");
+    const sessionUuid = url.searchParams.get("sessionId") || url.searchParams.get("sessionUuid");
     const userId = url.searchParams.get("userId");
     const deviceUuid = url.searchParams.get("deviceUuid") || userId;
     const shouldRecordRealtime = url.searchParams.get("record") === "1";
@@ -254,6 +258,7 @@ function createMatchHandler({
                     snappedLng,
                     edgeId: edge.way_id,
                     confidence: null,
+                    logPrefix,
                   }).catch((err) => {
                     console.error(`${logPrefix} realtime_record_error:`, err.message);
                   });

@@ -31,6 +31,8 @@ let lastRequestTime = 0;
 let recordEnabled = false;
 let recordedRawPoints = []; // レコード中のrawデータをメモリに保存
 let tracePolyline = null; // trace_attributesの結果を表示する黄緑線
+let currentSessionId = null;
+let currentSessionStartedAt = null;
 
 // Valhallaの6桁精度ポリラインをデコードする関数
 function decodePolyline(str, precision) {
@@ -108,6 +110,23 @@ function getOrCreateDeviceUuid() {
 
 function updateRecordButton() {
   toggleRecordBtn.checked = recordEnabled;
+}
+
+function postSessionLifecycle(action, payload) {
+  return fetch(`/api/session/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`session ${action} failed: ${res.status}`);
+      }
+      return res.json();
+    })
+    .catch((err) => {
+      console.error(`[Session] ${action} error:`, err);
+    });
 }
 
 // trace_attributesでフィッティングしてマップに表示
@@ -221,6 +240,9 @@ function requestSnappedLocation(latitude, longitude) {
   });
   if (recordEnabled) {
     params.set("record", "1");
+    if (currentSessionId) {
+      params.set("sessionId", currentSessionId);
+    }
   }
   
   if (lastSent) {
@@ -521,11 +543,25 @@ if ("geolocation" in navigator) {
           tracePolyline = null;
         }
         recordedRawPoints = [];
+        currentSessionId = generateUUID();
+        currentSessionStartedAt = new Date().toISOString();
+        postSessionLifecycle("start", {
+          sessionId: currentSessionId,
+          deviceId: deviceUuid,
+          startedAt: currentSessionStartedAt,
+        });
         recordEnabled = true;
         updateRecordButton();
-        console.log("[Record] Started recording");
+        console.log(`[Record] Started recording session=${currentSessionId}`);
       } else {
         // レコードOFF：trace_attributesでフィッティングして黄緑線表示
+        const endedAt = new Date().toISOString();
+        if (currentSessionId) {
+          postSessionLifecycle("end", {
+            sessionId: currentSessionId,
+            endedAt,
+          });
+        }
         recordEnabled = false;
         
         // 過去のドットをすべて黒色に変更
@@ -534,7 +570,9 @@ if ("geolocation" in navigator) {
         });
 
         updateRecordButton();
-        console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected`);
+        console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected. session=${currentSessionId}`);
+        currentSessionId = null;
+        currentSessionStartedAt = null;
         processAndDisplayTrace();
       }
     });
