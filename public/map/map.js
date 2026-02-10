@@ -130,7 +130,7 @@ function postSessionLifecycle(action, payload) {
 }
 
 // trace_attributesでフィッティングしてマップに表示
-function processAndDisplayTrace() {
+function processAndDisplayTrace(sessionId = null) {
   if (recordedRawPoints.length < 2) {
     console.log('[processAndDisplayTrace] Not enough points:', recordedRawPoints.length);
     alert('記録されたポイントが少なすぎます（最低2点必要）');
@@ -148,6 +148,10 @@ function processAndDisplayTrace() {
     shape_match: "map_snap"
     // フィルタを外して必要なデータをすべて取得
   };
+  if (sessionId) {
+    requestBody.sessionId = sessionId;
+    requestBody.source = "valhalla";
+  }
   
   fetch('/api/trace', {
     method: 'POST',
@@ -555,10 +559,11 @@ if ("geolocation" in navigator) {
         console.log(`[Record] Started recording session=${currentSessionId}`);
       } else {
         // レコードOFF：trace_attributesでフィッティングして黄緑線表示
+        const finishedSessionId = currentSessionId;
         const endedAt = new Date().toISOString();
-        if (currentSessionId) {
+        if (finishedSessionId) {
           postSessionLifecycle("end", {
-            sessionId: currentSessionId,
+            sessionId: finishedSessionId,
             endedAt,
           });
         }
@@ -570,10 +575,10 @@ if ("geolocation" in navigator) {
         });
 
         updateRecordButton();
-        console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected. session=${currentSessionId}`);
+        console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected. session=${finishedSessionId}`);
         currentSessionId = null;
         currentSessionStartedAt = null;
-        processAndDisplayTrace();
+        processAndDisplayTrace(finishedSessionId);
       }
     });
     
