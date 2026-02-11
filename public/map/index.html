@@ -28,10 +28,19 @@
               <span class="record-label">ON</span>
             </div>
             <div class="record-toggle" role="group" aria-label="Show all records toggle">
-              <span class="record-title">点字ブロック表示:</span>
+              <span class="record-title">アプリ点字ブロック表示:</span>
               <span class="record-label">OFF</span>
               <label class="switch">
                 <input id="toggle-show-all" type="checkbox" aria-label="Show All Records" />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
+            <div class="record-toggle" role="group" aria-label="OSM点字ブロック表示 toggle">
+              <span class="record-title">OSM点字ブロック表示:</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input id="toggle-show-osm" type="checkbox" aria-label="OSM点字ブロック表示" />
                 <span class="slider"></span>
               </label>
               <span class="record-label">ON</span>
@@ -62,7 +71,7 @@
       <p id="raw-coords">Raw: --, --</p>
       <p><a class="btn" href="../index.html">Back</a></p>
       <footer class="version-footer">
-        <span id="app-version">v1.8.4</span>
+        <span id="app-version">v1.9.0</span>
       </footer>
     </main>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

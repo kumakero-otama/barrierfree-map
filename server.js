@@ -8,6 +8,7 @@ const createSessionHandler = require("./server/api/session");
 const createConfigHandler = require("./server/api/config");
 const createRecordsHandler = require("./server/api/records");
 const createTraceHandler = require("./server/api/trace");
+const createOsmTactileWaysHandler = require("./server/api/osm_tactile");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -180,6 +181,10 @@ const handleTrace = createTraceHandler({
   sendJson,
 });
 
+const handleOsmTactileWays = createOsmTactileWaysHandler({
+  sendJson,
+});
+
 function handleRequest(req, res) {
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
@@ -203,6 +208,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/trace")) {
     handleTrace(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/osm-tactile-ways")) {
+    handleOsmTactileWays(req, res);
     return;
   }
   handleStatic(req, res);

@@ -4,6 +4,7 @@ const rawCoordsEl = document.getElementById("raw-coords");
 const lastUpdatedEl = document.getElementById("last-updated");
 const toggleRecordBtn = document.getElementById("toggle-record");
 const toggleShowAllBtn = document.getElementById("toggle-show-all");
+const toggleShowOsmBtn = document.getElementById("toggle-show-osm");
 const toggleCenterCurrentBtn = document.getElementById("toggle-center-current");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -83,6 +84,7 @@ function decodePolyline(str, precision) {
 const deviceUuid = getOrCreateDeviceUuid();
 let showAllRecords = false;
 let allRecordsMarkers = [];
+let osmTactileMarkers = [];
 
 // UUID v4 生成関数
 function generateUUID() {
@@ -451,6 +453,76 @@ function clearAllRecordsFromMap() {
   allRecordsMarkers = [];
 }
 
+function loadAndShowOsmTactileWays() {
+  console.log("[loadAndShowOsmTactileWays] Fetching tactile ways from OSM...");
+  const center = map.getCenter();
+  const params = new URLSearchParams({
+    centerLat: center.lat.toString(),
+    centerLng: center.lng.toString(),
+    radiusKm: "10",
+  });
+  fetch(`/api/osm-tactile-ways?${params.toString()}`)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`osm tactile fetch failed: ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      if (!data || !Array.isArray(data.features)) {
+        throw new Error("invalid osm tactile payload");
+      }
+      console.log(`[loadAndShowOsmTactileWays] Loaded ${data.features.length} ways`);
+      showOsmTactileWaysOnMap(data.features);
+    })
+    .catch((err) => {
+      console.error("[loadAndShowOsmTactileWays] Error:", err);
+      alert("OSM点字ブロックデータの取得に失敗しました。");
+      if (toggleShowOsmBtn) {
+        toggleShowOsmBtn.checked = false;
+      }
+      clearOsmTactileWaysFromMap();
+    });
+}
+
+function showOsmTactileWaysOnMap(features) {
+  clearOsmTactileWaysFromMap();
+
+  features.forEach((feature) => {
+    if (!feature || !feature.geometry || feature.geometry.type !== "LineString") {
+      return;
+    }
+    if (!Array.isArray(feature.geometry.coordinates)) {
+      return;
+    }
+
+    const coordinates = feature.geometry.coordinates
+      .map(([lng, lat]) => [lat, lng])
+      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+
+    if (coordinates.length < 2) {
+      return;
+    }
+
+    const polyline = L.polyline(coordinates, {
+      color: "#0066ff",
+      weight: 4,
+      opacity: 0.9,
+    }).addTo(map);
+    osmTactileMarkers.push(polyline);
+  });
+
+  console.log(`[showOsmTactileWaysOnMap] Displayed ${osmTactileMarkers.length} polylines`);
+}
+
+function clearOsmTactileWaysFromMap() {
+  console.log(`[clearOsmTactileWaysFromMap] Removing ${osmTactileMarkers.length} displayed ways`);
+  osmTactileMarkers.forEach((marker) => {
+    map.removeLayer(marker);
+  });
+  osmTactileMarkers = [];
+}
+
 // サーバーから設定を取得
 function loadConfig() {
   return fetch("/api/config")
@@ -576,6 +648,19 @@ if ("geolocation" in navigator) {
         clearAllRecordsFromMap();
       }
     });
+
+    if (toggleShowOsmBtn) {
+      toggleShowOsmBtn.addEventListener("change", () => {
+        const showOsmTactile = toggleShowOsmBtn.checked;
+        if (showOsmTactile) {
+          console.log("[toggleShowOsm] Showing OSM tactile ways");
+          loadAndShowOsmTactileWays();
+        } else {
+          console.log("[toggleShowOsm] Hiding OSM tactile ways");
+          clearOsmTactileWaysFromMap();
+        }
+      });
+    }
 
     // 現在地の中央表示トグル（ログのみ）
     if (toggleCenterCurrentBtn) {
