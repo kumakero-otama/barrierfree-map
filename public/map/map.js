@@ -379,7 +379,13 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
 // session_pathsを取得して表示
 function loadAndShowAllRecords() {
   console.log("[loadAndShowAllRecords] Fetching all session paths...");
-  fetch("/api/records")
+  const center = map.getCenter();
+  const params = new URLSearchParams({
+    centerLat: center.lat.toString(),
+    centerLng: center.lng.toString(),
+    radiusKm: "10",
+  });
+  fetch(`/api/records?${params.toString()}`)
     .then((res) => {
       if (!res.ok) {
         throw new Error(`records fetch failed: ${res.status}`);

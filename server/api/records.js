@@ -24,15 +24,35 @@ function createRecordsHandler({ sendJson }) {
     }
 
     try {
-      const [paths] = await pool.query(`
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const centerLat = Number(url.searchParams.get("centerLat"));
+      const centerLng = Number(url.searchParams.get("centerLng"));
+      const radiusKm = Number(url.searchParams.get("radiusKm"));
+
+      let query = `
         SELECT
           session_id,
           source,
           created_at,
           ST_AsGeoJSON(geom) AS geom_geojson
         FROM session_paths
-        ORDER BY created_at DESC
-      `);
+      `;
+      const params = [];
+
+      if (Number.isFinite(centerLat) && Number.isFinite(centerLng) && Number.isFinite(radiusKm) && radiusKm > 0) {
+        query += `
+          WHERE ST_DWithin(
+            geom,
+            ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+            ?
+          )
+        `;
+        params.push(centerLng, centerLat, radiusKm * 1000);
+      }
+
+      query += " ORDER BY created_at DESC";
+
+      const [paths] = await pool.query(query, params);
 
       sendJson(res, 200, {
         success: true,

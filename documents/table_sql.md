@@ -1,4 +1,4 @@
-# table_md
+# table_sql.md
 PostGreのテーブルを作るSQLコマンドのまとめ
 
 ## sessions
