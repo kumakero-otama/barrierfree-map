@@ -24,26 +24,20 @@ function createRecordsHandler({ sendJson }) {
     }
 
     try {
-      // すべてのセッションポイントを取得
-      const [points] = await pool.query(`
-        SELECT 
-          sp.lat,
-          sp.lng,
-          sp.seq,
-          sp.created_at,
-          s.session_uuid,
-          s.user_id,
-          s.started_at,
-          s.ended_at
-        FROM session_points sp
-        INNER JOIN sessions s ON sp.session_id = s.id
-        ORDER BY s.started_at DESC, sp.seq ASC
+      const [paths] = await pool.query(`
+        SELECT
+          session_id,
+          source,
+          created_at,
+          ST_AsGeoJSON(geom) AS geom_geojson
+        FROM session_paths
+        ORDER BY created_at DESC
       `);
 
       sendJson(res, 200, {
         success: true,
-        count: points.length,
-        points: points
+        count: paths.length,
+        paths: paths
       });
     } catch (err) {
       console.error("records_fetch_error", err.message);

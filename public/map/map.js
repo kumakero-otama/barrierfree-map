@@ -376,9 +376,9 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
   console.log('[updateDisplay] Display update complete');
 }
 
-// 全レコードを取得して表示
+// session_pathsを取得して表示
 function loadAndShowAllRecords() {
-  console.log("[loadAndShowAllRecords] Fetching all records...");
+  console.log("[loadAndShowAllRecords] Fetching all session paths...");
   fetch("/api/records")
     .then((res) => {
       if (!res.ok) {
@@ -387,81 +387,58 @@ function loadAndShowAllRecords() {
       return res.json();
     })
     .then((data) => {
-      console.log(`[loadAndShowAllRecords] Loaded ${data.count} points`);
-      if (data.success && Array.isArray(data.points)) {
-        showAllRecordsOnMap(data.points);
+      console.log(`[loadAndShowAllRecords] Loaded ${data.count} paths`);
+      if (data.success && Array.isArray(data.paths)) {
+        showAllSessionPathsOnMap(data.paths);
       }
     })
     .catch((err) => {
       console.error("[loadAndShowAllRecords] Error:", err);
-      alert("全レコードの取得に失敗しました。");
+      alert("軌跡データの取得に失敗しました。");
     });
 }
 
-// 全レコードを地図上に表示
-function showAllRecordsOnMap(points) {
-  // 既存のマーカーをクリア
+// session_pathsの全軌跡を地図上に表示
+function showAllSessionPathsOnMap(paths) {
   clearAllRecordsFromMap();
-  
-  console.log(`[showAllRecordsOnMap] Showing ${points.length} points`);
-  
-  // セッションごとにポイントをグループ化
-  const sessionMap = new Map();
-  points.forEach((point) => {
-    const sessionUuid = point.session_uuid;
-    if (!sessionMap.has(sessionUuid)) {
-      sessionMap.set(sessionUuid, []);
+
+  console.log(`[showAllSessionPathsOnMap] Showing ${paths.length} paths`);
+
+  paths.forEach((path) => {
+    let geom;
+    try {
+      geom = typeof path.geom_geojson === "string"
+        ? JSON.parse(path.geom_geojson)
+        : path.geom_geojson;
+    } catch (err) {
+      console.warn("[showAllSessionPathsOnMap] invalid geom_geojson:", err);
+      return;
     }
-    sessionMap.get(sessionUuid).push(point);
-  });
-  
-  console.log(`[showAllRecordsOnMap] Found ${sessionMap.size} sessions`);
-  
-  // 各セッションごとに処理
-  sessionMap.forEach((sessionPoints, sessionUuid) => {
-    // seqでソート
-    sessionPoints.sort((a, b) => a.seq - b.seq);
-    
-    // ポイントの座標を抽出
-    const coordinates = [];
-    sessionPoints.forEach((point) => {
-      const lat = parseFloat(point.lat);
-      const lng = parseFloat(point.lng);
-      
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        coordinates.push([lat, lng]);
-        
-        // 小さな点を表示
-        const marker = L.circleMarker([lat, lng], {
-          radius: 2,
-          color: "#0066ff",
-          fillColor: "#0066ff",
-          fillOpacity: 0.5,
-          weight: 1,
-        }).addTo(map);
-        
-        allRecordsMarkers.push(marker);
-      }
-    });
-    
-    // セッションの軌跡を青い線で描画
-    if (coordinates.length > 1) {
-      const polyline = L.polyline(coordinates, {
-        color: "#0066ff",
-        weight: 2,
-        opacity: 0.6,
-      }).addTo(map);
-      
-      allRecordsMarkers.push(polyline);
+    if (!geom || geom.type !== "LineString" || !Array.isArray(geom.coordinates)) {
+      return;
     }
+
+    const coordinates = geom.coordinates
+      .map(([lng, lat]) => [lat, lng])
+      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+    if (coordinates.length < 2) {
+      return;
+    }
+
+    const polyline = L.polyline(coordinates, {
+      color: "#ffd400",
+      weight: 4,
+      opacity: 0.85,
+    }).addTo(map);
+    allRecordsMarkers.push(polyline);
   });
-  
-  console.log(`[showAllRecordsOnMap] Displayed ${allRecordsMarkers.length} items (markers + lines)`);
+
+  console.log(`[showAllSessionPathsOnMap] Displayed ${allRecordsMarkers.length} polylines`);
 }
 
 // 全レコードを地図から削除
 function clearAllRecordsFromMap() {
-  console.log(`[clearAllRecordsFromMap] Removing ${allRecordsMarkers.length} markers`);
+  console.log(`[clearAllRecordsFromMap] Removing ${allRecordsMarkers.length} displayed paths`);
   allRecordsMarkers.forEach((marker) => {
     map.removeLayer(marker);
   });
