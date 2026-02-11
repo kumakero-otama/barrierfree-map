@@ -1,18 +1,65 @@
 const https = require("https");
+const fs = require("fs");
+const path = require("path");
+const yaml = require("yaml");
 
-const ALLOWED_VALUES = new Set([
-  "yes",
-  "left",
-  "right",
-  "both",
-  "perpendicular",
-  "direction_of_travel",
-]);
+const RULES_PATH = path.join(__dirname, "..", "..", "config", "osm_tactile_rules.yaml");
 
-function buildOverpassQuery(centerLat, centerLng, radiusMeters) {
+function escapeRegexValue(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function loadRules() {
+  const raw = fs.readFileSync(RULES_PATH, "utf8");
+  const parsed = yaml.parse(raw) || {};
+  const displayRules = parsed.osm_tactile_display || {};
+  const rawElementTypes = Array.isArray(displayRules.element_types)
+    ? displayRules.element_types
+    : typeof displayRules.element_type === "string"
+      ? [displayRules.element_type]
+      : [];
+  const elementTypes = rawElementTypes.filter((value) => value === "way" || value === "node");
+  const rawMatchers = Array.isArray(displayRules.matchers) ? displayRules.matchers : [];
+  const matchers = rawMatchers
+    .map((matcher) => {
+      const key = matcher && typeof matcher.key === "string" ? matcher.key : "";
+      const values = Array.isArray(matcher && matcher.values)
+        ? matcher.values.filter((value) => typeof value === "string" && value.length > 0)
+        : [];
+      if (!key || values.length === 0) {
+        return null;
+      }
+      return { key, values };
+    })
+    .filter(Boolean);
+
+  if (elementTypes.length === 0) {
+    throw new Error("invalid_element_types_in_osm_tactile_rules");
+  }
+  if (matchers.length === 0) {
+    throw new Error("empty_matchers_in_osm_tactile_rules");
+  }
+
+  return {
+    elementTypes,
+    matchers,
+  };
+}
+
+function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
+  const selectors = rules.elementTypes
+    .flatMap((elementType) =>
+      rules.matchers.map((matcher) => {
+        const valueRegex = matcher.values.map(escapeRegexValue).join("|");
+        return `${elementType}(around:${radiusMeters},${centerLat},${centerLng})["${matcher.key}"~"^(${valueRegex})$"];`;
+      })
+    )
+    .join("\n");
   return `
 [out:json][timeout:25];
-way(around:${radiusMeters},${centerLat},${centerLng})["tactile_paving"~"^(yes|left|right|both|perpendicular|direction_of_travel)$"];
+(
+${selectors}
+);
 out geom;
 `;
 }
@@ -54,40 +101,72 @@ function fetchOverpass(overpassHost, query, callback) {
   req.end();
 }
 
-function toFeatureCollection(overpassJson) {
+function toFeatureCollection(overpassJson, rules) {
   const elements = Array.isArray(overpassJson && overpassJson.elements) ? overpassJson.elements : [];
   const features = [];
 
   elements.forEach((el) => {
-    if (!el || el.type !== "way" || !Array.isArray(el.geometry) || el.geometry.length < 2) {
+    if (!el || !rules.elementTypes.includes(el.type)) {
       return;
     }
-    const tactileValue = el.tags && typeof el.tags.tactile_paving === "string"
-      ? el.tags.tactile_paving
-      : "";
-    if (!ALLOWED_VALUES.has(tactileValue)) {
-      return;
-    }
-
-    const coordinates = el.geometry
-      .map((pt) => [Number(pt.lon), Number(pt.lat)])
-      .filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
-
-    if (coordinates.length < 2) {
-      return;
-    }
-
-    features.push({
-      type: "Feature",
-      properties: {
-        osm_way_id: el.id,
-        tactile_paving: tactileValue,
-      },
-      geometry: {
-        type: "LineString",
-        coordinates,
-      },
+    const matched = rules.matchers.find((matcher) => {
+      const tagValue = el.tags && typeof el.tags[matcher.key] === "string" ? el.tags[matcher.key] : "";
+      return matcher.values.includes(tagValue);
     });
+    if (!matched) {
+      return;
+    }
+    const matchedValue = el.tags[matched.key];
+
+    if (el.type === "way") {
+      if (!Array.isArray(el.geometry) || el.geometry.length < 2) {
+        return;
+      }
+      const coordinates = el.geometry
+        .map((pt) => [Number(pt.lon), Number(pt.lat)])
+        .filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
+
+      if (coordinates.length < 2) {
+        return;
+      }
+
+      features.push({
+        type: "Feature",
+        properties: {
+          osm_way_id: el.id,
+          osm_type: "way",
+          matched_tag_key: matched.key,
+          matched_tag_value: matchedValue,
+        },
+        geometry: {
+          type: "LineString",
+          coordinates,
+        },
+      });
+      return;
+    }
+
+    if (el.type === "node") {
+      const lng = Number(el.lon);
+      const lat = Number(el.lat);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+      }
+
+      features.push({
+        type: "Feature",
+        properties: {
+          osm_node_id: el.id,
+          osm_type: "node",
+          matched_tag_key: matched.key,
+          matched_tag_value: matchedValue,
+        },
+        geometry: {
+          type: "Point",
+          coordinates: [lng, lat],
+        },
+      });
+    }
   });
 
   return {
@@ -98,6 +177,16 @@ function toFeatureCollection(overpassJson) {
 
 function createOsmTactileWaysHandler({ sendJson }) {
   const OVERPASS_HOST = process.env.OVERPASS_HOST || "overpass-api.de";
+  let rules;
+  try {
+    rules = loadRules();
+    console.log(
+      `[osm_tactile] rules_loaded path=${RULES_PATH} element_types=${rules.elementTypes.join(",")} matchers=${rules.matchers.map((m) => `${m.key}=[${m.values.join(",")}]`).join(";")}`
+    );
+  } catch (err) {
+    console.error("[osm_tactile] rules_load_error:", err.message);
+    rules = null;
+  }
 
   return function handleOsmTactileWays(req, res) {
     if (req.method !== "GET") {
@@ -106,6 +195,11 @@ function createOsmTactileWaysHandler({ sendJson }) {
     }
 
     try {
+      if (!rules) {
+        sendJson(res, 500, { error: "osm_tactile_rules_unavailable" });
+        return;
+      }
+
       const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
       const centerLat = Number(url.searchParams.get("centerLat"));
       const centerLng = Number(url.searchParams.get("centerLng"));
@@ -118,14 +212,14 @@ function createOsmTactileWaysHandler({ sendJson }) {
         return;
       }
 
-      const query = buildOverpassQuery(centerLat, centerLng, radiusMeters);
+      const query = buildOverpassQuery(centerLat, centerLng, radiusMeters, rules);
       fetchOverpass(OVERPASS_HOST, query, (err, overpassJson) => {
         if (err) {
           console.error("[osm_tactile] fetch error:", err.message);
           sendJson(res, 502, { error: "osm_upstream_error", message: err.message });
           return;
         }
-        const featureCollection = toFeatureCollection(overpassJson);
+        const featureCollection = toFeatureCollection(overpassJson, rules);
         sendJson(res, 200, {
           success: true,
           centerLat,

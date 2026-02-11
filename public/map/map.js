@@ -489,27 +489,47 @@ function showOsmTactileWaysOnMap(features) {
   clearOsmTactileWaysFromMap();
 
   features.forEach((feature) => {
-    if (!feature || !feature.geometry || feature.geometry.type !== "LineString") {
+    if (!feature || !feature.geometry || typeof feature.geometry.type !== "string") {
       return;
     }
-    if (!Array.isArray(feature.geometry.coordinates)) {
+    if (feature.geometry.type === "LineString") {
+      if (!Array.isArray(feature.geometry.coordinates)) {
+        return;
+      }
+      const coordinates = feature.geometry.coordinates
+        .map(([lng, lat]) => [lat, lng])
+        .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+
+      if (coordinates.length < 2) {
+        return;
+      }
+
+      const polyline = L.polyline(coordinates, {
+        color: "#0066ff",
+        weight: 4,
+        opacity: 0.9,
+      }).addTo(map);
+      osmTactileMarkers.push(polyline);
       return;
     }
 
-    const coordinates = feature.geometry.coordinates
-      .map(([lng, lat]) => [lat, lng])
-      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+    if (feature.geometry.type === "Point") {
+      const [lng, lat] = Array.isArray(feature.geometry.coordinates)
+        ? feature.geometry.coordinates
+        : [NaN, NaN];
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+      }
 
-    if (coordinates.length < 2) {
-      return;
+      const point = L.circleMarker([lat, lng], {
+        radius: 4,
+        color: "#0066ff",
+        fillColor: "#0066ff",
+        fillOpacity: 0.95,
+        weight: 1,
+      }).addTo(map);
+      osmTactileMarkers.push(point);
     }
-
-    const polyline = L.polyline(coordinates, {
-      color: "#0066ff",
-      weight: 4,
-      opacity: 0.9,
-    }).addTo(map);
-    osmTactileMarkers.push(polyline);
   });
 
   console.log(`[showOsmTactileWaysOnMap] Displayed ${osmTactileMarkers.length} polylines`);

@@ -1,0 +1,37 @@
+osm_tactile_display:
+  element_types:
+    - way
+    - node
+
+  matchers:
+    - key: tactile_paving
+      values:
+        - yes  # 点字ブロックがある
+        - both  # 点字ブロックが両側にある
+#        - partial  # 配置が一部しかなく、不適切
+#        - incorrect  # 配置が変/意味を成していない
+#        - primitive  # 点字ブロックではない、たまたまある段差や補装差
+        - contrasted  # コントラストがわかりやすい
+
+    - key: tactile_paving:orientation
+      values:
+        - perpendicular  # 進行方向に対して垂直（主に警告ブロック）
+        - parallel  # 進行方向に対して平行（主に誘導ブロック）
+
+    - key: tactile_paving:direction
+      values:
+        - left  # 道路の左側にある
+        - right  # 道路の右側にある
+
+    - key: tactile_paving:condition
+      values:
+        - excellent  # 状態が非常に良い
+        - good  # 状態が良い
+        - intermediate  # 状態が普通
+#        - bad  # 状態が悪い
+#        - very_bad  # 状態が非常に悪い
+
+    - key: tactile_paving:pattern
+      values:
+        - bars  # 誘導ブロック
+        - dots  # 警告ブロック
