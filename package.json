@@ -1,6 +1,6 @@
 {
   "name": "barrierfree-map",
-  "version": "1.10.4",
+  "version": "1.10.5",
   "private": true,
   "scripts": {
     "start": "node server.js",

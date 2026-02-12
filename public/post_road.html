@@ -310,6 +310,18 @@
         margin-top: 4px;
       }
 
+      .file-input-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
       #app-version {
         display: inline-block;
         font-size: 0.9rem;
@@ -397,13 +409,14 @@
         </div>
         <div class="upload-buttons">
           <button id="photo-library-button" type="button">写真ライブラリ</button>
-          <button type="button" class="not-ready" aria-disabled="true">カメラで撮影</button>
+          <button id="camera-capture-button" type="button">カメラで撮影</button>
           <footer class="version-footer">
-            <span id="app-version">v1.10.4</span>
+            <span id="app-version">v1.10.5</span>
           </footer>
         </div>
       </div>
-      <input id="photo-library-input" type="file" accept="image/*" multiple hidden />
+      <input id="photo-library-input" class="file-input-hidden" type="file" accept="image/*" multiple />
+      <input id="camera-capture-input" class="file-input-hidden" type="file" accept="image/*" capture="environment" />
 
       <div class="actions">
         <button id="back-button" type="button">戻る</button>
@@ -428,6 +441,8 @@
       const backButton = document.getElementById("back-button");
       const photoLibraryButton = document.getElementById("photo-library-button");
       const photoLibraryInput = document.getElementById("photo-library-input");
+      const cameraCaptureButton = document.getElementById("camera-capture-button");
+      const cameraCaptureInput = document.getElementById("camera-capture-input");
       const imagePreview = document.getElementById("image-preview");
       const mapCenterCoordsEl = document.getElementById("map-center-coords");
       const toggleCenterCurrentEl = document.getElementById("toggle-center-current");
@@ -576,9 +591,64 @@
         });
       }
 
+      function openInputPicker(inputEl, permissionLabel) {
+        try {
+          if (typeof inputEl.showPicker === "function") {
+            inputEl.showPicker();
+            return;
+          }
+          inputEl.click();
+        } catch (err) {
+          console.warn(`[post_road] ${permissionLabel} picker open error:`, err);
+          alert(`${permissionLabel}の権限が必要です。端末設定で許可してください。`);
+        }
+      }
+
+      async function requestCameraPermission() {
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+          return true;
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+          });
+          stream.getTracks().forEach((track) => track.stop());
+          return true;
+        } catch (err) {
+          console.warn("[post_road] camera permission denied:", err);
+          alert("カメラの権限が必要です。端末設定でカメラを許可してください。");
+          return false;
+        }
+      }
+
       if (photoLibraryButton && photoLibraryInput) {
         photoLibraryButton.addEventListener("click", () => {
-          photoLibraryInput.click();
+          openInputPicker(photoLibraryInput, "写真ライブラリ");
+        });
+      }
+
+      if (cameraCaptureButton && cameraCaptureInput) {
+        cameraCaptureButton.addEventListener("click", async () => {
+          const granted = await requestCameraPermission();
+          if (!granted) {
+            return;
+          }
+          openInputPicker(cameraCaptureInput, "カメラ");
+        });
+      }
+
+      function addSelectedImageFiles(files) {
+        files.forEach((file) => {
+          if (!file.type.startsWith("image/")) {
+            return;
+          }
+          const imageId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          selectedImages.push({
+            id: imageId,
+            name: file.name || "選択された画像",
+            url: URL.createObjectURL(file),
+          });
         });
       }
 
@@ -608,21 +678,21 @@
           if (files.length === 0) {
             return;
           }
-
-          files.forEach((file) => {
-            if (!file.type.startsWith("image/")) {
-              return;
-            }
-            const imageId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-            selectedImages.push({
-              id: imageId,
-              name: file.name || "選択された画像",
-              url: URL.createObjectURL(file),
-            });
-          });
-
+          addSelectedImageFiles(files);
           renderSelectedImages();
           photoLibraryInput.value = "";
+        });
+      }
+
+      if (cameraCaptureInput && imagePreview) {
+        cameraCaptureInput.addEventListener("change", () => {
+          const files = Array.from(cameraCaptureInput.files || []);
+          if (files.length === 0) {
+            return;
+          }
+          addSelectedImageFiles(files);
+          renderSelectedImages();
+          cameraCaptureInput.value = "";
         });
       }
 
