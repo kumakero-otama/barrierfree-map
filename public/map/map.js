@@ -118,7 +118,7 @@ map.on("click", (event) => {
     return;
   }
 
-  window.location.assign("/blank.html");
+  window.location.assign("/post_road.html");
 });
 
 // UUID v4 生成関数
