@@ -85,6 +85,41 @@ const deviceUuid = getOrCreateDeviceUuid();
 let showAllRecords = false;
 let allRecordsMarkers = [];
 let osmTactileMarkers = [];
+let isZooming = false;
+let suppressMapTapUntil = 0;
+const MAP_TAP_SUPPRESS_AFTER_ZOOM_MS = 400;
+
+function shouldIgnoreMapTap(event) {
+  if (isZooming || Date.now() < suppressMapTapUntil) {
+    return true;
+  }
+
+  const originalEvent = event?.originalEvent;
+  if (!originalEvent) {
+    return false;
+  }
+
+  // Double click zoom/wheel zoom should not trigger navigation.
+  return originalEvent.type === "dblclick" || originalEvent.type === "wheel" || originalEvent.type === "mousewheel";
+}
+
+map.on("zoomstart", () => {
+  isZooming = true;
+  suppressMapTapUntil = Date.now() + MAP_TAP_SUPPRESS_AFTER_ZOOM_MS;
+});
+
+map.on("zoomend", () => {
+  isZooming = false;
+  suppressMapTapUntil = Date.now() + MAP_TAP_SUPPRESS_AFTER_ZOOM_MS;
+});
+
+map.on("click", (event) => {
+  if (shouldIgnoreMapTap(event)) {
+    return;
+  }
+
+  window.location.assign("/blank.html");
+});
 
 // UUID v4 生成関数
 function generateUUID() {
