@@ -118,6 +118,12 @@ map.on("click", (event) => {
     return;
   }
 
+  const lat = Number(event?.latlng?.lat);
+  const lng = Number(event?.latlng?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    window.location.assign(`/post_road.html?lat=${lat}&lng=${lng}`);
+    return;
+  }
   window.location.assign("/post_road.html");
 });
 

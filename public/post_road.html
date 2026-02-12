@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>道情報の投稿</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
       :root {
         --bg: #ffffff;
@@ -39,6 +40,117 @@
       h2 {
         margin: 20px 0 10px;
         font-size: 1rem;
+      }
+
+      .location-map-wrap {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      #post-map {
+        width: 100%;
+        height: 240px;
+      }
+
+      .map-center-mark {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 28px;
+        height: 28px;
+        pointer-events: none;
+        z-index: 500;
+      }
+
+      .map-center-mark::before,
+      .map-center-mark::after {
+        content: "";
+        position: absolute;
+        background: #d10a0a;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .map-center-mark::before {
+        width: 2px;
+        height: 28px;
+      }
+
+      .map-center-mark::after {
+        width: 28px;
+        height: 2px;
+      }
+
+      .map-center-coords {
+        margin: 8px 2px 2px;
+        font-size: 0.95rem;
+        color: #333;
+      }
+
+      .record-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 2px 2px;
+      }
+
+      .record-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #222;
+      }
+
+      .record-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #222;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: #ddd;
+        border: 1px solid #222;
+        transition: 0.2s ease;
+        border-radius: 999px;
+      }
+
+      .slider::before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 2px;
+        top: 2px;
+        background-color: #222;
+        transition: 0.2s ease;
+        border-radius: 50%;
+      }
+
+      .switch input:checked + .slider {
+        background-color: #b9f5c5;
+      }
+
+      .switch input:checked + .slider::before {
+        transform: translateX(22px);
       }
 
       .tag-panel {
@@ -251,6 +363,23 @@
     <main class="page">
       <h1>道情報の投稿</h1>
 
+      <section aria-label="位置の微調整">
+        <div class="location-map-wrap">
+          <div id="post-map"></div>
+          <div class="map-center-mark" aria-hidden="true"></div>
+        </div>
+        <p id="map-center-coords" class="map-center-coords">中心座標: Lat --, Lng --</p>
+        <div class="record-toggle" role="group" aria-label="現在地の中央表示 toggle">
+          <span class="record-title">現在地の中央表示:</span>
+          <span class="record-label">OFF</span>
+          <label class="switch">
+            <input id="toggle-center-current" type="checkbox" aria-label="現在地の中央表示" />
+            <span class="slider"></span>
+          </label>
+          <span class="record-label">ON</span>
+        </div>
+      </section>
+
       <h2>タグ</h2>
       <section class="tag-panel" aria-label="タグ選択">
         <input id="tag-search" class="tag-search" type="text" placeholder="検索..." />
@@ -270,7 +399,7 @@
           <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button type="button" class="not-ready" aria-disabled="true">カメラで撮影</button>
           <footer class="version-footer">
-            <span id="app-version">v1.10.2</span>
+            <span id="app-version">v1.10.3</span>
           </footer>
         </div>
       </div>
@@ -281,6 +410,7 @@
         <button type="button" class="submit not-ready" aria-disabled="true">投稿</button>
       </div>
     </main>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
       const fallbackTags = [
         { id: "step", label: "段差" },
@@ -299,6 +429,8 @@
       const photoLibraryButton = document.getElementById("photo-library-button");
       const photoLibraryInput = document.getElementById("photo-library-input");
       const imagePreview = document.getElementById("image-preview");
+      const mapCenterCoordsEl = document.getElementById("map-center-coords");
+      const toggleCenterCurrentEl = document.getElementById("toggle-center-current");
       let allTags = [];
       const selectedTagIds = new Set();
       const selectedImages = [];
@@ -514,6 +646,71 @@
           selectedImages.splice(index, 1);
           renderSelectedImages();
         });
+      }
+
+      if (typeof L !== "undefined") {
+        const url = new URL(window.location.href);
+        const queryLat = Number(url.searchParams.get("lat"));
+        const queryLng = Number(url.searchParams.get("lng"));
+        const hasQueryCenter =
+          Number.isFinite(queryLat) &&
+          Number.isFinite(queryLng) &&
+          Math.abs(queryLat) <= 90 &&
+          Math.abs(queryLng) <= 180;
+        const initialLat = hasQueryCenter ? queryLat : 35.681236;
+        const initialLng = hasQueryCenter ? queryLng : 139.767125;
+
+        const postMap = L.map("post-map", { zoomControl: true }).setView([initialLat, initialLng], 16);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap contributors",
+        }).addTo(postMap);
+
+        const updateCenterCoords = () => {
+          if (!mapCenterCoordsEl) {
+            return;
+          }
+          const center = postMap.getCenter();
+          mapCenterCoordsEl.textContent = `中心座標: Lat ${center.lat.toFixed(6)}, Lng ${center.lng.toFixed(6)}`;
+        };
+
+        postMap.on("move", updateCenterCoords);
+        postMap.on("zoom", updateCenterCoords);
+        updateCenterCoords();
+
+        let latestDevicePosition = null;
+
+        function centerToCurrentLocation(animate = true) {
+          if (!toggleCenterCurrentEl || !toggleCenterCurrentEl.checked || !latestDevicePosition) {
+            return;
+          }
+          const currentZoom = postMap.getZoom();
+          postMap.setView([latestDevicePosition.lat, latestDevicePosition.lng], currentZoom, { animate });
+        }
+
+        if (toggleCenterCurrentEl) {
+          toggleCenterCurrentEl.addEventListener("change", () => {
+            if (toggleCenterCurrentEl.checked) {
+              centerToCurrentLocation(false);
+            }
+          });
+        }
+
+        if ("geolocation" in navigator) {
+          navigator.geolocation.watchPosition(
+            (pos) => {
+              latestDevicePosition = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+              };
+              centerToCurrentLocation(true);
+            },
+            (err) => {
+              console.warn("[post_road] geolocation watch error:", err);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        }
       }
     </script>
     <script src="/version.js"></script>
