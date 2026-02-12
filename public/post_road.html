@@ -140,17 +140,68 @@
         border: 1px dashed var(--line);
         border-radius: 12px;
         min-height: 180px;
+        background: #fafafa;
+        padding: 10px;
+      }
+
+      .preview-empty {
+        min-height: 158px;
         display: flex;
         align-items: center;
         justify-content: center;
         color: var(--muted);
-        background: #fafafa;
+      }
+
+      .preview-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+      }
+
+      .preview-card {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        background: #fff;
+        min-height: 100px;
+      }
+
+      .preview img {
+        width: 100%;
+        height: 100px;
+        object-fit: cover;
+        display: block;
+      }
+
+      .preview-remove {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        border: 1px solid #666;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #111;
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        line-height: 1;
+        cursor: pointer;
       }
 
       .upload-buttons {
         display: flex;
         flex-direction: column;
         gap: 10px;
+      }
+
+      .version-footer {
+        margin-top: 4px;
+      }
+
+      #app-version {
+        display: inline-block;
+        font-size: 0.9rem;
+        color: var(--muted);
       }
 
       button {
@@ -212,12 +263,18 @@
 
       <h2>画像アップロード</h2>
       <div class="upload-row">
-        <div class="preview">選択された画像がここに表示されます</div>
+        <div id="image-preview" class="preview">
+          <div class="preview-empty">選択された画像がここに表示されます</div>
+        </div>
         <div class="upload-buttons">
-          <button type="button" class="not-ready" aria-disabled="true">写真ライブラリ</button>
+          <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button type="button" class="not-ready" aria-disabled="true">カメラで撮影</button>
+          <footer class="version-footer">
+            <span id="app-version">v1.10.2</span>
+          </footer>
         </div>
       </div>
+      <input id="photo-library-input" type="file" accept="image/*" multiple hidden />
 
       <div class="actions">
         <button id="back-button" type="button">戻る</button>
@@ -239,8 +296,12 @@
       const tagSelectedEl = document.getElementById("tag-selected");
       const tagListEl = document.getElementById("tag-list");
       const backButton = document.getElementById("back-button");
+      const photoLibraryButton = document.getElementById("photo-library-button");
+      const photoLibraryInput = document.getElementById("photo-library-input");
+      const imagePreview = document.getElementById("image-preview");
       let allTags = [];
       const selectedTagIds = new Set();
+      const selectedImages = [];
 
       function escapeHtml(text) {
         return text
@@ -382,6 +443,79 @@
           window.history.back();
         });
       }
+
+      if (photoLibraryButton && photoLibraryInput) {
+        photoLibraryButton.addEventListener("click", () => {
+          photoLibraryInput.click();
+        });
+      }
+
+      function renderSelectedImages() {
+        if (!imagePreview) {
+          return;
+        }
+
+        if (selectedImages.length === 0) {
+          imagePreview.innerHTML = '<div class="preview-empty">選択された画像がここに表示されます</div>';
+          return;
+        }
+
+        imagePreview.innerHTML = `<div class="preview-list">${selectedImages
+          .map((item) => {
+            const safeId = escapeHtml(item.id);
+            const safeSrc = escapeHtml(item.url);
+            const safeAlt = escapeHtml(item.name || "選択された画像");
+            return `<div class="preview-card"><img src="${safeSrc}" alt="${safeAlt}"><button type="button" class="preview-remove" data-remove-image-id="${safeId}">削除</button></div>`;
+          })
+          .join("")}</div>`;
+      }
+
+      if (photoLibraryInput && imagePreview) {
+        photoLibraryInput.addEventListener("change", () => {
+          const files = Array.from(photoLibraryInput.files || []);
+          if (files.length === 0) {
+            return;
+          }
+
+          files.forEach((file) => {
+            if (!file.type.startsWith("image/")) {
+              return;
+            }
+            const imageId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            selectedImages.push({
+              id: imageId,
+              name: file.name || "選択された画像",
+              url: URL.createObjectURL(file),
+            });
+          });
+
+          renderSelectedImages();
+          photoLibraryInput.value = "";
+        });
+      }
+
+      if (imagePreview) {
+        imagePreview.addEventListener("click", (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) {
+            return;
+          }
+          const removeImageId = target.getAttribute("data-remove-image-id");
+          if (!removeImageId) {
+            return;
+          }
+
+          const index = selectedImages.findIndex((item) => item.id === removeImageId);
+          if (index < 0) {
+            return;
+          }
+
+          URL.revokeObjectURL(selectedImages[index].url);
+          selectedImages.splice(index, 1);
+          renderSelectedImages();
+        });
+      }
     </script>
+    <script src="/version.js"></script>
   </body>
 </html>
