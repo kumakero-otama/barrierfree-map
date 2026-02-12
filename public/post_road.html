@@ -399,7 +399,7 @@
           <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button type="button" class="not-ready" aria-disabled="true">カメラで撮影</button>
           <footer class="version-footer">
-            <span id="app-version">v1.10.3</span>
+            <span id="app-version">v1.10.4</span>
           </footer>
         </div>
       </div>
@@ -650,8 +650,10 @@
 
       if (typeof L !== "undefined") {
         const url = new URL(window.location.href);
-        const queryLat = Number(url.searchParams.get("lat"));
-        const queryLng = Number(url.searchParams.get("lng"));
+        const rawLat = url.searchParams.get("lat");
+        const rawLng = url.searchParams.get("lng");
+        const queryLat = rawLat === null ? NaN : Number(rawLat);
+        const queryLng = rawLng === null ? NaN : Number(rawLng);
         const hasQueryCenter =
           Number.isFinite(queryLat) &&
           Number.isFinite(queryLng) &&
@@ -659,6 +661,15 @@
           Math.abs(queryLng) <= 180;
         const initialLat = hasQueryCenter ? queryLat : 35.681236;
         const initialLng = hasQueryCenter ? queryLng : 139.767125;
+        console.log("[post_road] initial_map_center", {
+          rawLat,
+          rawLng,
+          queryLat,
+          queryLng,
+          hasQueryCenter,
+          initialLat,
+          initialLng,
+        });
 
         const postMap = L.map("post-map", { zoomControl: true }).setView([initialLat, initialLng], 16);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

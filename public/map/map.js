@@ -121,7 +121,11 @@ map.on("click", (event) => {
   const lat = Number(event?.latlng?.lat);
   const lng = Number(event?.latlng?.lng);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    window.location.assign(`/post_road.html?lat=${lat}&lng=${lng}`);
+    const params = new URLSearchParams({
+      lat: lat.toString(),
+      lng: lng.toString(),
+    });
+    window.location.assign(`/post_road.html?${params.toString()}`);
     return;
   }
   window.location.assign("/post_road.html");

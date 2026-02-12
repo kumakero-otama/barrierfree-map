@@ -119,7 +119,8 @@ const CONTENT_TYPES = {
 };
 
 function handleStatic(req, res) {
-  const requestPath = req.url === "/" ? "/index.html" : req.url;
+  const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const requestPath = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
   const filePath = path.join(PUBLIC_DIR, requestPath);
   const ext = path.extname(filePath).toLowerCase();
   const contentType = CONTENT_TYPES[ext] || "application/octet-stream";
