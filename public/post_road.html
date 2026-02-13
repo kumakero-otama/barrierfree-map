@@ -204,27 +204,27 @@
       }
 
       .tag-option {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        display: block;
+        width: 100%;
+        text-align: left;
         padding: 8px 10px;
         border-bottom: 1px solid #eee;
+        border-left: 0;
+        border-right: 0;
+        border-top: 0;
+        border-radius: 0;
+        background: #fff;
+        font-size: 1.05rem;
+        font-weight: 600;
+        cursor: pointer;
       }
 
       .tag-option:last-child {
         border-bottom: 0;
       }
 
-      .tag-option input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        margin: 0;
-      }
-
-      .tag-option label {
-        cursor: pointer;
-        font-size: 1.05rem;
-        font-weight: 600;
+      .tag-option:hover {
+        background: #f4f8ff;
       }
 
       .tag-list-empty {
@@ -394,7 +394,7 @@
 
       <h2>タグ</h2>
       <section class="tag-panel" aria-label="タグ選択">
-        <input id="tag-search" class="tag-search" type="text" placeholder="検索..." />
+        <input id="tag-search" class="tag-search" type="text" placeholder="検索または追加..." enterkeyhint="done" />
         <div id="tag-selected" class="tag-selected"></div>
         <div id="tag-list" class="tag-list"></div>
       </section>
@@ -411,7 +411,7 @@
           <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button id="camera-capture-button" type="button">カメラで撮影</button>
           <footer class="version-footer">
-            <span id="app-version">v1.10.5</span>
+            <span id="app-version">v1.10.6</span>
           </footer>
         </div>
       </div>
@@ -516,9 +516,7 @@
         }
         tagListEl.innerHTML = visibleTags
           .map((tag) => {
-            const checked = selectedTagIds.has(tag.id) ? "checked" : "";
-            const inputId = `tag-option-${tag.id}`;
-            return `<div class="tag-option"><input type="checkbox" id="${escapeHtml(inputId)}" data-tag-id="${escapeHtml(tag.id)}" ${checked}><label for="${escapeHtml(inputId)}">${escapeHtml(tag.label)}</label></div>`;
+            return `<button type="button" class="tag-option" data-tag-id="${escapeHtml(tag.id)}">${escapeHtml(tag.label)}</button>`;
           })
           .join("");
       }
@@ -546,25 +544,81 @@
         });
 
       if (tagSearchEl) {
+        const handleTagSearchSubmit = async () => {
+          const raw = tagSearchEl.value.trim();
+          if (!raw) {
+            return;
+          }
+
+          const existing = allTags.find((tag) => tag.label === raw);
+          if (existing) {
+            selectedTagIds.add(existing.id);
+            tagSearchEl.value = "";
+            renderTagUi();
+            return;
+          }
+
+          try {
+            const res = await fetch("/api/post-tags", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ label: raw }),
+            });
+            if (!res.ok) {
+              throw new Error(`create_tag_failed:${res.status}`);
+            }
+            const payload = await res.json();
+            const createdTag = payload && payload.tag ? payload.tag : null;
+            const normalized = normalizeTags(createdTag ? [createdTag] : []);
+            if (normalized.length === 0) {
+              throw new Error("invalid_created_tag");
+            }
+            const [tag] = normalized;
+            const alreadyExists = allTags.some((item) => item.id === tag.id);
+            if (!alreadyExists) {
+              allTags.push(tag);
+            }
+            selectedTagIds.add(tag.id);
+            tagSearchEl.value = "";
+            renderTagUi();
+          } catch (err) {
+            console.warn("[post_road] create tag failed:", err);
+            alert("タグの追加に失敗しました。時間をおいて再度お試しください。");
+          }
+        };
+
         tagSearchEl.addEventListener("input", () => {
           renderTagList();
         });
+
+        const onEnter = (event) => {
+          const isEnter = event.key === "Enter" || event.keyCode === 13;
+          if (!isEnter) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          void handleTagSearchSubmit();
+        };
+
+        tagSearchEl.addEventListener("keydown", onEnter);
+        tagSearchEl.addEventListener("keypress", onEnter);
       }
 
       if (tagListEl) {
-        tagListEl.addEventListener("change", (event) => {
+        tagListEl.addEventListener("click", (event) => {
           const target = event.target;
-          if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") {
+          if (!(target instanceof HTMLElement)) {
             return;
           }
           const tagId = target.getAttribute("data-tag-id");
           if (!tagId) {
             return;
           }
-          if (target.checked) {
-            selectedTagIds.add(tagId);
-          } else {
+          if (selectedTagIds.has(tagId)) {
             selectedTagIds.delete(tagId);
+          } else {
+            selectedTagIds.add(tagId);
           }
           renderTagUi();
         });
