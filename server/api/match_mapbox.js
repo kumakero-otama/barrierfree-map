@@ -12,6 +12,7 @@ function createMatchHandler({
   getMonthlyCount,
   incrementMonthlyCount,
   deletedSessionKeys,
+  canceledSessionIds,
   sendJson,
 }) {
   // DB接続とロガー
@@ -190,7 +191,9 @@ function createMatchHandler({
             console.log(`[DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
             
             // セッション更新（非同期だが待たない）
-            if (sessionUuid && userId && Number.isFinite(seq)) {
+            if (sessionUuid && canceledSessionIds && canceledSessionIds.has(sessionUuid)) {
+              console.log(`[DEBUG] Session canceled, skip updateSession: ${sessionUuid}`);
+            } else if (sessionUuid && userId && Number.isFinite(seq)) {
               console.log(`[DEBUG] Calling updateSession...`);
               updateSession(sessionUuid, userId, snappedLat, snappedLng, seq).catch(err => {
                 console.error('updateSession error:', err);

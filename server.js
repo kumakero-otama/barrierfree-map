@@ -142,6 +142,7 @@ function sendJson(res, statusCode, payload) {
 }
 
 const deletedSessionKeys = new Set();
+const canceledSessionIds = new Set();
 
 const handleMatch = createMatchHandler({
   https,
@@ -153,6 +154,7 @@ const handleMatch = createMatchHandler({
   getMonthlyCount,
   incrementMonthlyCount,
   deletedSessionKeys,
+  canceledSessionIds,
   sendJson,
 });
 
@@ -166,6 +168,7 @@ const handleCount = createCountHandler({
 
 const handleSession = createSessionHandler({
   deletedSessionKeys,
+  canceledSessionIds,
   sendJson,
 });
 
@@ -180,6 +183,7 @@ const handleRecords = createRecordsHandler({
 });
 
 const handleTrace = createTraceHandler({
+  canceledSessionIds,
   sendJson,
 });
 

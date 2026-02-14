@@ -65,7 +65,7 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
   }
 }
 
-function createTraceHandler({ sendJson }) {
+function createTraceHandler({ sendJson, canceledSessionIds }) {
   const VALHALLA_HOST = process.env.VALHALLA_HOST || "localhost";
   const VALHALLA_PORT = process.env.VALHALLA_PORT || "8002";
   const dbResult = createDbPool();
@@ -131,10 +131,12 @@ function createTraceHandler({ sendJson }) {
             const data = JSON.parse(responseBody);
             console.log(`${logPrefix} Response: edges=${data.edges?.length || 0}, matched_points=${data.matched_points?.length || 0}`);
 
-            if (sessionId) {
+            if (sessionId && (!canceledSessionIds || !canceledSessionIds.has(sessionId))) {
               persistSessionPath(pool, sessionId, source, data, logPrefix).catch((err) => {
                 console.error(`${logPrefix} session_path_save_error:`, err.message);
               });
+            } else if (sessionId) {
+              console.log(`${logPrefix} session_path_save_skipped: canceled session=${sessionId}`);
             }
 
             sendJson(res, 200, data);

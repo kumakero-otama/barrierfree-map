@@ -6,6 +6,11 @@ const toggleRecordBtn = document.getElementById("toggle-record");
 const toggleShowAllBtn = document.getElementById("toggle-show-all");
 const toggleShowOsmBtn = document.getElementById("toggle-show-osm");
 const toggleCenterCurrentBtn = document.getElementById("toggle-center-current");
+const traceConfirmModalEl = document.getElementById("trace-confirm-modal");
+const traceConfirmMapEl = document.getElementById("trace-confirm-map");
+const traceConfirmMessageEl = document.getElementById("trace-confirm-message");
+const traceConfirmOkBtn = document.getElementById("trace-confirm-ok");
+const traceConfirmCancelBtn = document.getElementById("trace-confirm-cancel");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -34,6 +39,9 @@ let recordedRawPoints = []; // レコード中のrawデータをメモリに保�
 let tracePolyline = null; // trace_attributesの結果を表示する黄緑線
 let currentSessionId = null;
 let currentSessionStartedAt = null;
+let traceConfirmMap = null;
+let traceConfirmPathLayer = null;
+let isHandlingRecordToggle = false;
 
 // Valhallaの6桁精度ポリラインをデコードする関数
 function decodePolyline(str, precision) {
@@ -176,92 +184,89 @@ function postSessionLifecycle(action, payload) {
     });
 }
 
-// trace_attributesでフィッティングしてマップに表示
-function processAndDisplayTrace(sessionId = null) {
-  if (recordedRawPoints.length < 2) {
-    console.log('[processAndDisplayTrace] Not enough points:', recordedRawPoints.length);
-    alert('記録されたポイントが少なすぎます（最低2点必要）');
-    return;
-  }
-  
-  console.log(`[processAndDisplayTrace] Processing ${recordedRawPoints.length} points`);
-  
-  // rawデータをValhalla trace_attributes形式に変換
-  const shape = recordedRawPoints.map(p => ({ lat: p.lat, lon: p.lng }));
-  
-  const requestBody = {
-    shape: shape,
-    costing: "pedestrian",
-    shape_match: "map_snap"
-    // フィルタを外して必要なデータをすべて取得
-  };
-  if (sessionId) {
-    requestBody.sessionId = sessionId;
-    requestBody.source = "valhalla";
-  }
-  
-  fetch('/api/trace', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
-  })
-    .then(res => {
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      return res.json();
-    })
-    .then(data => {
-      console.log('[processAndDisplayTrace] Valhalla response:', data);
-      
-      // 1. edgesがある場合、それぞれのshapeをつなぎ合わせる (way上の線を表示するため)
-      if (data.edges && data.edges.length > 0) {
-        console.log('[processAndDisplayTrace] Using edges shape');
-        let allCoords = [];
-        data.edges.forEach(edge => {
-          if (edge.shape) {
-            const edgeCoords = decodePolyline(edge.shape, 6);
-            // 重複する点を除去しつつ結合
-            if (allCoords.length > 0 && edgeCoords.length > 0) {
-              const lastPoint = allCoords[allCoords.length - 1];
-              const firstPoint = edgeCoords[0];
-              if (lastPoint[0] === firstPoint[0] && lastPoint[1] === firstPoint[1]) {
-                allCoords = allCoords.concat(edgeCoords.slice(1));
-              } else {
-                allCoords = allCoords.concat(edgeCoords);
-              }
-            } else {
-              allCoords = allCoords.concat(edgeCoords);
-            }
-          }
-        });
-        
-        if (allCoords.length > 0) {
-          displayTraceLine(allCoords);
+function extractTraceCoordinates(data, rawShape) {
+  if (data && Array.isArray(data.edges) && data.edges.length > 0) {
+    let allCoords = [];
+    data.edges.forEach((edge) => {
+      if (!edge || !edge.shape) {
+        return;
+      }
+      const edgeCoords = decodePolyline(edge.shape, 6);
+      if (allCoords.length > 0 && edgeCoords.length > 0) {
+        const lastPoint = allCoords[allCoords.length - 1];
+        const firstPoint = edgeCoords[0];
+        if (lastPoint[0] === firstPoint[0] && lastPoint[1] === firstPoint[1]) {
+          allCoords = allCoords.concat(edgeCoords.slice(1));
           return;
         }
       }
+      allCoords = allCoords.concat(edgeCoords);
+    });
+    if (allCoords.length > 1) {
+      return allCoords;
+    }
+  }
 
-      // 2. レスポンスの shape (エンコードされたポリライン) がある場合 (trace_route用)
-      if (data.shape) {
-        console.log('[processAndDisplayTrace] Decoding top-level shape geometry');
-        const coords = decodePolyline(data.shape, 6);
-        displayTraceLine(coords);
-      } 
-      // 3. matched_points がある場合 (バックアップ)
-      else if (data.matched_points && data.matched_points.length > 0) {
-        console.log('[processAndDisplayTrace] Using matched_points');
-        const coords = data.matched_points.map(p => [p.lat, p.lon]);
-        displayTraceLine(coords);
-      } 
-      // 4. どちらもない場合は生の座標を表示
-      else {
-        console.warn('[processAndDisplayTrace] No fitting data found, using raw points');
-        const coords = shape.map(p => [p.lat, p.lon]);
-        displayTraceLine(coords);
-      }
+  if (data && data.shape) {
+    const decoded = decodePolyline(data.shape, 6);
+    if (decoded.length > 1) {
+      return decoded;
+    }
+  }
+
+  if (data && Array.isArray(data.matched_points) && data.matched_points.length > 1) {
+    return data.matched_points
+      .map((p) => [Number(p.lat), Number(p.lon)])
+      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+  }
+
+  return rawShape
+    .map((p) => [p.lat, p.lon])
+    .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+}
+
+function requestTraceData(shape, { sessionId = null, persist = false } = {}) {
+  const requestBody = {
+    shape,
+    costing: "pedestrian",
+    shape_match: "map_snap",
+  };
+  if (persist && sessionId) {
+    requestBody.sessionId = sessionId;
+    requestBody.source = "valhalla";
+  }
+
+  return fetch("/api/trace", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  }).then((res) => {
+    if (!res.ok) {
+      throw new Error(`trace failed: ${res.status}`);
+    }
+    return res.json();
+  });
+}
+
+// trace_attributesでフィッティングしてマップに表示
+function processAndDisplayTrace(sessionId = null) {
+  if (recordedRawPoints.length < 2) {
+    console.log("[processAndDisplayTrace] Not enough points:", recordedRawPoints.length);
+    alert("記録されたポイントが少なすぎます（最低2点必要）");
+    return Promise.resolve(null);
+  }
+
+  const shape = recordedRawPoints.map((p) => ({ lat: p.lat, lon: p.lng }));
+  return requestTraceData(shape, { sessionId, persist: Boolean(sessionId) })
+    .then((data) => {
+      const coords = extractTraceCoordinates(data, shape);
+      displayTraceLine(coords);
+      return { data, coords };
     })
-    .catch(err => {
-      console.error('[processAndDisplayTrace] Error:', err);
-      alert('トレース処理に失敗しました: ' + err.message);
+    .catch((err) => {
+      console.error("[processAndDisplayTrace] Error:", err);
+      alert(`トレース処理に失敗しました: ${err.message}`);
+      return null;
     });
 }
 
@@ -280,6 +285,124 @@ function displayTraceLine(coordinates) {
       opacity: 0.8,
     }).addTo(map);
     console.log(`[displayTraceLine] Displayed trace with ${coordinates.length} points`);
+  }
+}
+
+function closeTraceConfirmModal() {
+  if (traceConfirmModalEl) {
+    traceConfirmModalEl.classList.add("hidden");
+  }
+  if (traceConfirmPathLayer && traceConfirmMap) {
+    traceConfirmMap.removeLayer(traceConfirmPathLayer);
+    traceConfirmPathLayer = null;
+  }
+  if (traceConfirmMap) {
+    traceConfirmMap.remove();
+    traceConfirmMap = null;
+  }
+}
+
+function openTraceConfirmModal(coordinates) {
+  return new Promise((resolve) => {
+    if (!traceConfirmModalEl || !traceConfirmMapEl || !traceConfirmOkBtn || !traceConfirmCancelBtn) {
+      resolve("cancel");
+      return;
+    }
+
+    traceConfirmModalEl.classList.remove("hidden");
+    traceConfirmMap = L.map(traceConfirmMapEl, { zoomControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(traceConfirmMap);
+
+    traceConfirmPathLayer = L.polyline(coordinates, {
+      color: "#9acd32",
+      weight: 5,
+      opacity: 0.9,
+    }).addTo(traceConfirmMap);
+    traceConfirmMap.fitBounds(traceConfirmPathLayer.getBounds(), { padding: [20, 20] });
+
+    const cleanupAndResolve = (result) => {
+      traceConfirmOkBtn.removeEventListener("click", onOk);
+      traceConfirmCancelBtn.removeEventListener("click", onCancel);
+      closeTraceConfirmModal();
+      resolve(result);
+    };
+
+    const onOk = () => cleanupAndResolve("ok");
+    const onCancel = () => cleanupAndResolve("cancel");
+
+    traceConfirmOkBtn.addEventListener("click", onOk);
+    traceConfirmCancelBtn.addEventListener("click", onCancel);
+
+    setTimeout(() => {
+      if (traceConfirmMap) {
+        traceConfirmMap.invalidateSize();
+      }
+    }, 0);
+  });
+}
+
+async function handleRecordStopWithConfirmation(finishedSessionId) {
+  if (!finishedSessionId) {
+    return;
+  }
+
+  if (recordedRawPoints.length < 2) {
+    alert("記録されたポイントが少なすぎます（最低2点必要）");
+    await postSessionLifecycle("cancel", {
+      sessionId: finishedSessionId,
+      deviceId: deviceUuid,
+    });
+    return;
+  }
+
+  const shape = recordedRawPoints.map((p) => ({ lat: p.lat, lon: p.lng }));
+  let previewData;
+  try {
+    previewData = await requestTraceData(shape);
+  } catch (err) {
+    console.error("[Record] preview trace error:", err);
+    alert(`保存確認用の経路生成に失敗しました: ${err.message}`);
+    await postSessionLifecycle("cancel", {
+      sessionId: finishedSessionId,
+      deviceId: deviceUuid,
+    });
+    return;
+  }
+
+  const previewCoords = extractTraceCoordinates(previewData, shape);
+  if (!Array.isArray(previewCoords) || previewCoords.length < 2) {
+    alert("保存確認用の経路を生成できませんでした。");
+    await postSessionLifecycle("cancel", {
+      sessionId: finishedSessionId,
+      deviceId: deviceUuid,
+    });
+    return;
+  }
+
+  if (traceConfirmMessageEl) {
+    traceConfirmMessageEl.textContent = "セッション全体でフィッティングした経路を黄緑線で表示しています。";
+  }
+
+  const decision = await openTraceConfirmModal(previewCoords);
+  if (decision === "ok") {
+    await postSessionLifecycle("end", {
+      sessionId: finishedSessionId,
+      endedAt: new Date().toISOString(),
+    });
+    await processAndDisplayTrace(finishedSessionId);
+    return;
+  }
+
+  await postSessionLifecycle("cancel", {
+    sessionId: finishedSessionId,
+    deviceId: deviceUuid,
+  });
+  if (tracePolyline) {
+    map.removeLayer(tracePolyline);
+    tracePolyline = null;
   }
 }
 
@@ -658,47 +781,52 @@ if ("geolocation" in navigator) {
     updateRecordButton();
     
     // レコードボタンのイベントハンドラー
-    toggleRecordBtn.addEventListener("change", () => {
-      const nextEnabled = toggleRecordBtn.checked;
-      if (nextEnabled) {
-        // レコードON：前回の黄緑線を削除し、新しいセッション開始
-        if (tracePolyline) {
-          map.removeLayer(tracePolyline);
-          tracePolyline = null;
-        }
-        recordedRawPoints = [];
-        currentSessionId = generateUUID();
-        currentSessionStartedAt = new Date().toISOString();
-        postSessionLifecycle("start", {
-          sessionId: currentSessionId,
-          deviceId: deviceUuid,
-          startedAt: currentSessionStartedAt,
-        });
-        recordEnabled = true;
+    toggleRecordBtn.addEventListener("change", async () => {
+      if (isHandlingRecordToggle) {
         updateRecordButton();
-        console.log(`[Record] Started recording session=${currentSessionId}`);
-      } else {
-        // レコードOFF：trace_attributesでフィッティングして黄緑線表示
-        const finishedSessionId = currentSessionId;
-        const endedAt = new Date().toISOString();
-        if (finishedSessionId) {
-          postSessionLifecycle("end", {
-            sessionId: finishedSessionId,
-            endedAt,
-          });
-        }
-        recordEnabled = false;
-        
-        // 過去のドットをすべて黒色に変更
-        trail.forEach(dot => {
-          dot.setStyle({ color: "#111", fillColor: "#111" });
-        });
+        return;
+      }
+      isHandlingRecordToggle = true;
+      toggleRecordBtn.disabled = true;
 
-        updateRecordButton();
-        console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected. session=${finishedSessionId}`);
-        currentSessionId = null;
-        currentSessionStartedAt = null;
-        processAndDisplayTrace(finishedSessionId);
+      const nextEnabled = toggleRecordBtn.checked;
+      try {
+        if (nextEnabled) {
+          // レコードON：前回の黄緑線を削除し、新しいセッション開始
+          if (tracePolyline) {
+            map.removeLayer(tracePolyline);
+            tracePolyline = null;
+          }
+          recordedRawPoints = [];
+          currentSessionId = generateUUID();
+          currentSessionStartedAt = new Date().toISOString();
+          await postSessionLifecycle("start", {
+            sessionId: currentSessionId,
+            deviceId: deviceUuid,
+            startedAt: currentSessionStartedAt,
+          });
+          recordEnabled = true;
+          updateRecordButton();
+          console.log(`[Record] Started recording session=${currentSessionId}`);
+        } else {
+          // レコードOFF：確認モーダルで保存可否を決定
+          const finishedSessionId = currentSessionId;
+          recordEnabled = false;
+
+          // 過去のドットをすべて黒色に変更
+          trail.forEach((dot) => {
+            dot.setStyle({ color: "#111", fillColor: "#111" });
+          });
+
+          updateRecordButton();
+          console.log(`[Record] Stopped recording. ${recordedRawPoints.length} points collected. session=${finishedSessionId}`);
+          currentSessionId = null;
+          currentSessionStartedAt = null;
+          await handleRecordStopWithConfirmation(finishedSessionId);
+        }
+      } finally {
+        isHandlingRecordToggle = false;
+        toggleRecordBtn.disabled = false;
       }
     });
     

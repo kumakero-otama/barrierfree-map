@@ -2,7 +2,7 @@ const { createDbPool } = require("../db");
 const { createLogger } = require("../logger");
 const path = require("path");
 
-function createSessionHandler({ sendJson }) {
+function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
   const dbError = dbResult.error;
@@ -48,6 +48,10 @@ function createSessionHandler({ sendJson }) {
       }
       if (action === "end") {
         await handleSessionEnd(data, res);
+        return;
+      }
+      if (action === "cancel") {
+        await handleSessionCancel(data, res);
         return;
       }
 
@@ -118,6 +122,52 @@ function createSessionHandler({ sendJson }) {
     } catch (err) {
       sessionLogger.appendLog("ERROR", `SESSION_END_DB_ERROR[${sessionId}]: ${err.message}`);
       sendJson(res, 500, { error: "session_end_failed", message: err.message });
+    }
+  }
+
+  async function handleSessionCancel(data, res) {
+    const sessionId = data.sessionId || data.sessionUuid;
+    const deviceId = data.deviceId || data.deviceUuid || null;
+
+    if (!sessionId) {
+      sendJson(res, 400, { error: "missing_session_id" });
+      return;
+    }
+
+    if (canceledSessionIds) {
+      canceledSessionIds.add(sessionId);
+    }
+    if (deletedSessionKeys && deviceId) {
+      deletedSessionKeys.add(`${sessionId}:${deviceId}`);
+    }
+    sessionLogger.appendLog("SESSION_CANCEL", `${sessionId},${deviceId || ""}`);
+
+    if (!pool) {
+      sendJson(res, 200, { success: true, sessionId, dbDisabled: true });
+      return;
+    }
+
+    try {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query("DELETE FROM session_path_edges WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM session_paths WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM gps_matched WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM gps_raw WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM sessions WHERE session_id = ?", [sessionId]);
+        await conn.commit();
+      } catch (err) {
+        await conn.rollback();
+        throw err;
+      } finally {
+        conn.release();
+      }
+
+      sendJson(res, 200, { success: true, sessionId, canceled: true });
+    } catch (err) {
+      sessionLogger.appendLog("ERROR", `SESSION_CANCEL_DB_ERROR[${sessionId}]: ${err.message}`);
+      sendJson(res, 500, { error: "session_cancel_failed", message: err.message });
     }
   }
 }

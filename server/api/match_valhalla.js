@@ -11,6 +11,7 @@ function createMatchHandler({
   getMonthlyCount,
   incrementMonthlyCount,
   deletedSessionKeys,
+  canceledSessionIds,
   sendJson,
 }) {
   // Valhalla設定（環境変数または固定値）
@@ -240,7 +241,9 @@ function createMatchHandler({
                 console.log(`${logPrefix} [DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
                 
                 // セッション更新（非同期だが待たない）
-                if (sessionUuid && userId && Number.isFinite(seq)) {
+                if (sessionUuid && canceledSessionIds && canceledSessionIds.has(sessionUuid)) {
+                  console.log(`${logPrefix} [DEBUG] Skipping save for canceled session=${sessionUuid}`);
+                } else if (sessionUuid && userId && Number.isFinite(seq)) {
                   console.log(`${logPrefix} [DEBUG] Calling updateSession...`);
                   updateSession(sessionUuid, userId, snappedLat, snappedLng, seq, logPrefix).catch(err => {
                     console.error(`${logPrefix} updateSession error:`, err);
@@ -249,7 +252,7 @@ function createMatchHandler({
                   console.log(`[DEBUG] updateSession NOT called: sessionUuid=${!!sessionUuid}, userId=${!!userId}, seq=${seq}`);
                 }
 
-                if (shouldRecordRealtime) {
+                if (shouldRecordRealtime && (!sessionUuid || !canceledSessionIds || !canceledSessionIds.has(sessionUuid))) {
                   persistRealtimePoints({
                     sessionUuid,
                     rawLat: lat,
@@ -262,6 +265,8 @@ function createMatchHandler({
                   }).catch((err) => {
                     console.error(`${logPrefix} realtime_record_error:`, err.message);
                   });
+                } else if (shouldRecordRealtime && sessionUuid) {
+                  console.log(`${logPrefix} [DEBUG] Realtime record skipped for canceled session=${sessionUuid}`);
                 }
                 
                 sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });

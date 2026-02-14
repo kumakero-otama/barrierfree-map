@@ -133,3 +133,55 @@
     grid-template-columns: 1fr;
   }
 }
+
+.trace-confirm-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 2000;
+  padding: 16px;
+}
+
+.trace-confirm-modal.hidden {
+  display: none;
+}
+
+.trace-confirm-panel {
+  width: min(860px, 96vw);
+  background: #fff;
+  border: 2px solid #222;
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+#trace-confirm-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+#trace-confirm-message {
+  margin: 0;
+  font-size: 14px;
+}
+
+#trace-confirm-map {
+  width: 100%;
+  height: min(52vh, 420px);
+  border: 2px solid #222;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.trace-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn.secondary {
+  background: #fff;
+}
