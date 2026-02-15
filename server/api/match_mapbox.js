@@ -50,14 +50,14 @@ function createMatchHandler({
     try {
       // セッションが存在するかチェック
       const [sessions] = await pool.query(
-        "SELECT id FROM sessions WHERE session_uuid = ?",
+        "SELECT id FROM tactile.sessions WHERE session_uuid = ?",
         [sessionUuid]
       );
       
       if (sessions.length === 0) {
         // 新規セッション作成
         const [result] = await pool.query(
-          "INSERT INTO sessions (session_uuid, user_id, started_at, ended_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+          "INSERT INTO tactile.sessions (session_uuid, user_id, started_at, ended_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
           [sessionUuid, safeUserId]
         );
         
@@ -66,20 +66,20 @@ function createMatchHandler({
         
         // ポイントを保存
         await pool.query(
-          "INSERT INTO session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
+          "INSERT INTO tactile.session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
           [sessionId, seq, snappedLat, snappedLng]
         );
       } else {
         // 既存セッションの終了時刻を更新
         const sessionId = sessions[0].id;
         await pool.query(
-          "UPDATE sessions SET ended_at = CURRENT_TIMESTAMP WHERE id = ?",
+          "UPDATE tactile.sessions SET ended_at = CURRENT_TIMESTAMP WHERE id = ?",
           [sessionId]
         );
         
         // ポイントを保存
         await pool.query(
-          "INSERT INTO session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
+          "INSERT INTO tactile.session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
           [sessionId, seq, snappedLat, snappedLng]
         );
       }

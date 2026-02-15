@@ -35,7 +35,7 @@ function createRecordsHandler({ sendJson }) {
           source,
           created_at,
           ST_AsGeoJSON(geom) AS geom_geojson
-        FROM session_paths
+        FROM tactile.session_paths
       `;
       const params = [];
 

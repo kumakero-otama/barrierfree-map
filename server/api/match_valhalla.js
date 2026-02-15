@@ -54,14 +54,14 @@ function createMatchHandler({
     try {
       // セッションが存在するかチェック
       const [sessions] = await pool.query(
-        "SELECT id FROM sessions WHERE session_uuid = ?",
+        "SELECT id FROM tactile.sessions WHERE session_uuid = ?",
         [sessionUuid]
       );
       
       if (sessions.length === 0) {
         // 新規セッション作成
         const [result] = await pool.query(
-          "INSERT INTO sessions (session_uuid, user_id, started_at, ended_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+          "INSERT INTO tactile.sessions (session_uuid, user_id, started_at, ended_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
           [sessionUuid, safeUserId]
         );
         
@@ -70,20 +70,20 @@ function createMatchHandler({
         
         // ポイントを保存
         await pool.query(
-          "INSERT INTO session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
+          "INSERT INTO tactile.session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
           [sessionId, seq, snappedLat, snappedLng]
         );
       } else {
         // 既存セッションの終了時刻を更新
         const sessionId = sessions[0].id;
         await pool.query(
-          "UPDATE sessions SET ended_at = CURRENT_TIMESTAMP WHERE id = ?",
+          "UPDATE tactile.sessions SET ended_at = CURRENT_TIMESTAMP WHERE id = ?",
           [sessionId]
         );
         
         // ポイントを保存
         await pool.query(
-          "INSERT INTO session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
+          "INSERT INTO tactile.session_points (session_id, seq, lat, lng) VALUES (?, ?, ?, ?)",
           [sessionId, seq, snappedLat, snappedLng]
         );
       }
@@ -98,8 +98,8 @@ function createMatchHandler({
       return;
     }
     try {
-      await pool.query("SELECT session_id, ts, geom, accuracy FROM gps_raw LIMIT 1");
-      await pool.query("SELECT session_id, ts, geom, edge_id, confidence FROM gps_matched LIMIT 1");
+      await pool.query("SELECT session_id, ts, geom, accuracy FROM tactile.gps_raw LIMIT 1");
+      await pool.query("SELECT session_id, ts, geom, edge_id, confidence FROM tactile.gps_matched LIMIT 1");
       realtimeSchemaChecked = true;
       console.log("[realtime_record] schema check passed: gps_raw, gps_matched");
     } catch (err) {
@@ -124,11 +124,11 @@ function createMatchHandler({
     try {
       await conn.beginTransaction();
       const [rawResult] = await conn.query(
-        "INSERT INTO gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
+        "INSERT INTO tactile.gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
         [safeSessionUuid, rawLng, rawLat, null]
       );
       await conn.query(
-        "INSERT INTO gps_matched (session_id, ts, geom, edge_id, confidence) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?, ?)",
+        "INSERT INTO tactile.gps_matched (session_id, ts, geom, edge_id, confidence) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?, ?)",
         [safeSessionUuid, snappedLng, snappedLat, edgeId || null, confidence ?? null]
       );
       await conn.commit();

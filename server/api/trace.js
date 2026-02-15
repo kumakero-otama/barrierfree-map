@@ -33,7 +33,7 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
     await conn.beginTransaction();
 
     await conn.query(
-      `INSERT INTO session_paths (session_id, geom, source)
+      `INSERT INTO tactile.session_paths (session_id, geom, source)
        VALUES (?, ST_GeogFromText(?), ?)
        ON CONFLICT (session_id) DO UPDATE
          SET geom = EXCLUDED.geom,
@@ -44,13 +44,13 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
     );
 
     await conn.query(
-      "DELETE FROM session_path_edges WHERE session_id = ?",
+      "DELETE FROM tactile.session_path_edges WHERE session_id = ?",
       [sessionId]
     );
 
     for (let i = 0; i < validEdges.length; i += 1) {
       await conn.query(
-        "INSERT INTO session_path_edges (session_id, seq, edge_id) VALUES (?, ?, ?) RETURNING session_id",
+        "INSERT INTO tactile.session_path_edges (session_id, seq, edge_id) VALUES (?, ?, ?) RETURNING session_id",
         [sessionId, i + 1, validEdges[i]]
       );
     }

@@ -78,7 +78,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
     try {
       await pool.query(
-        `INSERT INTO sessions (session_id, device_id, started_at, ended_at)
+        `INSERT INTO tactile.sessions (session_id, device_id, started_at, ended_at)
          VALUES (?, ?, ?, NULL)
          ON CONFLICT (session_id) DO UPDATE
            SET device_id = EXCLUDED.device_id,
@@ -111,7 +111,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
     try {
       const [result] = await pool.query(
-        "UPDATE sessions SET ended_at = ? WHERE session_id = ?",
+        "UPDATE tactile.sessions SET ended_at = ? WHERE session_id = ?",
         [endedAt, sessionId]
       );
       sendJson(res, 200, {
@@ -151,11 +151,11 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
-        await conn.query("DELETE FROM session_path_edges WHERE session_id = ?", [sessionId]);
-        await conn.query("DELETE FROM session_paths WHERE session_id = ?", [sessionId]);
-        await conn.query("DELETE FROM gps_matched WHERE session_id = ?", [sessionId]);
-        await conn.query("DELETE FROM gps_raw WHERE session_id = ?", [sessionId]);
-        await conn.query("DELETE FROM sessions WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM tactile.session_path_edges WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM tactile.session_paths WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM tactile.gps_raw WHERE session_id = ?", [sessionId]);
+        await conn.query("DELETE FROM tactile.sessions WHERE session_id = ?", [sessionId]);
         await conn.commit();
       } catch (err) {
         await conn.rollback();
