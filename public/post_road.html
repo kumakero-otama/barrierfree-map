@@ -411,7 +411,7 @@
           <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button id="camera-capture-button" type="button">カメラで撮影</button>
           <footer class="version-footer">
-            <span id="app-version">v1.11.2</span>
+            <span id="app-version">v1.11.3</span>
           </footer>
         </div>
       </div>
@@ -448,6 +448,7 @@
       const toggleCenterCurrentEl = document.getElementById("toggle-center-current");
       const detailInputEl = document.querySelector(".detail-input");
       const submitButton = document.querySelector(".submit");
+      let maxImageBytes = 2 * 1024 * 1024;
       let allTags = [];
       const selectedTagIds = new Set();
       const selectedImages = [];
@@ -529,6 +530,24 @@
         renderSelectedTags();
         renderTagList();
       }
+
+      async function refreshImageLimitFromConfig() {
+        try {
+          const res = await fetch("/api/config");
+          if (!res.ok) {
+            return;
+          }
+          const payload = await res.json();
+          const configured = Number(payload && payload.roadInfoImageMaxBytes);
+          if (Number.isFinite(configured) && configured > 0) {
+            maxImageBytes = Math.floor(configured);
+          }
+        } catch {
+          // keep default
+        }
+      }
+
+      void refreshImageLimitFromConfig();
 
       fetch("/api/post-tags")
         .then((res) => {
@@ -664,6 +683,7 @@
           isSubmitting = true;
           submitButton.disabled = true;
           try {
+            await refreshImageLimitFromConfig();
             const images = await buildImagePayloads();
             const res = await fetch("/api/road-info", {
               method: "POST",
@@ -695,6 +715,10 @@
             renderSelectedImages();
           } catch (err) {
             console.warn("[post_road] submit failed:", err);
+            if (err && err.message === "image_too_large") {
+              alert("画像サイズが大きすぎます。より小さい画像で再度お試しください。");
+              return;
+            }
             alert("投稿の保存に失敗しました。時間をおいて再度お試しください。");
           } finally {
             isSubmitting = false;
@@ -780,17 +804,88 @@
         });
       }
 
+      function loadImageFromFile(file) {
+        return new Promise((resolve, reject) => {
+          const objectUrl = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(img);
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error("image_load_failed"));
+          };
+          img.src = objectUrl;
+        });
+      }
+
+      function dataUrlSizeBytes(dataUrl) {
+        const commaIndex = dataUrl.indexOf(",");
+        if (commaIndex < 0) {
+          return Number.MAX_SAFE_INTEGER;
+        }
+        const base64 = dataUrl.slice(commaIndex + 1);
+        return Math.floor((base64.length * 3) / 4);
+      }
+
+      async function createCompressedImagePayload(file, nameHint) {
+        const image = await loadImageFromFile(file);
+        let scale = 1;
+        let attempt = 0;
+        let bestDataUrl = "";
+
+        while (attempt < 10) {
+          const width = Math.max(1, Math.round(image.naturalWidth * scale));
+          const height = Math.max(1, Math.round(image.naturalHeight * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            throw new Error("image_process_failed");
+          }
+          ctx.drawImage(image, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          bestDataUrl = dataUrl;
+          if (dataUrlSizeBytes(dataUrl) <= maxImageBytes) {
+            return {
+              name: `${(nameHint || "image").replace(/\.[^.]+$/, "")}.jpg`,
+              dataUrl,
+            };
+          }
+
+          scale *= 0.82;
+          attempt += 1;
+        }
+
+        if (dataUrlSizeBytes(bestDataUrl) > maxImageBytes) {
+          throw new Error("image_too_large");
+        }
+        return {
+          name: `${(nameHint || "image").replace(/\.[^.]+$/, "")}.jpg`,
+          dataUrl: bestDataUrl,
+        };
+      }
+
       async function buildImagePayloads() {
         const payloads = [];
         for (const image of selectedImages) {
           if (!image || !image.file) {
             continue;
           }
-          const dataUrl = await fileToDataUrl(image.file);
-          payloads.push({
-            name: image.name || "image",
-            dataUrl,
-          });
+          if (image.file.size <= maxImageBytes) {
+            const dataUrl = await fileToDataUrl(image.file);
+            payloads.push({
+              name: image.name || "image",
+              dataUrl,
+            });
+            continue;
+          }
+
+          const compressed = await createCompressedImagePayload(image.file, image.name || "image");
+          payloads.push(compressed);
         }
         return payloads;
       }

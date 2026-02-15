@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
+const { loadRoadInfoConfig } = require("../road_info_config");
 
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "uploads", "road_info_media");
 
@@ -49,7 +50,7 @@ function sanitizeTagIds(rawTagIds) {
   return [...new Set(tags)];
 }
 
-function parseDataUrl(dataUrl) {
+function parseDataUrl(dataUrl, maxImageBytes) {
   if (typeof dataUrl !== "string") {
     throw new Error("invalid_image_data");
   }
@@ -65,18 +66,21 @@ function parseDataUrl(dataUrl) {
   if (!binary.length) {
     throw new Error("invalid_image_data");
   }
+  if (binary.length > maxImageBytes) {
+    throw new Error("image_too_large");
+  }
   return { mimeType, binary };
 }
 
 function getExtension(name, mimeType) {
-  const extFromName = path.extname(name || "").replace(".", "").toLowerCase();
-  if (extFromName && /^[a-z0-9]+$/.test(extFromName)) {
-    return extFromName;
-  }
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/webp") return "webp";
   if (mimeType === "image/gif") return "gif";
+  const extFromName = path.extname(name || "").replace(".", "").toLowerCase();
+  if (extFromName && /^[a-z0-9]+$/.test(extFromName)) {
+    return extFromName;
+  }
   return "bin";
 }
 
@@ -84,8 +88,8 @@ async function ensureUploadDir() {
   await fs.promises.mkdir(UPLOAD_ROOT, { recursive: true });
 }
 
-async function saveImage(image, index) {
-  const { mimeType, binary } = parseDataUrl(image && image.dataUrl);
+async function saveImage(image, index, maxImageBytes) {
+  const { mimeType, binary } = parseDataUrl(image && image.dataUrl, maxImageBytes);
   const ext = getExtension(image && image.name, mimeType);
   const fileName = `${Date.now()}_${index}_${crypto.randomBytes(6).toString("hex")}.${ext}`;
   const absPath = path.join(UPLOAD_ROOT, fileName);
@@ -129,6 +133,8 @@ function createRoadInfoHandler({ sendJson }) {
       const detail = typeof body?.detail === "string" ? body.detail.trim() : "";
       const images = Array.isArray(body?.images) ? body.images : [];
       const tagCodes = sanitizeTagIds(body?.tagIds);
+      const roadInfoConfig = loadRoadInfoConfig();
+      const maxImageBytes = roadInfoConfig.imageMaxBytes;
 
       if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
         sendJson(res, 400, { error: "invalid_coordinates" });
@@ -192,7 +198,7 @@ function createRoadInfoHandler({ sendJson }) {
         }
 
         for (let i = 0; i < images.length; i += 1) {
-          const saved = await saveImage(images[i], i + 1);
+          const saved = await saveImage(images[i], i + 1, maxImageBytes);
           savedFiles.push(saved.absPath);
           await conn.query(
             `INSERT INTO roadinfo.road_info_media (note_id, media_type, url, created_by, is_deleted)
@@ -222,7 +228,7 @@ function createRoadInfoHandler({ sendJson }) {
           sendJson(res, 400, { error: "unknown_tags" });
           return;
         }
-        if (["invalid_image_data", "invalid_image_type"].includes(err.message)) {
+        if (["invalid_image_data", "invalid_image_type", "image_too_large"].includes(err.message)) {
           sendJson(res, 400, { error: err.message });
           return;
         }
