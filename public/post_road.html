@@ -411,7 +411,7 @@
           <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button id="camera-capture-button" type="button">カメラで撮影</button>
           <footer class="version-footer">
-            <span id="app-version">v1.11.1</span>
+            <span id="app-version">v1.11.2</span>
           </footer>
         </div>
       </div>
@@ -446,9 +446,13 @@
       const imagePreview = document.getElementById("image-preview");
       const mapCenterCoordsEl = document.getElementById("map-center-coords");
       const toggleCenterCurrentEl = document.getElementById("toggle-center-current");
+      const detailInputEl = document.querySelector(".detail-input");
+      const submitButton = document.querySelector(".submit");
       let allTags = [];
       const selectedTagIds = new Set();
       const selectedImages = [];
+      let currentMapCenter = null;
+      let isSubmitting = false;
 
       function escapeHtml(text) {
         return text
@@ -645,6 +649,60 @@
         });
       }
 
+      if (submitButton) {
+        submitButton.classList.remove("not-ready");
+        submitButton.removeAttribute("aria-disabled");
+        submitButton.addEventListener("click", async () => {
+          if (isSubmitting) {
+            return;
+          }
+          if (!currentMapCenter || !Number.isFinite(currentMapCenter.lat) || !Number.isFinite(currentMapCenter.lng)) {
+            alert("地図の中心座標が取得できません。少し待って再度お試しください。");
+            return;
+          }
+
+          isSubmitting = true;
+          submitButton.disabled = true;
+          try {
+            const images = await buildImagePayloads();
+            const res = await fetch("/api/road-info", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                lat: currentMapCenter.lat,
+                lng: currentMapCenter.lng,
+                tagIds: Array.from(selectedTagIds),
+                detail: detailInputEl ? detailInputEl.value : "",
+                images,
+              }),
+            });
+            if (!res.ok) {
+              throw new Error(`submit_failed:${res.status}`);
+            }
+
+            alert("投稿を保存しました。");
+            if (detailInputEl) {
+              detailInputEl.value = "";
+            }
+            selectedTagIds.clear();
+            for (const image of selectedImages) {
+              if (image && image.url) {
+                URL.revokeObjectURL(image.url);
+              }
+            }
+            selectedImages.splice(0, selectedImages.length);
+            renderTagUi();
+            renderSelectedImages();
+          } catch (err) {
+            console.warn("[post_road] submit failed:", err);
+            alert("投稿の保存に失敗しました。時間をおいて再度お試しください。");
+          } finally {
+            isSubmitting = false;
+            submitButton.disabled = false;
+          }
+        });
+      }
+
       function openInputPicker(inputEl, permissionLabel) {
         try {
           if (typeof inputEl.showPicker === "function") {
@@ -702,8 +760,39 @@
             id: imageId,
             name: file.name || "選択された画像",
             url: URL.createObjectURL(file),
+            file,
           });
         });
+      }
+
+      function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === "string") {
+              resolve(reader.result);
+              return;
+            }
+            reject(new Error("file_read_failed"));
+          };
+          reader.onerror = () => reject(new Error("file_read_failed"));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function buildImagePayloads() {
+        const payloads = [];
+        for (const image of selectedImages) {
+          if (!image || !image.file) {
+            continue;
+          }
+          const dataUrl = await fileToDataUrl(image.file);
+          payloads.push({
+            name: image.name || "image",
+            dataUrl,
+          });
+        }
+        return payloads;
       }
 
       function renderSelectedImages() {
@@ -806,6 +895,7 @@
             return;
           }
           const center = postMap.getCenter();
+          currentMapCenter = { lat: center.lat, lng: center.lng };
           mapCenterCoordsEl.textContent = `中心座標: Lat ${center.lat.toFixed(6)}, Lng ${center.lng.toFixed(6)}`;
         };
 

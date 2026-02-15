@@ -10,6 +10,7 @@ const createRecordsHandler = require("./server/api/records");
 const createTraceHandler = require("./server/api/trace");
 const createOsmTactileWaysHandler = require("./server/api/osm_tactile");
 const createPostTagsHandler = require("./server/api/post_tags");
+const createRoadInfoHandler = require("./server/api/road_info");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -22,6 +23,7 @@ const CLIENT_MIN_INTERVAL_MS = parseInt(process.env.CLIENT_MIN_INTERVAL_MS, 10) 
 const MAX_MATCH_CALLS_PER_MONTH = 100000;
 const COUNT_FILE = path.join(__dirname, "data", "mapbox-count.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const UPLOADS_DIR = path.join(__dirname, "uploads");
 const LOG_DIR = path.join(__dirname, "logs");
 const SERVER_LOG = path.join(LOG_DIR, "server.csv");
 let monthlyCounts = {};
@@ -136,6 +138,34 @@ function handleStatic(req, res) {
   });
 }
 
+function handleUploads(req, res) {
+  const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const requestPath = requestUrl.pathname.replace(/^\/uploads\//, "");
+  const normalized = path
+    .normalize(requestPath)
+    .replace(/^([/\\])+/, "")
+    .replace(/^(\.\.(\/|\\|$))+/, "");
+  const filePath = path.resolve(UPLOADS_DIR, normalized);
+  const uploadsRoot = path.resolve(UPLOADS_DIR);
+  if (!filePath.startsWith(`${uploadsRoot}${path.sep}`) && filePath !== uploadsRoot) {
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Forbidden");
+    return;
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = CONTENT_TYPES[ext] || "application/octet-stream";
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Not Found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(data);
+  });
+}
+
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
@@ -195,6 +225,10 @@ const handlePostTags = createPostTagsHandler({
   sendJson,
 });
 
+const handleRoadInfo = createRoadInfoHandler({
+  sendJson,
+});
+
 function handleRequest(req, res) {
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
@@ -226,6 +260,14 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/post-tags")) {
     handlePostTags(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/road-info")) {
+    handleRoadInfo(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/uploads/")) {
+    handleUploads(req, res);
     return;
   }
   handleStatic(req, res);

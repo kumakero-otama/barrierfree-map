@@ -6,3 +6,4 @@ config.yaml
 logs/
 node_modules/
 data/mapbox-count.json
+uploads/
