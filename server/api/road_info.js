@@ -112,6 +112,62 @@ function createRoadInfoHandler({ sendJson }) {
   }
 
   return function handleRoadInfo(req, res) {
+    if (req.method === "GET") {
+      if (!pool) {
+        sendJson(res, 503, { error: "database_unavailable" });
+        return;
+      }
+
+      const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+      const centerLat = Number(requestUrl.searchParams.get("centerLat"));
+      const centerLng = Number(requestUrl.searchParams.get("centerLng"));
+      const radiusKmRaw = Number(requestUrl.searchParams.get("radiusKm"));
+      const radiusKm = Number.isFinite(radiusKmRaw) ? radiusKmRaw : 10;
+
+      if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || Math.abs(centerLat) > 90 || Math.abs(centerLng) > 180) {
+        sendJson(res, 400, { error: "invalid_coordinates" });
+        return;
+      }
+      if (!Number.isFinite(radiusKm) || radiusKm <= 0) {
+        sendJson(res, 400, { error: "invalid_radius" });
+        return;
+      }
+
+      const radiusMeters = Math.min(radiusKm, 20) * 1000;
+      pool.query(
+        `SELECT
+           id,
+           ST_Y(geom::geometry) AS lat,
+           ST_X(geom::geometry) AS lng
+         FROM roadinfo.road_info_point
+         WHERE status = 'active'
+           AND ST_DWithin(
+             geom,
+             ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+             ?
+           )
+         ORDER BY created_at DESC
+         LIMIT 3000`,
+        [centerLng, centerLat, radiusMeters]
+      )
+        .then(([rows]) => {
+          sendJson(res, 200, {
+            success: true,
+            count: rows.length,
+            points: rows.map((row) => ({
+              id: row.id,
+              lat: Number(row.lat),
+              lng: Number(row.lng),
+            })),
+          });
+        })
+        .catch((err) => {
+          console.error("[road_info] list_error:", err.message);
+          sendJson(res, 500, { error: "road_info_list_failed" });
+        });
+      return;
+    }
+
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "method_not_allowed" });
       return;

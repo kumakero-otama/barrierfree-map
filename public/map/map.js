@@ -5,6 +5,7 @@ const lastUpdatedEl = document.getElementById("last-updated");
 const toggleRecordBtn = document.getElementById("toggle-record");
 const toggleShowAllBtn = document.getElementById("toggle-show-all");
 const toggleShowOsmBtn = document.getElementById("toggle-show-osm");
+const toggleShowRoadInfoBtn = document.getElementById("toggle-show-road-info");
 const toggleCenterCurrentBtn = document.getElementById("toggle-center-current");
 const traceConfirmModalEl = document.getElementById("trace-confirm-modal");
 const traceConfirmMapEl = document.getElementById("trace-confirm-map");
@@ -93,9 +94,16 @@ const deviceUuid = getOrCreateDeviceUuid();
 let showAllRecords = false;
 let allRecordsMarkers = [];
 let osmTactileMarkers = [];
+let roadInfoMarkers = [];
 let isZooming = false;
 let suppressMapTapUntil = 0;
 const MAP_TAP_SUPPRESS_AFTER_ZOOM_MS = 400;
+const roadInfoSquareIcon = L.divIcon({
+  className: "road-info-square-icon",
+  html: '<span class="road-info-square"></span>',
+  iconSize: [8, 8],
+  iconAnchor: [4, 4],
+});
 
 function shouldIgnoreMapTap(event) {
   if (isZooming || Date.now() < suppressMapTapUntil) {
@@ -711,6 +719,66 @@ function clearOsmTactileWaysFromMap() {
   osmTactileMarkers = [];
 }
 
+function loadAndShowRoadInfoPoints() {
+  console.log("[loadAndShowRoadInfoPoints] Fetching road info points...");
+  const center = map.getCenter();
+  const params = new URLSearchParams({
+    centerLat: center.lat.toString(),
+    centerLng: center.lng.toString(),
+    radiusKm: "10",
+  });
+  fetch(`/api/road-info?${params.toString()}`)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`road-info fetch failed: ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      if (!data || !Array.isArray(data.points)) {
+        throw new Error("invalid road-info payload");
+      }
+      showRoadInfoPointsOnMap(data.points);
+    })
+    .catch((err) => {
+      console.error("[loadAndShowRoadInfoPoints] Error:", err);
+      alert("道情報データの取得に失敗しました。");
+      if (toggleShowRoadInfoBtn) {
+        toggleShowRoadInfoBtn.checked = false;
+      }
+      clearRoadInfoPointsFromMap();
+    });
+}
+
+function showRoadInfoPointsOnMap(points) {
+  clearRoadInfoPointsFromMap();
+
+  points.forEach((point) => {
+    const lat = Number(point && point.lat);
+    const lng = Number(point && point.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return;
+    }
+
+    const square = L.marker([lat, lng], {
+      icon: roadInfoSquareIcon,
+      interactive: false,
+      keyboard: false,
+    }).addTo(map);
+    roadInfoMarkers.push(square);
+  });
+
+  console.log(`[showRoadInfoPointsOnMap] Displayed ${roadInfoMarkers.length} points`);
+}
+
+function clearRoadInfoPointsFromMap() {
+  console.log(`[clearRoadInfoPointsFromMap] Removing ${roadInfoMarkers.length} points`);
+  roadInfoMarkers.forEach((marker) => {
+    map.removeLayer(marker);
+  });
+  roadInfoMarkers = [];
+}
+
 // サーバーから設定を取得
 function loadConfig() {
   return fetch("/api/config")
@@ -851,6 +919,17 @@ if ("geolocation" in navigator) {
         } else {
           console.log("[toggleShowOsm] Hiding OSM tactile ways");
           clearOsmTactileWaysFromMap();
+        }
+      });
+    }
+
+    if (toggleShowRoadInfoBtn) {
+      toggleShowRoadInfoBtn.addEventListener("change", () => {
+        const showRoadInfo = toggleShowRoadInfoBtn.checked;
+        if (showRoadInfo) {
+          loadAndShowRoadInfoPoints();
+        } else {
+          clearRoadInfoPointsFromMap();
         }
       });
     }

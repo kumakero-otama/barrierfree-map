@@ -185,3 +185,17 @@
 .btn.secondary {
   background: #fff;
 }
+
+.road-info-square-icon {
+  background: transparent;
+  border: 0;
+}
+
+.road-info-square {
+  display: block;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  background: #0066ff;
+  border: 1px solid #0047b3;
+}
