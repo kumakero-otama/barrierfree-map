@@ -1,3 +1,5 @@
+# 今はもうroadinfo.road_info_tagテーブルを使っているため、このファイルは使われていない。
+
 post_tags:
   - id: audible_signal
     label: 音が鳴る信号機
