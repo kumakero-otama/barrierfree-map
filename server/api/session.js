@@ -19,6 +19,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     sessionLogger.appendLog("INFO", "DB接続成功");
   }
 
+  // /api/session/{start|end|cancel} を1つのハンドラで振り分ける。
   return async function handleSession(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.pathname.split("/").pop();
@@ -59,6 +60,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     });
   };
 
+  // セッション開始時刻を作成/更新する。
   async function handleSessionStart(data, res) {
     const sessionId = data.sessionId || data.sessionUuid;
     const deviceId = data.deviceId || data.deviceUuid || null;
@@ -93,6 +95,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     }
   }
 
+  // セッション終了時刻を更新する。
   async function handleSessionEnd(data, res) {
     const sessionId = data.sessionId || data.sessionUuid;
     const endedAt = data.endedAt || new Date().toISOString();
@@ -125,6 +128,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     }
   }
 
+  // キャンセル対象セッションの関連データをまとめて削除する。
   async function handleSessionCancel(data, res) {
     const sessionId = data.sessionId || data.sessionUuid;
     const deviceId = data.deviceId || data.deviceUuid || null;

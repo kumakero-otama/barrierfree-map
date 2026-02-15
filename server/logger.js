@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
+// CSVの1行に安全に埋め込めるよう、各フィールドを引用符で包む。
 function toCsv(fields) {
   return fields
     .map((field) => {
@@ -11,7 +12,9 @@ function toCsv(fields) {
     .join(",");
 }
 
+// 指定ファイルにCSVログを追記するロガーを作る。
 function createLogger(logFilePath) {
+  // ログ出力先ディレクトリがなければ作成する。
   function ensureLogDir() {
     try {
       const dir = path.dirname(logFilePath);
@@ -21,6 +24,7 @@ function createLogger(logFilePath) {
     }
   }
 
+  // 1イベントを「timestamp,level,message」のCSVで追記する。
   function appendLog(level, message) {
     const timestamp = new Date().toISOString();
     const line = `${toCsv([timestamp, level, message])}\n`;

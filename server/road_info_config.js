@@ -5,6 +5,7 @@ const yaml = require("yaml");
 const ROAD_INFO_CONFIG_PATH = path.join(__dirname, "..", "config", "road_info.yaml");
 const DEFAULT_MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
+// 道情報投稿用設定を読み込み、未設定時は安全なデフォルト値を返す。
 function loadRoadInfoConfig() {
   try {
     const raw = fs.readFileSync(ROAD_INFO_CONFIG_PATH, "utf8");

@@ -5,10 +5,12 @@ const yaml = require("yaml");
 
 const RULES_PATH = path.join(__dirname, "..", "..", "config", "osm_tactile_rules.yaml");
 
+// 正規表現で安全に扱えるよう、設定値のメタ文字をエスケープする。
 function escapeRegexValue(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// YAMLルールを読み込み、利用可能な形式だけに正規化する。
 function loadRules() {
   const raw = fs.readFileSync(RULES_PATH, "utf8");
   const parsed = yaml.parse(raw) || {};
@@ -46,6 +48,7 @@ function loadRules() {
   };
 }
 
+// ルールと中心点からOverpass QLクエリを組み立てる。
 function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
   const selectors = rules.elementTypes
     .flatMap((elementType) =>
@@ -64,6 +67,7 @@ out geom;
 `;
 }
 
+// Overpass APIへPOSTしてJSONレスポンスを受け取る。
 function fetchOverpass(overpassHost, query, callback) {
   const body = `data=${encodeURIComponent(query)}`;
   const options = {
@@ -101,6 +105,7 @@ function fetchOverpass(overpassHost, query, callback) {
   req.end();
 }
 
+// Overpassのelement配列を地図表示しやすいGeoJSONへ変換する。
 function toFeatureCollection(overpassJson, rules) {
   const elements = Array.isArray(overpassJson && overpassJson.elements) ? overpassJson.elements : [];
   const features = [];
@@ -188,6 +193,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
     rules = null;
   }
 
+  // 指定範囲の点字ブロック関連データをOverpass経由で返す。
   return function handleOsmTactileWays(req, res) {
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });

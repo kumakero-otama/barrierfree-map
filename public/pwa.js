@@ -1,5 +1,6 @@
 
 if ("serviceWorker" in navigator) {
+  // 同一ページ内で多重リロードしないためのフラグ。
   let refreshing = false;
 
   // Service Workerの更新を監視
@@ -54,7 +55,7 @@ if ("serviceWorker" in navigator) {
       });
   });
 
-  // フォーカス時にも更新をチェック
+  // タブ復帰時にも更新確認して古いキャッシュ滞留を減らす。
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       navigator.serviceWorker.ready.then((registration) => {

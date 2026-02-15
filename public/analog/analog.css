@@ -1,3 +1,4 @@
+/* ページ全体の中央配置 */
 html,
 body {
   height: 100%;
@@ -19,6 +20,7 @@ body {
   padding: 40px 16px;
 }
 
+/* アナログ時計の盤面 */
 .clock {
   position: relative;
   width: 260px;
@@ -29,6 +31,7 @@ body {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
 }
 
+/* 針の共通設定（個別長さは下で上書き） */
 .hand {
   position: absolute;
   top: 50%;
@@ -67,6 +70,7 @@ body {
   transform: translate(-50%, -50%);
 }
 
+/* ホームに戻るボタン */
 .btn {
   display: inline-block;
   padding: 10px 16px;

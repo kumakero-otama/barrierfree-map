@@ -7,6 +7,7 @@ const postCountEl = document.getElementById("post-count");
 const backBtn = document.getElementById("back-btn");
 const postSelfBtn = document.getElementById("post-self-btn");
 
+// ユーザー投稿本文を安全に表示するためのHTMLエスケープ。
 function escapeHtml(text) {
   return String(text || "")
     .replace(/&/g, "&amp;")
@@ -16,6 +17,7 @@ function escapeHtml(text) {
     .replace(/'/g, "&#39;");
 }
 
+// APIの日時文字列を画面表示用の yyyy/mm/dd hh:mm へ変換する。
 function formatDate(dateRaw) {
   const date = new Date(dateRaw);
   if (Number.isNaN(date.getTime())) {
@@ -29,6 +31,7 @@ function formatDate(dateRaw) {
   return `${y}/${m}/${d} ${hh}:${mm}`;
 }
 
+// 読み込み失敗時にエラー文言だけを見せる。
 function setError(message) {
   if (detailLoadingEl) {
     detailLoadingEl.classList.add("hidden");
@@ -42,6 +45,7 @@ function setError(message) {
   }
 }
 
+// タグ一覧を箇条書きで描画する。
 function renderTags(tags) {
   if (!tagsListEl) {
     return;
@@ -55,6 +59,7 @@ function renderTags(tags) {
     .join("");
 }
 
+// 投稿一覧（本文 + 画像）をカード形式で描画する。
 function renderPosts(posts) {
   if (!postsListEl) {
     return;
@@ -88,6 +93,7 @@ function renderPosts(posts) {
     .join("");
 }
 
+// ローディング表示から通常表示へ切り替える。
 function showContent() {
   if (detailLoadingEl) {
     detailLoadingEl.classList.add("hidden");
@@ -100,6 +106,7 @@ function showContent() {
   }
 }
 
+// 画面下部ボタンのイベントを初期化する。
 function initActions() {
   if (postSelfBtn) {
     postSelfBtn.addEventListener("click", () => {
@@ -112,11 +119,12 @@ function initActions() {
         window.history.back();
         return;
       }
-      window.location.assign("/map/index.html");
+      window.location.assign("/map/Index.html");
     });
   }
 }
 
+// URLのpointIdを使って詳細APIを呼び出し、画面に反映する。
 function loadRoadInfoDetail() {
   const params = new URLSearchParams(window.location.search);
   const pointId = Number(params.get("pointId"));

@@ -11,6 +11,7 @@ function createRecordsHandler({ sendJson }) {
     console.warn("records_handler_no_pool");
   }
 
+  // 保存済みの経路ライン（session_paths）を地図描画用に返す。
   return async function handleRecords(req, res) {
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });
@@ -29,6 +30,7 @@ function createRecordsHandler({ sendJson }) {
       const centerLng = Number(url.searchParams.get("centerLng"));
       const radiusKm = Number(url.searchParams.get("radiusKm"));
 
+      // 基本は全経路を取得し、条件があれば範囲検索を追加する。
       let query = `
         SELECT
           session_id,

@@ -37,18 +37,18 @@ const swJsContent = `const CACHE_VERSION = "${VERSION}"; // このバージョ�
 const CACHE_NAME = \`barrierfree-map-v\${CACHE_VERSION}-\${Date.now()}\`;
 const CORE_ASSETS = [
   "/",
-  "/index.html",
+  "/home/Index.html",
   "/style.css",
-  "/app.js",
+  "/home/app.js",
   "/version.js",
-  "/analog/index.html",
+  "/analog/Index.html",
   "/analog/analog.css",
   "/analog/analog.js",
-  "/map/index.html",
+  "/map/Index.html",
   "/map/map.css",
   "/map/map.js",
   "/manifest.webmanifest",
-  "/icon.svg",
+  "/assets/icon.svg",
   "/pwa.js",
 ];
 

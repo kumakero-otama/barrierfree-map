@@ -6,23 +6,25 @@
     <title>HTML Sandbox</title>
     <meta name="theme-color" content="#222222" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
+    <!-- ホーム画面の案内と遷移リンク -->
     <h1>It works!</h1>
     <p>Node.js HTTP server is running.</p>
     <p>Current time: <span id="clock">--:--:--</span></p>
     <p>
-      <a class="btn" href="analog/index.html">Open analog clock</a>
+      <a class="btn" href="/analog/Index.html">Open analog clock</a>
     </p>
     <p>
-      <a class="btn" href="map/index.html">Open draggable map</a>
+      <a class="btn" href="/map/Index.html">Open draggable map</a>
     </p>
+    <!-- 共通バージョン表示 -->
     <footer class="version-footer">
-      <span id="app-version">v1.12.1</span>
+      <span id="app-version">v1.12.2</span>
     </footer>
     <script src="app.js"></script>
-    <script src="version.js"></script>
+    <script src="/version.js"></script>
     <script src="/pwa.js"></script>
   </body>
 </html>

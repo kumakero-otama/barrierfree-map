@@ -10,6 +10,7 @@ const DB_LOG = path.join(LOG_DIR, "db_connection.csv");
 
 const dbLogger = createLogger(DB_LOG);
 
+// ルートのconfig.yamlからDB接続設定を読む。
 function loadConfig() {
   const raw = fs.readFileSync(CONFIG_PATH, "utf8");
   const parsed = yaml.parse(raw);
@@ -19,15 +20,18 @@ function loadConfig() {
   return parsed.db;
 }
 
+// MySQL互換の ? プレースホルダを PostgreSQL の $1 形式へ変換する。
 function toPgSql(sql) {
   let index = 0;
   return sql.replace(/\?/g, () => `$${++index}`);
 }
 
+// INSERT文にRETURNINGがない場合、insertId互換を得るために補完が必要か判定する。
 function needsReturningId(sql) {
   return /^\s*insert\s+/i.test(sql) && !/\breturning\b/i.test(sql);
 }
 
+// pgの結果を既存コード互換（rows / insertId / affectedRows）に整形する。
 function makeCompatResult(sql, result) {
   if (/^\s*select\s+/i.test(sql) || /^\s*with\s+/i.test(sql)) {
     return [result.rows];
@@ -54,6 +58,7 @@ class PgCompatConnection {
     this.client = client;
   }
 
+  // 既存コードの query(sql, params) をそのまま使えるよう変換して実行する。
   async query(sql, params = []) {
     const baseSql = toPgSql(sql);
     const pgSql = needsReturningId(baseSql) ? `${baseSql} RETURNING id` : baseSql;
@@ -83,6 +88,7 @@ class PgCompatPool {
     this.pool = pool;
   }
 
+  // プール直実行時も同じ互換ルールで結果を返す。
   async query(sql, params = []) {
     const baseSql = toPgSql(sql);
     const pgSql = needsReturningId(baseSql) ? `${baseSql} RETURNING id` : baseSql;
@@ -90,12 +96,14 @@ class PgCompatPool {
     return makeCompatResult(baseSql, result);
   }
 
+  // トランザクション用コネクションを取得する。
   async getConnection() {
     const client = await this.pool.connect();
     return new PgCompatConnection(client);
   }
 }
 
+// DBプールを初期化し、利用可否を呼び出し元へ返す。
 function createDbPool() {
   try {
     const dbConfig = loadConfig();

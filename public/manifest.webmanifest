@@ -1,15 +1,15 @@
 {
   "name": "Barrierfree Map",
   "short_name": "BF Map",
-  "start_url": "/map/index.html",
+  "start_url": "/map/Index.html",
   "display": "standalone",
   "background_color": "#f7f5f0",
   "theme_color": "#222222",
   "icons": [
     {
-      "src": "/otamap_logo.png",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/assets/otamap_logo.png",
+      "sizes": "150x150",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

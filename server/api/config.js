@@ -5,6 +5,7 @@ function createConfigHandler({
   CLIENT_MIN_INTERVAL_MS,
   sendJson,
 }) {
+  // クライアント初期化に必要な設定値をまとめて返す。
   return function handleConfig(req, res) {
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });

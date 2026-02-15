@@ -5,6 +5,7 @@ function createCountHandler({
   monthlyCounts,
   sendJson,
 }) {
+  // 月次の利用回数カウンタを可視化するAPI。
   return function handleCount(req, res) {
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });

@@ -15,7 +15,7 @@ function createMatchHandler({
   canceledSessionIds,
   sendJson,
 }) {
-  // DB接続とロガー
+  // DB接続とロガーを準備する（旧Mapbox版の記録処理用）。
   const dbResult = createDbPool();
   const pool = dbResult.pool;
   
@@ -26,7 +26,7 @@ function createMatchHandler({
   const sessionLogger = createLogger(SESSION_LOG);
   const pointsLogger = createLogger(POINTS_LOG);
   
-  // セッション更新関数（存在しなければ作成、存在すれば終了時刻を更新）
+  // スナップ結果をセッション情報とポイント履歴に保存する。
   async function updateSession(sessionUuid, userId, snappedLat, snappedLng, seq) {
     console.log(`[updateSession] Called with: sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
     
@@ -89,12 +89,14 @@ function createMatchHandler({
     }
   }
   
+  // マッチ不可時は204で「更新なし」を返す。
   function sendNoContent(res) {
 
     res.writeHead(204);
     res.end();
   }
 
+  // Mapbox Matching APIを使って最新座標を道路にスナップする。
   return function handleMatch(req, res) {
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });

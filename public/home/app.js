@@ -1,5 +1,6 @@
 const clockEl = document.getElementById("clock");
 
+// ホーム画面の時刻表示を現在時刻で更新する。
 function updateClock() {
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, "0");

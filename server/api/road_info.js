@@ -6,6 +6,7 @@ const { loadRoadInfoConfig } = require("../road_info_config");
 
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "uploads", "road_info_media");
 
+// JSONボディを受け取り、サイズ超過/JSON不正を共通処理する。
 function parseJsonBody(req, callback) {
   let done = false;
   const finish = (err, payload) => {
@@ -40,6 +41,7 @@ function parseJsonBody(req, callback) {
   });
 }
 
+// タグID配列を「空文字除外 + 重複排除」で正規化する。
 function sanitizeTagIds(rawTagIds) {
   if (!Array.isArray(rawTagIds)) {
     return [];
@@ -50,6 +52,7 @@ function sanitizeTagIds(rawTagIds) {
   return [...new Set(tags)];
 }
 
+// data URL形式の画像を検証し、バイナリへ変換する。
 function parseDataUrl(dataUrl, maxImageBytes) {
   if (typeof dataUrl !== "string") {
     throw new Error("invalid_image_data");
@@ -72,6 +75,7 @@ function parseDataUrl(dataUrl, maxImageBytes) {
   return { mimeType, binary };
 }
 
+// MIMEまたはファイル名から保存拡張子を決める。
 function getExtension(name, mimeType) {
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/png") return "png";
@@ -84,10 +88,12 @@ function getExtension(name, mimeType) {
   return "bin";
 }
 
+// 道情報画像の保存先ディレクトリを用意する。
 async function ensureUploadDir() {
   await fs.promises.mkdir(UPLOAD_ROOT, { recursive: true });
 }
 
+// 1枚の画像を保存し、公開URLを返す。
 async function saveImage(image, index, maxImageBytes) {
   const { mimeType, binary } = parseDataUrl(image && image.dataUrl, maxImageBytes);
   const ext = getExtension(image && image.name, mimeType);
@@ -111,6 +117,7 @@ function createRoadInfoHandler({ sendJson }) {
     console.warn("[road_info] db_pool_unavailable");
   }
 
+  // 一覧取得・詳細取得・新規投稿をまとめて扱うAPI。
   return function handleRoadInfo(req, res) {
     if (req.method === "GET") {
       if (!pool) {
@@ -118,6 +125,7 @@ function createRoadInfoHandler({ sendJson }) {
         return;
       }
 
+      // GETは pointId の有無で「詳細」か「地図用一覧」かを切り替える。
       const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       const pointId = Number(requestUrl.searchParams.get("pointId"));
       if (Number.isInteger(pointId) && pointId > 0) {
@@ -139,6 +147,7 @@ function createRoadInfoHandler({ sendJson }) {
             }
 
             const point = pointRows[0];
+            // 詳細表示用にタグ・投稿・画像を別テーブルから組み立てる。
             const [tagRows] = await pool.query(
               `SELECT t.id, t.code, t.label_ja
                FROM roadinfo.road_info_point_tag pt
@@ -225,6 +234,7 @@ function createRoadInfoHandler({ sendJson }) {
         return;
       }
 
+      // 地図用一覧は中心点 + 半径でactiveポイントのみ返す。
       const radiusMeters = Math.min(radiusKm, 20) * 1000;
       pool.query(
         `SELECT
@@ -269,6 +279,7 @@ function createRoadInfoHandler({ sendJson }) {
       return;
     }
 
+    // POSTは point + tag関連 + note + media を1トランザクションで保存する。
     parseJsonBody(req, async (parseErr, body) => {
       if (parseErr) {
         const code = parseErr.message === "payload_too_large" ? "payload_too_large" : "invalid_json";

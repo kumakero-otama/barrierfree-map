@@ -1,6 +1,7 @@
 const http = require("http");
 const { createDbPool } = require("../db");
 
+// matched_points から PostGISに保存できるLINESTRING WKTを組み立てる。
 function createLinestringWkt(points) {
   const coords = points
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon))
@@ -11,6 +12,7 @@ function createLinestringWkt(points) {
   return `SRID=4326;LINESTRING(${coords.join(",")})`;
 }
 
+// trace結果をセッション単位の経路テーブルへ反映する。
 async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
   if (!pool || !sessionId) {
     return;
@@ -32,6 +34,7 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
   try {
     await conn.beginTransaction();
 
+    // 本体のライン情報（session_paths）は upsert で更新する。
     await conn.query(
       `INSERT INTO tactile.session_paths (session_id, geom, source)
        VALUES (?, ST_GeogFromText(?), ?)
@@ -43,6 +46,7 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
       [sessionId, wkt, source]
     );
 
+    // 紐づくエッジ列は一旦削除して再作成する。
     await conn.query(
       "DELETE FROM tactile.session_path_edges WHERE session_id = ?",
       [sessionId]
@@ -71,6 +75,7 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
 
+  // Valhalla trace_attributesを呼び、必要ならDB保存も行う。
   return function handleTrace(req, res) {
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "method_not_allowed" });

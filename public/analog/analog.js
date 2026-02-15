@@ -2,6 +2,7 @@ const hourHand = document.getElementById("hour-hand");
 const minuteHand = document.getElementById("minute-hand");
 const secondHand = document.getElementById("second-hand");
 
+// 現在時刻から各針の角度を計算してアナログ時計に反映する。
 function updateAnalogClock() {
   const now = new Date();
   const hours = now.getHours() % 12;

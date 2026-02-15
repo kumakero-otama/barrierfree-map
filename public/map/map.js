@@ -143,10 +143,10 @@ map.on("click", (event) => {
       lat: lat.toString(),
       lng: lng.toString(),
     });
-    window.location.assign(`/post_road.html?${params.toString()}`);
+    window.location.assign(`/post_road/Index.html?${params.toString()}`);
     return;
   }
-  window.location.assign("/post_road.html");
+  window.location.assign("/post_road/Index.html");
 });
 
 // UUID v4 生成関数
@@ -722,6 +722,7 @@ function clearOsmTactileWaysFromMap() {
 }
 
 function loadAndShowRoadInfoPoints() {
+  // 地図中心から10kmの道情報ポイントを取得する。
   console.log("[loadAndShowRoadInfoPoints] Fetching road info points...");
   const center = map.getCenter();
   const params = new URLSearchParams({
@@ -753,6 +754,7 @@ function loadAndShowRoadInfoPoints() {
 }
 
 function showRoadInfoPointsOnMap(points) {
+  // 既存ピンを消してから最新結果だけを表示する。
   clearRoadInfoPointsFromMap();
 
   points.forEach((point) => {
@@ -770,7 +772,7 @@ function showRoadInfoPointsOnMap(points) {
       if (!Number.isInteger(pointId) || pointId <= 0) {
         return;
       }
-      window.location.assign(`/road_info_detail.html?pointId=${pointId}`);
+      window.location.assign(`/road_info_detail/Index.html?pointId=${pointId}`);
     });
     roadInfoMarkers.push(pin);
   });
@@ -779,6 +781,7 @@ function showRoadInfoPointsOnMap(points) {
 }
 
 function clearRoadInfoPointsFromMap() {
+  // 道情報ピンレイヤーをすべて破棄する。
   console.log(`[clearRoadInfoPointsFromMap] Removing ${roadInfoMarkers.length} points`);
   roadInfoMarkers.forEach((marker) => {
     map.removeLayer(marker);
@@ -931,6 +934,7 @@ if ("geolocation" in navigator) {
     }
 
     if (toggleShowRoadInfoBtn) {
+      // 道情報トグルでAPI取得と描画ON/OFFを切り替える。
       toggleShowRoadInfoBtn.addEventListener("change", () => {
         const showRoadInfo = toggleShowRoadInfoBtn.checked;
         if (showRoadInfo) {

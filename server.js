@@ -31,6 +31,7 @@ let monthlyCounts = {};
 const logger = createLogger(SERVER_LOG);
 const { appendLog } = logger;
 
+// console引数をログ保存しやすい文字列へ整形する。
 function formatMessage(args) {
   return args
     .map((arg) => {
@@ -74,6 +75,7 @@ function getCurrentMonth() {
   return `${year}-${month}`;
 }
 
+// 月次カウンタJSONを起動時に読み込む。
 function loadCount() {
   try {
     const raw = fs.readFileSync(COUNT_FILE, "utf8");
@@ -87,6 +89,7 @@ function loadCount() {
   }
 }
 
+// 月次カウンタJSONを書き戻す。
 function saveCount() {
   try {
     fs.writeFileSync(COUNT_FILE, JSON.stringify(monthlyCounts, null, 2), "utf8");
@@ -95,10 +98,12 @@ function saveCount() {
   }
 }
 
+// 指定月のカウント値を返す（未定義は0）。
 function getMonthlyCount(month) {
   return monthlyCounts[month] || 0;
 }
 
+// 指定月のカウントを1増やし、即時保存する。
 function incrementMonthlyCount(month) {
   monthlyCounts[month] = getMonthlyCount(month) + 1;
   saveCount();
@@ -122,7 +127,30 @@ const CONTENT_TYPES = {
 
 function handleStatic(req, res) {
   const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-  const requestPath = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
+  // 旧パスでアクセスされた場合は新しいページ構成へリダイレクトする。
+  const legacyPathMap = {
+    "/index.html": "/home/Index.html",
+    "/home/index.html": "/home/Index.html",
+    "/map/index.html": "/map/Index.html",
+    "/analog/index.html": "/analog/Index.html",
+    "/post_road.html": "/post_road/Index.html",
+    "/post_road/index.html": "/post_road/Index.html",
+    "/otasuke.html": "/otasuke/Index.html",
+    "/otasuke/index.html": "/otasuke/Index.html",
+    "/road_info_detail.html": "/road_info_detail/Index.html",
+    "/road_info_detail/index.html": "/road_info_detail/Index.html",
+  };
+  const lowerPath = requestUrl.pathname.toLowerCase();
+  const canonicalPath = requestUrl.pathname === "/"
+    ? "/home/Index.html"
+    : (legacyPathMap[lowerPath] || requestUrl.pathname);
+  if (requestUrl.pathname !== canonicalPath) {
+    res.writeHead(302, { Location: canonicalPath });
+    res.end();
+    return;
+  }
+  const requestPath = canonicalPath;
+  // public配下の静的ファイルを拡張子に応じたContent-Typeで返す。
   const filePath = path.join(PUBLIC_DIR, requestPath);
   const ext = path.extname(filePath).toLowerCase();
   const contentType = CONTENT_TYPES[ext] || "application/octet-stream";
@@ -140,6 +168,7 @@ function handleStatic(req, res) {
 
 function handleUploads(req, res) {
   const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  // uploads外に出ないようパス正規化してディレクトリトラバーサルを防ぐ。
   const requestPath = requestUrl.pathname.replace(/^\/uploads\//, "");
   const normalized = path
     .normalize(requestPath)
@@ -230,6 +259,7 @@ const handleRoadInfo = createRoadInfoHandler({
 });
 
 function handleRequest(req, res) {
+  // APIパスを先に判定し、それ以外は静的配信へフォールバックする。
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
     return;

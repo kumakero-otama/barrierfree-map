@@ -1,3 +1,4 @@
+/* 地図 + サイドパネルの2カラム配置 */
 .map-row {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) 220px;
@@ -8,6 +9,7 @@
   align-items: start;
 }
 
+/* 地図キャンバスの見た目 */
 #map {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -19,6 +21,7 @@
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
 }
 
+/* 右側の情報パネル */
 .map-side {
   border: 2px solid #222;
   border-radius: 12px;
@@ -57,11 +60,13 @@
   outline-offset: 3px;
 }
 
+/* トグルと補助情報の縦並び */
 .meta {
   display: grid;
   gap: 12px;
 }
 
+/* ON/OFFトグル共通スタイル */
 .record-toggle {
   display: inline-flex;
   align-items: center;
@@ -134,6 +139,7 @@
   }
 }
 
+/* 記録停止時の確認モーダル */
 .trace-confirm-modal {
   position: fixed;
   inset: 0;

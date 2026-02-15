@@ -1,3 +1,4 @@
+/* 詳細ページ全体レイアウト */
 .detail-wrap {
   max-width: 760px;
   margin: 0 auto;
@@ -27,6 +28,7 @@ h1 {
   margin: 10px 0 16px;
 }
 
+/* 「タグ」「投稿」などセクション見出し */
 .section-label {
   margin: 0 0 8px;
   font-size: 24px;
@@ -34,6 +36,7 @@ h1 {
   line-height: 1.2;
 }
 
+/* タグは読みやすさ重視で箇条書き表示 */
 .tags-list {
   margin: 0;
   padding-left: 28px;
@@ -52,6 +55,7 @@ h1 {
   font-weight: 400;
 }
 
+/* 画面最下部の操作ボタン群 */
 .bottom-actions {
   margin-top: 18px;
   display: flex;
@@ -67,6 +71,7 @@ h1 {
   min-width: 220px;
 }
 
+/* 投稿カード内の本文と画像 */
 .posts-list {
   display: grid;
   gap: 14px;

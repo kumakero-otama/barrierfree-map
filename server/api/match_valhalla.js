@@ -14,11 +14,11 @@ function createMatchHandler({
   canceledSessionIds,
   sendJson,
 }) {
-  // Valhalla設定（環境変数または固定値）
+  // Valhalla接続先（環境変数で上書き可能）。
   const VALHALLA_HOST = process.env.VALHALLA_HOST || "localhost";
   const VALHALLA_PORT = process.env.VALHALLA_PORT || "8002";
   
-  // DB接続とロガー
+  // DB接続とログ出力先を準備する。
   const dbResult = createDbPool();
   const pool = dbResult.pool;
   
@@ -30,7 +30,7 @@ function createMatchHandler({
   const pointsLogger = createLogger(POINTS_LOG);
   let realtimeSchemaChecked = false;
   
-  // セッション更新関数（存在しなければ作成、存在すれば終了時刻を更新）
+  // セッション情報を更新し、スナップ点を時系列で保存する。
   async function updateSession(sessionUuid, userId, snappedLat, snappedLng, seq, logPrefix = "") {
     console.log(`${logPrefix} [updateSession] Called with: sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
     
@@ -93,6 +93,7 @@ function createMatchHandler({
     }
   }
 
+  // リアルタイム保存に必要なテーブルの存在を一度だけ確認する。
   async function ensureRealtimeSchema() {
     if (!pool || realtimeSchemaChecked) {
       return;
@@ -107,6 +108,7 @@ function createMatchHandler({
     }
   }
 
+  // raw座標とsnapped座標を同一トランザクションで保存する。
   async function persistRealtimePoints({ sessionUuid, rawLat, rawLng, snappedLat, snappedLng, edgeId, confidence, logPrefix }) {
     if (!pool) {
       return;
@@ -140,11 +142,13 @@ function createMatchHandler({
     }
   }
   
+  // 更新データがない場合は204で返す。
   function sendNoContent(res) {
     res.writeHead(204);
     res.end();
   }
 
+  // Valhalla /locate を呼び、地図上の最新スナップ座標を返す。
   return function handleMatch(req, res) {
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });
@@ -179,6 +183,7 @@ function createMatchHandler({
       return;
     }
 
+    // 端末単位の最小送信間隔を守る。
     const now = Date.now();
     const rateLimitKey = deviceUuid || ip;
     const last = lastRequestByDevice.get(rateLimitKey) || 0;
@@ -188,7 +193,7 @@ function createMatchHandler({
     }
     lastRequestByDevice.set(rateLimitKey, now);
 
-    // Valhallaのlocateエンドポイントにリクエストを送る
+    // Valhalla locate に1点問い合わせして最寄り道路を取得する。
     console.log(`${logPrefix} valhalla locate request: lat=${lat}, lng=${lng}`);
 
     // Valhallaのリクエストボディ（locateエンドポイント用）

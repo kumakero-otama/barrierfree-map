@@ -1,5 +1,6 @@
 const { createDbPool } = require("../db");
 
+// 小さなJSONボディを安全に受け取り、エラーを1箇所で扱う。
 function parseJsonBody(req, callback) {
   let done = false;
   const finish = (err, payload) => {
@@ -34,6 +35,7 @@ function parseJsonBody(req, callback) {
   });
 }
 
+// DB行をフロント向けのタグオブジェクトへ正規化する。
 function normalizeTagRow(row) {
   if (!row || typeof row !== "object") {
     return null;
@@ -51,6 +53,7 @@ function normalizeTagRow(row) {
   };
 }
 
+// ラベル文字列から英数字ベースのコード候補を作る。
 function buildBaseCode(label) {
   const normalized = label
     .normalize("NFKC")
@@ -63,6 +66,7 @@ function buildBaseCode(label) {
   return normalized || "tag";
 }
 
+// 指定コードが既存タグに存在するか確認する。
 async function codeExists(pool, code) {
   const [rows] = await pool.query(
     "SELECT 1 FROM roadinfo.road_info_tag WHERE code = ? LIMIT 1",
@@ -71,6 +75,7 @@ async function codeExists(pool, code) {
   return rows.length > 0;
 }
 
+// 重複しないタグコードを作る（base, base_2 ... の順に探索）。
 async function buildUniqueCode(pool, label) {
   const base = buildBaseCode(label);
   if (!(await codeExists(pool, base))) {
@@ -91,6 +96,7 @@ async function buildUniqueCode(pool, label) {
   throw new Error("tag_code_generation_failed");
 }
 
+// 有効なタグ一覧を表示順で取得する。
 async function fetchActiveTags(pool) {
   const [rows] = await pool.query(
     `SELECT id, code, label_ja, sort_order
@@ -101,6 +107,7 @@ async function fetchActiveTags(pool) {
   return rows.map(normalizeTagRow).filter(Boolean);
 }
 
+// ラベル完全一致で既存タグを1件探す。
 async function findTagByLabel(pool, label) {
   const [rows] = await pool.query(
     `SELECT id, code, label_ja, sort_order
@@ -113,6 +120,7 @@ async function findTagByLabel(pool, label) {
   return normalizeTagRow(rows[0]);
 }
 
+// タグ追加をトランザクションで実行し、作成行を返す。
 async function createTag(pool, label) {
   const conn = await pool.getConnection();
   try {
@@ -156,6 +164,7 @@ function createPostTagsHandler({ sendJson }) {
     console.warn("[post_tags] db_pool_unavailable");
   }
 
+  // タグ一覧取得（GET）とタグ追加（POST）を提供する。
   return function handlePostTags(req, res) {
     if (req.method === "GET") {
       if (!pool) {

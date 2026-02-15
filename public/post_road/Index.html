@@ -6,6 +6,7 @@
     <title>道情報の投稿</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+      /* ページ全体で使う色と余白の基準値 */
       :root {
         --bg: #ffffff;
         --text: #111111;
@@ -42,6 +43,7 @@
         font-size: 1rem;
       }
 
+      /* 投稿地点を決める地図枠 */
       .location-map-wrap {
         position: relative;
         border: 1px solid var(--line);
@@ -153,6 +155,7 @@
         transform: translateX(22px);
       }
 
+      /* タグ検索・選択の入力領域 */
       .tag-panel {
         border: 1px solid var(--line);
         border-radius: 12px;
@@ -242,6 +245,7 @@
         font-size: 1rem;
       }
 
+      /* 画像プレビューとアップロード操作 */
       .upload-row {
         display: grid;
         grid-template-columns: 1fr 160px;
@@ -357,6 +361,7 @@
         cursor: not-allowed;
       }
 
+      /* 画面下部の戻る/投稿ボタン */
       .actions {
         position: fixed;
         left: 50%;
@@ -432,6 +437,7 @@
     </style>
   </head>
   <body>
+    <!-- 道情報投稿フォーム全体 -->
     <main class="page">
       <h1>道情報の投稿</h1>
 
@@ -470,8 +476,9 @@
         <div class="upload-buttons">
           <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button id="camera-capture-button" type="button">カメラで撮影</button>
+          <!-- 共通バージョン表示 -->
           <footer class="version-footer">
-            <span id="app-version">v1.12.1</span>
+            <span id="app-version">v1.12.2</span>
           </footer>
         </div>
       </div>
@@ -490,6 +497,7 @@
     </main>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+      // 投稿画面の状態管理・画像処理・送信を扱うメインスクリプト。
       const fallbackTags = [
         { id: "step", label: "段差" },
         { id: "construction", label: "工事中" },
@@ -521,6 +529,7 @@
       let currentMapCenter = null;
       let isSubmitting = false;
 
+      // タップ中の見た目（押下状態）をボタンに付与する。
       function enablePressFeedback(buttonEl) {
         if (!buttonEl) {
           return;
@@ -536,6 +545,7 @@
       enablePressFeedback(backButton);
       enablePressFeedback(submitButton);
 
+      // 投稿中はローディング表示へ切り替え、二重送信を抑止する。
       function setSubmittingUi(active) {
         if (!submitLoadingEl) {
           return;
@@ -544,6 +554,7 @@
         submitLoadingEl.setAttribute("aria-hidden", active ? "false" : "true");
       }
 
+      // タグ表示などで使う最小限のHTMLエスケープ。
       function escapeHtml(text) {
         return text
           .replaceAll("&", "&amp;")
@@ -553,6 +564,7 @@
           .replaceAll("'", "&#39;");
       }
 
+      // API/ローカル定義のタグを同じ形式に揃える。
       function normalizeTags(rawTags) {
         return rawTags
           .map((tag, index) => {
@@ -569,6 +581,7 @@
           .filter(Boolean);
       }
 
+      // 検索語と選択状態から、表示対象タグを絞り込む。
       function getVisibleTags() {
         const query = tagSearchEl ? tagSearchEl.value.trim().toLowerCase() : "";
         const filtered = query
@@ -585,6 +598,7 @@
         return filtered;
       }
 
+      // 選択済みタグを上段のチップとして描画する。
       function renderSelectedTags() {
         if (!tagSelectedEl) {
           return;
@@ -599,6 +613,7 @@
           .join("");
       }
 
+      // 候補タグ一覧を検索条件に合わせて描画する。
       function renderTagList() {
         if (!tagListEl) {
           return;
@@ -615,11 +630,13 @@
           .join("");
       }
 
+      // タグ表示全体（選択済み + 候補一覧）を更新する。
       function renderTagUi() {
         renderSelectedTags();
         renderTagList();
       }
 
+      // サーバー設定から画像の上限バイト数を取得する。
       async function refreshImageLimitFromConfig() {
         try {
           const res = await fetch("/api/config");
@@ -819,6 +836,7 @@
         });
       }
 
+      // ファイル選択UIを端末に応じた方法で開く。
       function openInputPicker(inputEl, permissionLabel) {
         try {
           if (typeof inputEl.showPicker === "function") {
@@ -832,6 +850,7 @@
         }
       }
 
+      // カメラ撮影前に権限を確認する。
       async function requestCameraPermission() {
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
           return true;
@@ -866,6 +885,7 @@
         });
       }
 
+      // 選択された画像ファイルを内部リストへ追加する。
       function addSelectedImageFiles(files) {
         files.forEach((file) => {
           if (!file.type.startsWith("image/")) {
@@ -881,6 +901,7 @@
         });
       }
 
+      // 画像ファイルをdata URLへ変換する。
       function fileToDataUrl(file) {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -896,6 +917,7 @@
         });
       }
 
+      // 画像サイズ取得や圧縮処理用にImageオブジェクト化する。
       function loadImageFromFile(file) {
         return new Promise((resolve, reject) => {
           const objectUrl = URL.createObjectURL(file);
@@ -912,6 +934,7 @@
         });
       }
 
+      // data URLの実サイズ（概算バイト）を算出する。
       function dataUrlSizeBytes(dataUrl) {
         const commaIndex = dataUrl.indexOf(",");
         if (commaIndex < 0) {
@@ -921,6 +944,7 @@
         return Math.floor((base64.length * 3) / 4);
       }
 
+      // 上限サイズに収まるまで段階的に縮小して投稿用データを作る。
       async function createCompressedImagePayload(file, nameHint) {
         const image = await loadImageFromFile(file);
         let scale = 1;
@@ -961,6 +985,7 @@
         };
       }
 
+      // 選択済み画像を投稿API用の配列へ変換する。
       async function buildImagePayloads() {
         const payloads = [];
         for (const image of selectedImages) {
@@ -982,6 +1007,7 @@
         return payloads;
       }
 
+      // 選択済み画像のサムネイル一覧を再描画する。
       function renderSelectedImages() {
         if (!imagePreview) {
           return;
@@ -1077,6 +1103,7 @@
           attribution: "&copy; OpenStreetMap contributors",
         }).addTo(postMap);
 
+        // 地図中心の緯度経度をUIに反映する。
         const updateCenterCoords = () => {
           if (!mapCenterCoordsEl) {
             return;
@@ -1092,6 +1119,7 @@
 
         let latestDevicePosition = null;
 
+        // 現在地追従トグルがONなら地図中心を現在地へ寄せる。
         function centerToCurrentLocation(animate = true) {
           if (!toggleCenterCurrentEl || !toggleCenterCurrentEl.checked || !latestDevicePosition) {
             return;

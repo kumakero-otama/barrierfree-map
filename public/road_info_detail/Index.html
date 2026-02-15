@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>道情報の詳細</title>
     <link rel="stylesheet" href="/style.css" />
-    <link rel="stylesheet" href="/road_info_detail.css" />
+    <link rel="stylesheet" href="/road_info_detail/road_info_detail.css" />
   </head>
   <body>
+    <!-- 道情報詳細（タグ・投稿・画像）の表示画面 -->
     <main class="detail-wrap">
       <h1>道情報の詳細</h1>
       <div class="detail-main">
@@ -27,15 +28,17 @@
         <section id="detail-loading">読み込み中...</section>
       </div>
 
+      <!-- 画面下部の固定操作ボタン -->
       <div class="bottom-actions">
         <button id="post-self-btn" class="btn btn-primary" type="button">自分もここに投稿する</button>
         <button id="back-btn" class="btn" type="button">戻る</button>
       </div>
+      <!-- 共通バージョン表示 -->
       <footer class="version-footer">
-        <span id="app-version">v1.12.1</span>
+        <span id="app-version">v1.12.2</span>
       </footer>
     </main>
-    <script src="/road_info_detail.js"></script>
+    <script src="/road_info_detail/road_info_detail.js"></script>
     <script src="/version.js"></script>
     <script src="/pwa.js"></script>
   </body>
