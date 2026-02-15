@@ -26,6 +26,14 @@ const redPinIcon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+const bluePinIcon = L.icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
 let MIN_REQUEST_INTERVAL_MS = 2000; // 2秒間隔
 let latestLocation = null; // OSからの最新位置情報を保持する変数
@@ -98,12 +106,6 @@ let roadInfoMarkers = [];
 let isZooming = false;
 let suppressMapTapUntil = 0;
 const MAP_TAP_SUPPRESS_AFTER_ZOOM_MS = 400;
-const roadInfoSquareIcon = L.divIcon({
-  className: "road-info-square-icon",
-  html: '<span class="road-info-square"></span>',
-  iconSize: [8, 8],
-  iconAnchor: [4, 4],
-});
 
 function shouldIgnoreMapTap(event) {
   if (isZooming || Date.now() < suppressMapTapUntil) {
@@ -760,12 +762,17 @@ function showRoadInfoPointsOnMap(points) {
       return;
     }
 
-    const square = L.marker([lat, lng], {
-      icon: roadInfoSquareIcon,
-      interactive: false,
-      keyboard: false,
+    const pin = L.marker([lat, lng], {
+      icon: bluePinIcon,
     }).addTo(map);
-    roadInfoMarkers.push(square);
+    pin.on("click", () => {
+      const pointId = Number(point.id);
+      if (!Number.isInteger(pointId) || pointId <= 0) {
+        return;
+      }
+      window.location.assign(`/road_info_detail.html?pointId=${pointId}`);
+    });
+    roadInfoMarkers.push(pin);
   });
 
   console.log(`[showRoadInfoPointsOnMap] Displayed ${roadInfoMarkers.length} points`);

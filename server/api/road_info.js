@@ -119,6 +119,98 @@ function createRoadInfoHandler({ sendJson }) {
       }
 
       const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+      const pointId = Number(requestUrl.searchParams.get("pointId"));
+      if (Number.isInteger(pointId) && pointId > 0) {
+        pool.query(
+          `SELECT id,
+                  ST_Y(geom::geometry) AS lat,
+                  ST_X(geom::geometry) AS lng,
+                  status,
+                  created_at
+           FROM roadinfo.road_info_point
+           WHERE id = ?
+           LIMIT 1`,
+          [pointId]
+        )
+          .then(async ([pointRows]) => {
+            if (!Array.isArray(pointRows) || pointRows.length < 1) {
+              sendJson(res, 404, { error: "not_found" });
+              return;
+            }
+
+            const point = pointRows[0];
+            const [tagRows] = await pool.query(
+              `SELECT t.id, t.code, t.label_ja
+               FROM roadinfo.road_info_point_tag pt
+               JOIN roadinfo.road_info_tag t ON t.id = pt.tag_id
+               WHERE pt.point_id = ? AND t.is_active = true
+               ORDER BY t.sort_order ASC, t.id ASC`,
+              [pointId]
+            );
+
+            const [noteRows] = await pool.query(
+              `SELECT id, body, created_at
+               FROM roadinfo.road_info_note
+               WHERE point_id = ? AND is_deleted = false
+               ORDER BY created_at DESC, id DESC`,
+              [pointId]
+            );
+
+            const noteIds = noteRows.map((row) => row.id);
+            let mediaRows = [];
+            if (noteIds.length > 0) {
+              const placeholders = noteIds.map(() => "?").join(", ");
+              const [rows] = await pool.query(
+                `SELECT id, note_id, media_type, url, created_at
+                 FROM roadinfo.road_info_media
+                 WHERE is_deleted = false AND note_id IN (${placeholders})
+                 ORDER BY created_at ASC, id ASC`,
+                noteIds
+              );
+              mediaRows = rows;
+            }
+
+            const mediaByNoteId = new Map();
+            mediaRows.forEach((row) => {
+              const list = mediaByNoteId.get(row.note_id) || [];
+              list.push({
+                id: row.id,
+                mediaType: row.media_type,
+                url: row.url,
+                createdAt: row.created_at,
+              });
+              mediaByNoteId.set(row.note_id, list);
+            });
+
+            sendJson(res, 200, {
+              success: true,
+              point: {
+                id: point.id,
+                lat: Number(point.lat),
+                lng: Number(point.lng),
+                status: point.status,
+                createdAt: point.created_at,
+                tags: tagRows.map((row) => ({
+                  id: row.id,
+                  code: row.code,
+                  labelJa: row.label_ja,
+                })),
+                posts: noteRows.map((row) => ({
+                  id: row.id,
+                  body: row.body,
+                  createdAt: row.created_at,
+                  media: mediaByNoteId.get(row.id) || [],
+                })),
+              },
+            });
+          })
+          .catch((err) => {
+            console.error("[road_info] detail_error:", err.message);
+            sendJson(res, 500, { error: "road_info_detail_failed" });
+          });
+        return;
+      }
+
       const centerLat = Number(requestUrl.searchParams.get("centerLat"));
       const centerLng = Number(requestUrl.searchParams.get("centerLng"));
       const radiusKmRaw = Number(requestUrl.searchParams.get("radiusKm"));
