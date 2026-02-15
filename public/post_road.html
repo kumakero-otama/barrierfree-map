@@ -335,6 +335,21 @@
         font-size: 0.95rem;
         background: #fff;
         color: var(--text);
+        transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+        cursor: pointer;
+      }
+
+      #back-button {
+        background: #f4f4f4;
+        border-color: #b9b9b9;
+      }
+
+      #back-button:active,
+      #back-button.is-pressed {
+        background: #d9d9d9;
+        border-color: #8f8f8f;
+        color: #111;
+        transform: translateY(1px);
       }
 
       .not-ready {
@@ -362,6 +377,51 @@
         background: var(--primary);
         color: #fff;
         border-color: var(--primary);
+      }
+
+      .submit:active,
+      .submit.is-pressed {
+        background: #0047b3;
+        border-color: #0047b3;
+        color: #fff;
+        transform: translateY(1px);
+      }
+
+      .submit-loading {
+        position: fixed;
+        left: 50%;
+        top: 42%;
+        transform: translate(-50%, -50%);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        z-index: 2000;
+        color: #222;
+        pointer-events: none;
+      }
+
+      .submit-loading.visible {
+        display: flex;
+      }
+
+      .submit-loading-text {
+        font-size: 0.88rem;
+        font-weight: 600;
+      }
+
+      .submit-loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 6px solid #d7d7d7;
+        border-top-color: #0066ff;
+        border-radius: 50%;
+        animation: submit-spin 0.8s linear infinite;
+      }
+
+      @keyframes submit-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
 
       @media (max-width: 640px) {
@@ -411,7 +471,7 @@
           <button id="photo-library-button" type="button">写真ライブラリ</button>
           <button id="camera-capture-button" type="button">カメラで撮影</button>
           <footer class="version-footer">
-            <span id="app-version">v1.11.3</span>
+            <span id="app-version">v1.11.4</span>
           </footer>
         </div>
       </div>
@@ -421,6 +481,11 @@
       <div class="actions">
         <button id="back-button" type="button">戻る</button>
         <button type="button" class="submit not-ready" aria-disabled="true">投稿</button>
+      </div>
+
+      <div id="submit-loading" class="submit-loading" aria-live="polite" aria-hidden="true">
+        <div class="submit-loading-text">投稿しています...</div>
+        <div class="submit-loading-spinner" aria-hidden="true"></div>
       </div>
     </main>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -448,12 +513,36 @@
       const toggleCenterCurrentEl = document.getElementById("toggle-center-current");
       const detailInputEl = document.querySelector(".detail-input");
       const submitButton = document.querySelector(".submit");
+      const submitLoadingEl = document.getElementById("submit-loading");
       let maxImageBytes = 2 * 1024 * 1024;
       let allTags = [];
       const selectedTagIds = new Set();
       const selectedImages = [];
       let currentMapCenter = null;
       let isSubmitting = false;
+
+      function enablePressFeedback(buttonEl) {
+        if (!buttonEl) {
+          return;
+        }
+        const add = () => buttonEl.classList.add("is-pressed");
+        const remove = () => buttonEl.classList.remove("is-pressed");
+        buttonEl.addEventListener("pointerdown", add);
+        buttonEl.addEventListener("pointerup", remove);
+        buttonEl.addEventListener("pointercancel", remove);
+        buttonEl.addEventListener("pointerleave", remove);
+      }
+
+      enablePressFeedback(backButton);
+      enablePressFeedback(submitButton);
+
+      function setSubmittingUi(active) {
+        if (!submitLoadingEl) {
+          return;
+        }
+        submitLoadingEl.classList.toggle("visible", active);
+        submitLoadingEl.setAttribute("aria-hidden", active ? "false" : "true");
+      }
 
       function escapeHtml(text) {
         return text
@@ -682,6 +771,7 @@
 
           isSubmitting = true;
           submitButton.disabled = true;
+          setSubmittingUi(true);
           try {
             await refreshImageLimitFromConfig();
             const images = await buildImagePayloads();
@@ -713,6 +803,7 @@
             selectedImages.splice(0, selectedImages.length);
             renderTagUi();
             renderSelectedImages();
+            window.history.back();
           } catch (err) {
             console.warn("[post_road] submit failed:", err);
             if (err && err.message === "image_too_large") {
@@ -723,6 +814,7 @@
           } finally {
             isSubmitting = false;
             submitButton.disabled = false;
+            setSubmittingUi(false);
           }
         });
       }
