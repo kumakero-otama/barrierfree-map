@@ -8,6 +8,7 @@ const toggleShowOsmBtn = document.getElementById("toggle-show-osm");
 const toggleShowRoadInfoBtn = document.getElementById("toggle-show-road-info");
 const toggleCenterCurrentBtn = document.getElementById("toggle-center-current");
 const osmLoadingOverlayEl = document.getElementById("osm-loading-overlay");
+const recordsLoadingOverlayEl = document.getElementById("records-loading-overlay");
 const traceConfirmModalEl = document.getElementById("trace-confirm-modal");
 const traceConfirmMapEl = document.getElementById("trace-confirm-map");
 const traceConfirmMessageEl = document.getElementById("trace-confirm-message");
@@ -107,6 +108,7 @@ let roadInfoMarkers = [];
 let isZooming = false;
 let suppressMapTapUntil = 0;
 let osmTactileLoadRequestSeq = 0;
+let recordsLoadRequestSeq = 0;
 const MAP_TAP_SUPPRESS_AFTER_ZOOM_MS = 400;
 
 function shouldIgnoreMapTap(event) {
@@ -560,6 +562,8 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
 
 // session_pathsを取得して表示
 function loadAndShowAllRecords() {
+  const requestSeq = ++recordsLoadRequestSeq;
+  setRecordsLoadingVisible(true);
   console.log("[loadAndShowAllRecords] Fetching all session paths...");
   const center = map.getCenter();
   const params = new URLSearchParams({
@@ -575,14 +579,25 @@ function loadAndShowAllRecords() {
       return res.json();
     })
     .then((data) => {
+      if (requestSeq !== recordsLoadRequestSeq || !toggleShowAllBtn || !toggleShowAllBtn.checked) {
+        return;
+      }
       console.log(`[loadAndShowAllRecords] Loaded ${data.count} paths`);
       if (data.success && Array.isArray(data.paths)) {
         showAllSessionPathsOnMap(data.paths);
       }
     })
     .catch((err) => {
+      if (requestSeq !== recordsLoadRequestSeq) {
+        return;
+      }
       console.error("[loadAndShowAllRecords] Error:", err);
       alert("軌跡データの取得に失敗しました。");
+    })
+    .finally(() => {
+      if (requestSeq === recordsLoadRequestSeq) {
+        setRecordsLoadingVisible(false);
+      }
     });
 }
 
@@ -631,6 +646,18 @@ function clearAllRecordsFromMap() {
     map.removeLayer(marker);
   });
   allRecordsMarkers = [];
+}
+
+// アプリ点字ブロック取得中に中央ローディングを表示する。
+function setRecordsLoadingVisible(visible) {
+  if (!recordsLoadingOverlayEl) {
+    return;
+  }
+  if (visible) {
+    recordsLoadingOverlayEl.classList.remove("hidden");
+    return;
+  }
+  recordsLoadingOverlayEl.classList.add("hidden");
 }
 
 function loadAndShowOsmTactileWays() {
@@ -944,6 +971,8 @@ if ("geolocation" in navigator) {
         loadAndShowAllRecords();
       } else {
         console.log("[toggleShowAll] Hiding all records");
+        recordsLoadRequestSeq += 1;
+        setRecordsLoadingVisible(false);
         clearAllRecordsFromMap();
       }
     });

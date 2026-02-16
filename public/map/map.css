@@ -29,37 +29,6 @@
   background: #fff;
 }
 
-.assist-action {
-  margin: 14px 0 8px;
-  display: flex;
-  justify-content: center;
-}
-
-.assist-btn {
-  display: inline-block;
-  border-radius: 999px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-  text-decoration: none;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  line-height: 0;
-}
-
-.assist-btn img {
-  display: block;
-  height: 44px;
-  width: auto;
-}
-
-.assist-btn:focus-visible {
-  outline: 3px solid #222;
-  outline-offset: 3px;
-}
-
 /* トグルと補助情報の縦並び */
 .meta {
   display: grid;
@@ -172,6 +141,50 @@
 }
 
 @keyframes osm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* アプリ点字ブロック（黄線）取得中のローディング表示 */
+.records-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1790;
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.records-loading-overlay.hidden {
+  display: none;
+}
+
+.records-loading-spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 76px;
+  height: 76px;
+  margin-left: -38px;
+  margin-top: -38px;
+  border-radius: 50%;
+  border: 7px solid #f2e7a8;
+  border-top-color: #e0b000;
+  animation: records-spin 0.9s linear infinite;
+}
+
+.records-loading-text {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 56px);
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #111;
+  text-align: center;
+}
+
+@keyframes records-spin {
   to {
     transform: rotate(360deg);
   }

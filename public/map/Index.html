@@ -72,23 +72,21 @@
           </div>
         </aside>
       </div>
-      <!-- お助け投稿へのショートカット -->
-      <div class="assist-action">
-        <a class="assist-btn" href="/otasuke/Index.html" aria-label="お助け投稿">
-          <img src="/assets/buttons/otasuke.png" alt="お助け投稿" />
-        </a>
-      </div>
       <p id="coords">Lat: --, Lng: --</p>
       <p id="raw-coords">Raw: --, --</p>
       <p><a class="btn" href="/home/Index.html">Back</a></p>
       <!-- 共通バージョン表示 -->
       <footer class="version-footer">
-        <span id="app-version">v1.13.2</span>
+        <span id="app-version">v1.13.3</span>
       </footer>
     </main>
     <div id="osm-loading-overlay" class="osm-loading-overlay hidden" aria-live="polite" aria-busy="true">
       <div class="osm-loading-spinner" aria-hidden="true"></div>
       <div class="osm-loading-text">OSMデータ取得中...</div>
+    </div>
+    <div id="records-loading-overlay" class="records-loading-overlay hidden" aria-live="polite" aria-busy="true">
+      <div class="records-loading-spinner" aria-hidden="true"></div>
+      <div class="records-loading-text">点字ブロックデータ取得中...</div>
     </div>
     <!-- 記録停止時の確認モーダル -->
     <div id="trace-confirm-modal" class="trace-confirm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="trace-confirm-title">
