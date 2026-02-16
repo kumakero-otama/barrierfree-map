@@ -16,6 +16,7 @@ const commentPhotoLibraryInput = document.getElementById("comment-photo-library-
 const commentCameraInput = document.getElementById("comment-camera-input");
 const commentImagePreviewEl = document.getElementById("comment-image-preview");
 const selectedCommentImages = [];
+let currentPointId = null;
 
 // ユーザー投稿本文を安全に表示するためのHTMLエスケープ。
 function escapeHtml(text) {
@@ -202,6 +203,102 @@ function removeCommentImageById(imageId) {
   renderCommentImagePreview();
 }
 
+// Fileをdata URLへ変換して投稿APIで扱える形式にする。
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("file_read_failed"));
+    };
+    reader.onerror = () => reject(new Error("file_read_failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// モーダル内の選択画像をAPI送信用配列に変換する。
+async function buildCommentImagePayloads() {
+  const payloads = [];
+  for (const item of selectedCommentImages) {
+    if (!item || !item.file) {
+      continue;
+    }
+    const dataUrl = await fileToDataUrl(item.file);
+    payloads.push({
+      name: item.name || item.file.name || "image",
+      dataUrl,
+    });
+  }
+  return payloads;
+}
+
+// 既存ポイントへ note/media を追加保存する。
+async function submitComment() {
+  if (!Number.isInteger(currentPointId) || currentPointId <= 0) {
+    alert("投稿先の道情報IDが不正です。");
+    return;
+  }
+  if (!commentSubmitBtn) {
+    return;
+  }
+
+  const detail = commentBodyInputEl ? commentBodyInputEl.value.trim() : "";
+  if (!detail && selectedCommentImages.length < 1) {
+    alert("本文または画像を入力してください。");
+    return;
+  }
+
+  commentSubmitBtn.disabled = true;
+  try {
+    const images = await buildCommentImagePayloads();
+    const res = await fetch("/api/road-info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pointId: currentPointId,
+        detail,
+        images,
+      }),
+    });
+    if (res.status === 404) {
+      throw new Error("point_not_found");
+    }
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      const errorCode = payload && payload.error ? payload.error : `submit_failed_${res.status}`;
+      throw new Error(errorCode);
+    }
+
+    if (commentBodyInputEl) {
+      commentBodyInputEl.value = "";
+    }
+    selectedCommentImages.forEach((item) => {
+      if (item && item.url) {
+        URL.revokeObjectURL(item.url);
+      }
+    });
+    selectedCommentImages.splice(0, selectedCommentImages.length);
+    renderCommentImagePreview();
+    setCommentModalOpen(false);
+    loadRoadInfoDetail();
+  } catch (err) {
+    if (err.message === "image_too_large") {
+      alert("画像サイズが大きすぎます。小さな画像で再度お試しください。");
+      return;
+    }
+    if (err.message === "point_not_found") {
+      alert("投稿先の道情報が見つかりませんでした。");
+      return;
+    }
+    alert("投稿に失敗しました。時間をおいて再度お試しください。");
+  } finally {
+    commentSubmitBtn.disabled = false;
+  }
+}
+
 // 画面下部ボタンのイベントを初期化する。
 function initActions() {
   if (postSelfBtn) {
@@ -246,7 +343,7 @@ function initActions() {
 
   if (commentSubmitBtn) {
     commentSubmitBtn.addEventListener("click", () => {
-      // 要件どおり、投稿ボタンはまだ無動作。
+      void submitComment();
     });
   }
 
@@ -312,6 +409,7 @@ function loadRoadInfoDetail() {
       if (!data || !data.point) {
         throw new Error("invalid_payload");
       }
+      currentPointId = Number(data.point.id);
       renderTags(data.point.tags);
       renderPosts(data.point.posts);
       showContent();

@@ -287,6 +287,7 @@ function createRoadInfoHandler({ sendJson }) {
         return;
       }
 
+      const pointIdFromBody = Number(body && body.pointId);
       const lat = Number(body && body.lat);
       const lng = Number(body && body.lng);
       const detail = typeof body?.detail === "string" ? body.detail.trim() : "";
@@ -294,10 +295,13 @@ function createRoadInfoHandler({ sendJson }) {
       const tagCodes = sanitizeTagIds(body?.tagIds);
       const roadInfoConfig = loadRoadInfoConfig();
       const maxImageBytes = roadInfoConfig.imageMaxBytes;
+      const hasExistingPointId = Number.isInteger(pointIdFromBody) && pointIdFromBody > 0;
 
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-        sendJson(res, 400, { error: "invalid_coordinates" });
-        return;
+      if (!hasExistingPointId) {
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+          sendJson(res, 400, { error: "invalid_coordinates" });
+          return;
+        }
       }
 
       try {
@@ -313,36 +317,51 @@ function createRoadInfoHandler({ sendJson }) {
       try {
         await conn.beginTransaction();
 
-        const [pointResult] = await conn.query(
-          `INSERT INTO roadinfo.road_info_point (geom, status, created_by)
-           VALUES (ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 'active', NULL)`,
-          [lng, lat]
-        );
-        const pointId = pointResult.insertId;
-        if (!pointId) {
-          throw new Error("point_insert_failed");
-        }
-
-        if (tagCodes.length > 0) {
-          const placeholders = tagCodes.map(() => "?").join(", ");
-          const [tagRows] = await conn.query(
-            `SELECT id, code
-             FROM roadinfo.road_info_tag
-             WHERE is_active = true AND code IN (${placeholders})`,
-            tagCodes
+        let pointId = null;
+        if (hasExistingPointId) {
+          const [pointRows] = await conn.query(
+            `SELECT id
+             FROM roadinfo.road_info_point
+             WHERE id = ? AND status <> 'deleted'
+             LIMIT 1`,
+            [pointIdFromBody]
           );
-
-          const tagIdByCode = new Map(tagRows.map((row) => [row.code, row.id]));
-          const missingCodes = tagCodes.filter((code) => !tagIdByCode.has(code));
-          if (missingCodes.length > 0) {
-            throw new Error(`unknown_tags:${missingCodes.join(",")}`);
+          if (!Array.isArray(pointRows) || pointRows.length < 1) {
+            throw new Error("point_not_found");
+          }
+          pointId = pointIdFromBody;
+        } else {
+          const [pointResult] = await conn.query(
+            `INSERT INTO roadinfo.road_info_point (geom, status, created_by)
+             VALUES (ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 'active', NULL)`,
+            [lng, lat]
+          );
+          pointId = pointResult.insertId;
+          if (!pointId) {
+            throw new Error("point_insert_failed");
           }
 
-          for (const code of tagCodes) {
-            await conn.query(
-              "INSERT INTO roadinfo.road_info_point_tag (point_id, tag_id) VALUES (?, ?) RETURNING point_id",
-              [pointId, tagIdByCode.get(code)]
+          if (tagCodes.length > 0) {
+            const placeholders = tagCodes.map(() => "?").join(", ");
+            const [tagRows] = await conn.query(
+              `SELECT id, code
+               FROM roadinfo.road_info_tag
+               WHERE is_active = true AND code IN (${placeholders})`,
+              tagCodes
             );
+
+            const tagIdByCode = new Map(tagRows.map((row) => [row.code, row.id]));
+            const missingCodes = tagCodes.filter((code) => !tagIdByCode.has(code));
+            if (missingCodes.length > 0) {
+              throw new Error(`unknown_tags:${missingCodes.join(",")}`);
+            }
+
+            for (const code of tagCodes) {
+              await conn.query(
+                "INSERT INTO roadinfo.road_info_point_tag (point_id, tag_id) VALUES (?, ?) RETURNING point_id",
+                [pointId, tagIdByCode.get(code)]
+              );
+            }
           }
         }
 
@@ -385,6 +404,10 @@ function createRoadInfoHandler({ sendJson }) {
         }
         if (String(err.message || "").startsWith("unknown_tags:")) {
           sendJson(res, 400, { error: "unknown_tags" });
+          return;
+        }
+        if (err.message === "point_not_found") {
+          sendJson(res, 404, { error: "point_not_found" });
           return;
         }
         if (["invalid_image_data", "invalid_image_type", "image_too_large"].includes(err.message)) {
