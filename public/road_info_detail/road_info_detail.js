@@ -6,6 +6,16 @@ const postsListEl = document.getElementById("posts-list");
 const postCountEl = document.getElementById("post-count");
 const backBtn = document.getElementById("back-btn");
 const postSelfBtn = document.getElementById("post-self-btn");
+const commentModalEl = document.getElementById("comment-modal");
+const commentCloseBtn = document.getElementById("comment-close-btn");
+const commentSubmitBtn = document.getElementById("comment-submit-btn");
+const commentBodyInputEl = document.getElementById("comment-body-input");
+const commentPhotoLibraryBtn = document.getElementById("comment-photo-library-btn");
+const commentCameraBtn = document.getElementById("comment-camera-btn");
+const commentPhotoLibraryInput = document.getElementById("comment-photo-library-input");
+const commentCameraInput = document.getElementById("comment-camera-input");
+const commentImagePreviewEl = document.getElementById("comment-image-preview");
+const selectedCommentImages = [];
 
 // ユーザー投稿本文を安全に表示するためのHTMLエスケープ。
 function escapeHtml(text) {
@@ -106,13 +116,168 @@ function showContent() {
   }
 }
 
+// コメント投稿モーダルの表示状態を切り替える。
+function setCommentModalOpen(open) {
+  if (!commentModalEl) {
+    return;
+  }
+  if (open) {
+    commentModalEl.classList.remove("hidden");
+    return;
+  }
+  commentModalEl.classList.add("hidden");
+}
+
+// 選択済み画像のプレビューをモーダル内に描画する。
+function renderCommentImagePreview() {
+  if (!commentImagePreviewEl) {
+    return;
+  }
+  if (selectedCommentImages.length < 1) {
+    commentImagePreviewEl.innerHTML = '<div class="comment-image-empty">選択された画像がここに表示されます</div>';
+    return;
+  }
+
+  const imagesHtml = selectedCommentImages
+    .map((item) => `
+      <div class="comment-image-item">
+        <button
+          class="comment-image-remove-btn"
+          type="button"
+          aria-label="この画像を削除"
+          data-remove-image-id="${escapeHtml(item.id)}"
+        >
+          <img src="/assets/buttons/delete.png" alt="" />
+        </button>
+        <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name || "投稿画像")}" loading="lazy" />
+      </div>
+    `)
+    .join("");
+  commentImagePreviewEl.innerHTML = `<div class="comment-image-list">${imagesHtml}</div>`;
+}
+
+// file input を安全に開く（showPicker対応端末を優先）。
+function openCommentInputPicker(inputEl) {
+  if (!inputEl) {
+    return;
+  }
+  try {
+    if (typeof inputEl.showPicker === "function") {
+      inputEl.showPicker();
+      return;
+    }
+    inputEl.click();
+  } catch {
+    inputEl.click();
+  }
+}
+
+// モーダルに追加する画像ファイルを内部配列へ反映する。
+function addCommentImageFiles(files) {
+  files.forEach((file) => {
+    if (!file || typeof file.type !== "string" || !file.type.startsWith("image/")) {
+      return;
+    }
+    selectedCommentImages.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: file.name || "選択された画像",
+      url: URL.createObjectURL(file),
+      file,
+    });
+  });
+  renderCommentImagePreview();
+}
+
+// 指定IDの画像を選択リストから削除する。
+function removeCommentImageById(imageId) {
+  const index = selectedCommentImages.findIndex((item) => item.id === imageId);
+  if (index < 0) {
+    return;
+  }
+  const removed = selectedCommentImages[index];
+  if (removed && removed.url) {
+    URL.revokeObjectURL(removed.url);
+  }
+  selectedCommentImages.splice(index, 1);
+  renderCommentImagePreview();
+}
+
 // 画面下部ボタンのイベントを初期化する。
 function initActions() {
   if (postSelfBtn) {
     postSelfBtn.addEventListener("click", () => {
-      // 要件どおり現時点では未実装（見た目のみ表示）
+      setCommentModalOpen(true);
+      if (commentBodyInputEl) {
+        commentBodyInputEl.focus();
+      }
     });
   }
+
+  if (commentCloseBtn) {
+    commentCloseBtn.addEventListener("click", () => {
+      setCommentModalOpen(false);
+    });
+  }
+
+  if (commentModalEl) {
+    commentModalEl.addEventListener("click", (event) => {
+      if (event.target === commentModalEl) {
+        setCommentModalOpen(false);
+      }
+    });
+  }
+
+  if (commentImagePreviewEl) {
+    commentImagePreviewEl.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      const removeButton = target.closest("[data-remove-image-id]");
+      const imageId = removeButton instanceof HTMLElement
+        ? removeButton.getAttribute("data-remove-image-id")
+        : null;
+      if (!imageId) {
+        return;
+      }
+      removeCommentImageById(imageId);
+    });
+  }
+
+  if (commentSubmitBtn) {
+    commentSubmitBtn.addEventListener("click", () => {
+      // 要件どおり、投稿ボタンはまだ無動作。
+    });
+  }
+
+  if (commentPhotoLibraryBtn && commentPhotoLibraryInput) {
+    commentPhotoLibraryBtn.addEventListener("click", () => {
+      openCommentInputPicker(commentPhotoLibraryInput);
+    });
+  }
+
+  if (commentCameraBtn && commentCameraInput) {
+    commentCameraBtn.addEventListener("click", () => {
+      openCommentInputPicker(commentCameraInput);
+    });
+  }
+
+  if (commentPhotoLibraryInput) {
+    commentPhotoLibraryInput.addEventListener("change", () => {
+      const files = Array.from(commentPhotoLibraryInput.files || []);
+      addCommentImageFiles(files);
+      commentPhotoLibraryInput.value = "";
+    });
+  }
+
+  if (commentCameraInput) {
+    commentCameraInput.addEventListener("change", () => {
+      const files = Array.from(commentCameraInput.files || []);
+      addCommentImageFiles(files);
+      commentCameraInput.value = "";
+    });
+  }
+
   if (backBtn) {
     backBtn.addEventListener("click", () => {
       if (window.history.length > 1) {
@@ -161,4 +326,6 @@ function loadRoadInfoDetail() {
 }
 
 initActions();
+setCommentModalOpen(false);
+renderCommentImagePreview();
 loadRoadInfoDetail();

@@ -126,6 +126,153 @@ h1 {
   color: #444;
 }
 
+/* コメント投稿モーダル */
+.comment-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.comment-modal.hidden {
+  display: none;
+}
+
+.comment-window {
+  width: min(760px, 96vw);
+  max-height: calc(100vh - 32px);
+  background: #fff;
+  border: 2px solid #222;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.comment-window-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #dcdcdc;
+}
+
+.comment-window-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.comment-close-btn {
+  border: 1px solid #999;
+  background: #fff;
+  color: #333;
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.comment-window-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.comment-window-foot {
+  border-top: 1px solid #dcdcdc;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.comment-label {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.comment-body-input {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid #bbb;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.comment-upload-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.comment-image-preview {
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background: #f7f7f7;
+  min-height: 96px;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.comment-image-empty {
+  color: #666;
+  font-size: 13px;
+}
+
+.comment-image-list {
+  display: grid;
+  gap: 8px;
+}
+
+.comment-image-item {
+  position: relative;
+  display: inline-block;
+}
+
+.comment-image-list img {
+  width: 100%;
+  max-width: 320px;
+  border: 1px solid #777;
+  background: #fff;
+}
+
+.comment-image-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #999;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  z-index: 2;
+  cursor: pointer;
+}
+
+.comment-image-remove-btn img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.comment-file-input-hidden {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .section-label {
     font-size: 20px;
@@ -144,6 +291,10 @@ h1 {
   }
 
   .post-body {
+    font-size: 16px;
+  }
+
+  .comment-window-title {
     font-size: 16px;
   }
 
