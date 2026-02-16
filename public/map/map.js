@@ -7,6 +7,7 @@ const toggleShowAllBtn = document.getElementById("toggle-show-all");
 const toggleShowOsmBtn = document.getElementById("toggle-show-osm");
 const toggleShowRoadInfoBtn = document.getElementById("toggle-show-road-info");
 const toggleCenterCurrentBtn = document.getElementById("toggle-center-current");
+const osmLoadingOverlayEl = document.getElementById("osm-loading-overlay");
 const traceConfirmModalEl = document.getElementById("trace-confirm-modal");
 const traceConfirmMapEl = document.getElementById("trace-confirm-map");
 const traceConfirmMessageEl = document.getElementById("trace-confirm-message");
@@ -105,6 +106,7 @@ let osmTactileMarkers = [];
 let roadInfoMarkers = [];
 let isZooming = false;
 let suppressMapTapUntil = 0;
+let osmTactileLoadRequestSeq = 0;
 const MAP_TAP_SUPPRESS_AFTER_ZOOM_MS = 400;
 
 function shouldIgnoreMapTap(event) {
@@ -632,6 +634,9 @@ function clearAllRecordsFromMap() {
 }
 
 function loadAndShowOsmTactileWays() {
+  // トグルONの最新リクエストだけを有効にするための採番。
+  const requestSeq = ++osmTactileLoadRequestSeq;
+  setOsmLoadingVisible(true);
   console.log("[loadAndShowOsmTactileWays] Fetching tactile ways from OSM...");
   const center = map.getCenter();
   const params = new URLSearchParams({
@@ -647,6 +652,9 @@ function loadAndShowOsmTactileWays() {
       return res.json();
     })
     .then((data) => {
+      if (requestSeq !== osmTactileLoadRequestSeq || !toggleShowOsmBtn || !toggleShowOsmBtn.checked) {
+        return;
+      }
       if (!data || !Array.isArray(data.features)) {
         throw new Error("invalid osm tactile payload");
       }
@@ -654,12 +662,20 @@ function loadAndShowOsmTactileWays() {
       showOsmTactileWaysOnMap(data.features);
     })
     .catch((err) => {
+      if (requestSeq !== osmTactileLoadRequestSeq) {
+        return;
+      }
       console.error("[loadAndShowOsmTactileWays] Error:", err);
       alert("OSM点字ブロックデータの取得に失敗しました。");
       if (toggleShowOsmBtn) {
         toggleShowOsmBtn.checked = false;
       }
       clearOsmTactileWaysFromMap();
+    })
+    .finally(() => {
+      if (requestSeq === osmTactileLoadRequestSeq) {
+        setOsmLoadingVisible(false);
+      }
     });
 }
 
@@ -719,6 +735,18 @@ function clearOsmTactileWaysFromMap() {
     map.removeLayer(marker);
   });
   osmTactileMarkers = [];
+}
+
+// OSM取得中にだけ中央ローディング表示を切り替える。
+function setOsmLoadingVisible(visible) {
+  if (!osmLoadingOverlayEl) {
+    return;
+  }
+  if (visible) {
+    osmLoadingOverlayEl.classList.remove("hidden");
+    return;
+  }
+  osmLoadingOverlayEl.classList.add("hidden");
 }
 
 function loadAndShowRoadInfoPoints() {
@@ -928,6 +956,8 @@ if ("geolocation" in navigator) {
           loadAndShowOsmTactileWays();
         } else {
           console.log("[toggleShowOsm] Hiding OSM tactile ways");
+          osmTactileLoadRequestSeq += 1;
+          setOsmLoadingVisible(false);
           clearOsmTactileWaysFromMap();
         }
       });

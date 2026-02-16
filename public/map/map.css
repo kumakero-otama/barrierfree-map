@@ -133,6 +133,50 @@
   color: #222;
 }
 
+/* OSMデータ取得中に中央へ表示するローディングオーバーレイ */
+.osm-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.osm-loading-overlay.hidden {
+  display: none;
+}
+
+.osm-loading-spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 76px;
+  height: 76px;
+  margin-left: -38px;
+  margin-top: -38px;
+  border-radius: 50%;
+  border: 7px solid #d4e4ff;
+  border-top-color: #0c63ce;
+  animation: osm-spin 0.9s linear infinite;
+}
+
+.osm-loading-text {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 56px);
+  transform: translateX(-50%);
+  font-size: 13px;
+  font-weight: 600;
+  color: #111;
+  text-align: center;
+}
+
+@keyframes osm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 720px) {
   .map-row {
     grid-template-columns: 1fr;

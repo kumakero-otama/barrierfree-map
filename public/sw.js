@@ -1,4 +1,4 @@
-const CACHE_VERSION = "1.12.2"; // このバージョンはpackage.jsonから自動生成されます
+const CACHE_VERSION = "1.12.3"; // このバージョンはpackage.jsonから自動生成されます
 const CACHE_NAME = `barrierfree-map-v${CACHE_VERSION}-${Date.now()}`;
 const CORE_ASSETS = [
   "/",
@@ -17,7 +17,6 @@ const CORE_ASSETS = [
   "/pwa.js",
 ];
 
-// 初回インストール時にアプリの主要静的ファイルを先読みする。
 self.addEventListener("install", (event) => {
   console.log("[SW] Installing new service worker...");
   event.waitUntil(
@@ -27,7 +26,6 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-// 新しいSW有効化時に古いキャッシュをまとめて削除する。
 self.addEventListener("activate", (event) => {
   console.log("[SW] Activating new service worker...");
   event.waitUntil(
@@ -47,7 +45,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// 同一オリジンのGETをキャッシュ優先で返す（画面遷移はnetwork-first）。
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") {
