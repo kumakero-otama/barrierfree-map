@@ -15,6 +15,10 @@ const commentCameraBtn = document.getElementById("comment-camera-btn");
 const commentPhotoLibraryInput = document.getElementById("comment-photo-library-input");
 const commentCameraInput = document.getElementById("comment-camera-input");
 const commentImagePreviewEl = document.getElementById("comment-image-preview");
+const commentSubmitLoadingEl = document.getElementById("comment-submit-loading");
+const commentResultModalEl = document.getElementById("comment-result-modal");
+const commentResultMessageEl = document.getElementById("comment-result-message");
+const commentResultOkBtn = document.getElementById("comment-result-ok-btn");
 const selectedCommentImages = [];
 let currentPointId = null;
 
@@ -203,6 +207,35 @@ function removeCommentImageById(imageId) {
   renderCommentImagePreview();
 }
 
+// 投稿中オーバーレイの表示状態を切り替える。
+function setCommentSubmittingVisible(visible) {
+  if (!commentSubmitLoadingEl) {
+    return;
+  }
+  if (visible) {
+    commentSubmitLoadingEl.classList.remove("hidden");
+    return;
+  }
+  commentSubmitLoadingEl.classList.add("hidden");
+}
+
+// 投稿結果のモーダルを表示する。
+function showCommentResultModal(message) {
+  if (!commentResultModalEl || !commentResultMessageEl) {
+    return;
+  }
+  commentResultMessageEl.textContent = message;
+  commentResultModalEl.classList.remove("hidden");
+}
+
+// 投稿結果モーダルを閉じる。
+function hideCommentResultModal() {
+  if (!commentResultModalEl) {
+    return;
+  }
+  commentResultModalEl.classList.add("hidden");
+}
+
 // Fileをdata URLへ変換して投稿APIで扱える形式にする。
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -252,6 +285,7 @@ async function submitComment() {
   }
 
   commentSubmitBtn.disabled = true;
+  setCommentSubmittingVisible(true);
   try {
     const images = await buildCommentImagePayloads();
     const res = await fetch("/api/road-info", {
@@ -284,17 +318,12 @@ async function submitComment() {
     renderCommentImagePreview();
     setCommentModalOpen(false);
     loadRoadInfoDetail();
+    showCommentResultModal("コメントの投稿が成功しました");
   } catch (err) {
-    if (err.message === "image_too_large") {
-      alert("画像サイズが大きすぎます。小さな画像で再度お試しください。");
-      return;
-    }
-    if (err.message === "point_not_found") {
-      alert("投稿先の道情報が見つかりませんでした。");
-      return;
-    }
-    alert("投稿に失敗しました。時間をおいて再度お試しください。");
+    setCommentModalOpen(false);
+    showCommentResultModal("コメントの投稿が失敗しました");
   } finally {
+    setCommentSubmittingVisible(false);
     commentSubmitBtn.disabled = false;
   }
 }
@@ -344,6 +373,12 @@ function initActions() {
   if (commentSubmitBtn) {
     commentSubmitBtn.addEventListener("click", () => {
       void submitComment();
+    });
+  }
+
+  if (commentResultOkBtn) {
+    commentResultOkBtn.addEventListener("click", () => {
+      hideCommentResultModal();
     });
   }
 
@@ -425,5 +460,7 @@ function loadRoadInfoDetail() {
 
 initActions();
 setCommentModalOpen(false);
+setCommentSubmittingVisible(false);
+hideCommentResultModal();
 renderCommentImagePreview();
 loadRoadInfoDetail();

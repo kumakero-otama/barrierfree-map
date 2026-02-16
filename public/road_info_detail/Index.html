@@ -35,7 +35,7 @@
       </div>
       <!-- 共通バージョン表示 -->
       <footer class="version-footer">
-        <span id="app-version">v1.13.1</span>
+        <span id="app-version">v1.13.2</span>
       </footer>
     </main>
     <div id="comment-modal" class="comment-modal hidden" role="dialog" aria-modal="true" aria-label="コメント投稿">
@@ -78,6 +78,18 @@
         </div>
         <div class="comment-window-foot">
           <button id="comment-submit-btn" class="btn btn-primary" type="button">投稿</button>
+        </div>
+      </div>
+    </div>
+    <div id="comment-submit-loading" class="comment-submit-loading hidden" aria-live="polite" aria-busy="true">
+      <div class="comment-submit-text">コメント投稿中...</div>
+      <div class="comment-submit-spinner" aria-hidden="true"></div>
+    </div>
+    <div id="comment-result-modal" class="comment-result-modal hidden" role="dialog" aria-modal="true" aria-label="コメント投稿結果">
+      <div class="comment-result-panel">
+        <p id="comment-result-message" class="comment-result-message"></p>
+        <div class="comment-result-actions">
+          <button id="comment-result-ok-btn" class="btn" type="button">OK</button>
         </div>
       </div>
     </div>

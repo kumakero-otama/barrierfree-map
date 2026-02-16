@@ -273,6 +273,84 @@ h1 {
   display: none;
 }
 
+/* 投稿中ローディング表示 */
+.comment-submit-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 2300;
+  background: rgba(255, 255, 255, 0.42);
+  display: grid;
+  place-items: center;
+  pointer-events: all;
+}
+
+.comment-submit-loading.hidden {
+  display: none;
+}
+
+.comment-submit-loading > * {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.comment-submit-spinner {
+  width: 78px;
+  height: 78px;
+  border: 7px solid #d7e5ff;
+  border-top-color: #0c63ce;
+  border-radius: 50%;
+  animation: comment-submit-spin 0.9s linear infinite;
+}
+
+.comment-submit-text {
+  transform: translateY(-58px);
+  font-size: 12px;
+  font-weight: 600;
+  color: #111;
+  text-align: center;
+}
+
+@keyframes comment-submit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 投稿完了結果（成功/失敗） */
+.comment-result-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2350;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.comment-result-modal.hidden {
+  display: none;
+}
+
+.comment-result-panel {
+  width: min(420px, 92vw);
+  background: #fff;
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.comment-result-message {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.comment-result-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 720px) {
   .section-label {
     font-size: 20px;
@@ -296,6 +374,10 @@ h1 {
 
   .comment-window-title {
     font-size: 16px;
+  }
+
+  .comment-result-message {
+    font-size: 15px;
   }
 
 }
