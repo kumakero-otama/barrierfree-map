@@ -629,7 +629,7 @@ function showAllSessionPathsOnMap(paths) {
     }
 
     const polyline = L.polyline(coordinates, {
-      color: "#ffd400",
+      color: "#00b050",
       weight: 4,
       opacity: 0.85,
     }).addTo(map);
