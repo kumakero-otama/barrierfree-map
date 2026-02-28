@@ -6,7 +6,7 @@ PostGreのテーブルを作るSQLコマンドのまとめ
 ```SQL
 CREATE TABLE IF NOT EXISTS login.user_sessions (
   session_id TEXT PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   expires_at TIMESTAMP NOT NULL
 );
@@ -20,7 +20,7 @@ ON login.user_sessions (user_id);
 ```SQL
 CREATE TABLE login.user_auth_providers (
     auth_id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL
+    user_id BIGINT NOT NULL
         REFERENCES login.users(user_id)
         ON DELETE CASCADE,
     provider VARCHAR(20) NOT NULL
@@ -64,7 +64,7 @@ CREATE TABLE login.email_verification_tokens (
 1レコードが一つのユーザ
 ```SQL
 CREATE TABLE login.users (
-    user_id SERIAL PRIMARY KEY,
+    user_id BIGSERIAL PRIMARY KEY,
 
     username VARCHAR(50),  -- allow NULL (set later)
     icon_url TEXT,
@@ -173,7 +173,8 @@ CREATE INDEX road_info_media_note_idx
 ```SQL
 CREATE TABLE sessions (
   session_id UUID PRIMARY KEY,
-  device_id UUID,
+  user_id BIGINT NOT NULL
+    REFERENCES login.users(user_id),
   started_at TIMESTAMP NOT NULL,
   ended_at TIMESTAMP
 );

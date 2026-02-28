@@ -1,5 +1,6 @@
 const { createDbPool } = require("../db");
 const { createLogger } = require("../logger");
+const { resolveAuthenticatedUserId } = require("../auth_user");
 const path = require("path");
 
 function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds }) {
@@ -44,15 +45,15 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
 
       if (action === "start") {
-        await handleSessionStart(data, res);
+        await handleSessionStart(req, data, res);
         return;
       }
       if (action === "end") {
-        await handleSessionEnd(data, res);
+        await handleSessionEnd(req, data, res);
         return;
       }
       if (action === "cancel") {
-        await handleSessionCancel(data, res);
+        await handleSessionCancel(req, data, res);
         return;
       }
 
@@ -61,9 +62,8 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
   };
 
   // セッション開始時刻を作成/更新する。
-  async function handleSessionStart(data, res) {
+  async function handleSessionStart(req, data, res) {
     const sessionId = data.sessionId || data.sessionUuid;
-    const deviceId = data.deviceId || data.deviceUuid || null;
     const startedAt = data.startedAt || new Date().toISOString();
 
     if (!sessionId) {
@@ -71,22 +71,28 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       return;
     }
 
-    sessionLogger.appendLog("SESSION_START", `${sessionId},${deviceId || ""},${startedAt}`);
-
     if (!pool) {
       sendJson(res, 200, { success: true, sessionId, dbDisabled: true });
       return;
     }
 
     try {
+      const userId = await resolveAuthenticatedUserId(req, pool);
+      if (!userId) {
+        sendJson(res, 401, { error: "unauthorized" });
+        return;
+      }
+
+      sessionLogger.appendLog("SESSION_START", `${sessionId},user_id=${userId},${startedAt}`);
+
       await pool.query(
-        `INSERT INTO tactile.sessions (session_id, device_id, started_at, ended_at)
+        `INSERT INTO tactile.sessions (session_id, user_id, started_at, ended_at)
          VALUES (?, ?, ?, NULL)
          ON CONFLICT (session_id) DO UPDATE
-           SET device_id = EXCLUDED.device_id,
+           SET user_id = EXCLUDED.user_id,
                started_at = EXCLUDED.started_at
          RETURNING session_id`,
-        [sessionId, deviceId, startedAt]
+        [sessionId, userId, startedAt]
       );
       sendJson(res, 200, { success: true, sessionId });
     } catch (err) {
@@ -96,7 +102,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
   }
 
   // セッション終了時刻を更新する。
-  async function handleSessionEnd(data, res) {
+  async function handleSessionEnd(req, data, res) {
     const sessionId = data.sessionId || data.sessionUuid;
     const endedAt = data.endedAt || new Date().toISOString();
 
@@ -113,9 +119,15 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     }
 
     try {
+      const userId = await resolveAuthenticatedUserId(req, pool);
+      if (!userId) {
+        sendJson(res, 401, { error: "unauthorized" });
+        return;
+      }
+
       const [result] = await pool.query(
-        "UPDATE tactile.sessions SET ended_at = ? WHERE session_id = ?",
-        [endedAt, sessionId]
+        "UPDATE tactile.sessions SET ended_at = ? WHERE session_id = ? AND user_id = ?",
+        [endedAt, sessionId, userId]
       );
       sendJson(res, 200, {
         success: true,
@@ -129,22 +141,13 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
   }
 
   // キャンセル対象セッションの関連データをまとめて削除する。
-  async function handleSessionCancel(data, res) {
+  async function handleSessionCancel(req, data, res) {
     const sessionId = data.sessionId || data.sessionUuid;
-    const deviceId = data.deviceId || data.deviceUuid || null;
 
     if (!sessionId) {
       sendJson(res, 400, { error: "missing_session_id" });
       return;
     }
-
-    if (canceledSessionIds) {
-      canceledSessionIds.add(sessionId);
-    }
-    if (deletedSessionKeys && deviceId) {
-      deletedSessionKeys.add(`${sessionId}:${deviceId}`);
-    }
-    sessionLogger.appendLog("SESSION_CANCEL", `${sessionId},${deviceId || ""}`);
 
     if (!pool) {
       sendJson(res, 200, { success: true, sessionId, dbDisabled: true });
@@ -152,9 +155,29 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     }
 
     try {
+      const userId = await resolveAuthenticatedUserId(req, pool);
+      if (!userId) {
+        sendJson(res, 401, { error: "unauthorized" });
+        return;
+      }
+      if (canceledSessionIds) {
+        canceledSessionIds.add(sessionId);
+      }
+      if (deletedSessionKeys) {
+        deletedSessionKeys.add(`${sessionId}:${userId}`);
+      }
+      sessionLogger.appendLog("SESSION_CANCEL", `${sessionId},user_id=${userId}`);
+
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
+        const [targetRows] = await conn.query(
+          "SELECT session_id FROM tactile.sessions WHERE session_id = ? AND user_id = ? LIMIT 1",
+          [sessionId, userId]
+        );
+        if (!Array.isArray(targetRows) || targetRows.length < 1) {
+          throw new Error("session_not_found_or_forbidden");
+        }
         await conn.query("DELETE FROM tactile.session_path_edges WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.session_paths WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
@@ -170,6 +193,10 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
       sendJson(res, 200, { success: true, sessionId, canceled: true });
     } catch (err) {
+      if (err && err.message === "session_not_found_or_forbidden") {
+        sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+        return;
+      }
       sessionLogger.appendLog("ERROR", `SESSION_CANCEL_DB_ERROR[${sessionId}]: ${err.message}`);
       sendJson(res, 500, { error: "session_cancel_failed", message: err.message });
     }

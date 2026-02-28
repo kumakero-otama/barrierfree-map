@@ -70,7 +70,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS login.users (
-          user_id SERIAL PRIMARY KEY,
+          user_id BIGSERIAL PRIMARY KEY,
           username VARCHAR(50),
           icon_url TEXT,
           total_tactile_length NUMERIC(10,3) DEFAULT 0,
@@ -87,7 +87,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS login.user_auth_providers (
           auth_id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
+          user_id BIGINT NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
           provider VARCHAR(20) NOT NULL CHECK (provider IN ('email','google')),
           provider_user_id TEXT,
           email VARCHAR(255),
@@ -116,7 +116,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS login.user_sessions (
           session_id TEXT PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
+          user_id BIGINT NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           expires_at TIMESTAMP NOT NULL
         )

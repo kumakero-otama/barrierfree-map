@@ -53,6 +53,7 @@ let currentSessionStartedAt = null;
 let traceConfirmMap = null;
 let traceConfirmPathLayer = null;
 let isHandlingRecordToggle = false;
+let currentUserId = null;
 
 // Valhallaの6桁精度ポリラインをデコードする関数
 function decodePolyline(str, precision) {
@@ -100,7 +101,6 @@ function decodePolyline(str, precision) {
   return coordinates;
 }
 
-const deviceUuid = getOrCreateDeviceUuid();
 let showAllRecords = false;
 let allRecordsMarkers = [];
 let osmTactileMarkers = [];
@@ -162,19 +162,19 @@ function generateUUID() {
   });
 }
 
-function getOrCreateDeviceUuid() {
-  const key = "deviceUuid";
-  try {
-    const existing = localStorage.getItem(key);
-    if (existing) {
-      return existing;
-    }
-    const created = generateUUID();
-    localStorage.setItem(key, created);
-    return created;
-  } catch {
-    return generateUUID();
+async function loadCurrentUserId() {
+  const res = await fetch("/auth/me", { credentials: "same-origin" });
+  if (!res.ok) {
+    window.location.replace("/auth/login.html");
+    throw new Error("unauthorized");
   }
+  const payload = await res.json();
+  const userId = payload && payload.user ? Number(payload.user.userId) : NaN;
+  if (!Number.isFinite(userId) || userId <= 0) {
+    window.location.replace("/auth/login.html");
+    throw new Error("invalid_user");
+  }
+  currentUserId = userId;
 }
 
 function updateRecordButton() {
@@ -367,7 +367,6 @@ async function handleRecordStopWithConfirmation(finishedSessionId) {
     alert("記録されたポイントが少なすぎます（最低2点必要）");
     await postSessionLifecycle("cancel", {
       sessionId: finishedSessionId,
-      deviceId: deviceUuid,
     });
     return;
   }
@@ -381,7 +380,6 @@ async function handleRecordStopWithConfirmation(finishedSessionId) {
     alert(`保存確認用の経路生成に失敗しました: ${err.message}`);
     await postSessionLifecycle("cancel", {
       sessionId: finishedSessionId,
-      deviceId: deviceUuid,
     });
     return;
   }
@@ -391,7 +389,6 @@ async function handleRecordStopWithConfirmation(finishedSessionId) {
     alert("保存確認用の経路を生成できませんでした。");
     await postSessionLifecycle("cancel", {
       sessionId: finishedSessionId,
-      deviceId: deviceUuid,
     });
     return;
   }
@@ -412,7 +409,6 @@ async function handleRecordStopWithConfirmation(finishedSessionId) {
 
   await postSessionLifecycle("cancel", {
     sessionId: finishedSessionId,
-    deviceId: deviceUuid,
   });
   if (tracePolyline) {
     map.removeLayer(tracePolyline);
@@ -421,10 +417,13 @@ async function handleRecordStopWithConfirmation(finishedSessionId) {
 }
 
 function requestSnappedLocation(latitude, longitude) {
+  if (!currentUserId) {
+    return;
+  }
   const params = new URLSearchParams({
     lat: latitude.toString(),
     lng: longitude.toString(),
-    deviceUuid: deviceUuid,
+    userId: String(currentUserId),
   });
   if (recordEnabled) {
     params.set("record", "1");
@@ -904,7 +903,8 @@ if ("geolocation" in navigator) {
   coordsEl.textContent = "Lat: locating..., Lng: locating...";
 
   // 設定を読み込んでから位置情報取得を開始
-  loadConfig().then(() => {
+  loadConfig().then(async () => {
+    await loadCurrentUserId();
     // 監視を開始
     startWatching();
     
@@ -935,7 +935,6 @@ if ("geolocation" in navigator) {
           currentSessionStartedAt = new Date().toISOString();
           await postSessionLifecycle("start", {
             sessionId: currentSessionId,
-            deviceId: deviceUuid,
             startedAt: currentSessionStartedAt,
           });
           recordEnabled = true;

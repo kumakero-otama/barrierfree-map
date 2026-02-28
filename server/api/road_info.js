@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
+const { resolveAuthenticatedUserId } = require("../auth_user");
 const { loadRoadInfoConfig } = require("../road_info_config");
 
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "uploads", "road_info_media");
@@ -296,6 +297,7 @@ function createRoadInfoHandler({ sendJson }) {
       const roadInfoConfig = loadRoadInfoConfig();
       const maxImageBytes = roadInfoConfig.imageMaxBytes;
       const hasExistingPointId = Number.isInteger(pointIdFromBody) && pointIdFromBody > 0;
+      let userId = null;
 
       if (!hasExistingPointId) {
         if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
@@ -305,6 +307,12 @@ function createRoadInfoHandler({ sendJson }) {
       }
 
       try {
+        userId = await resolveAuthenticatedUserId(req, pool);
+        if (!userId) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+
         await ensureUploadDir();
       } catch (err) {
         console.error("[road_info] upload_dir_error:", err.message);
@@ -333,8 +341,8 @@ function createRoadInfoHandler({ sendJson }) {
         } else {
           const [pointResult] = await conn.query(
             `INSERT INTO roadinfo.road_info_point (geom, status, created_by)
-             VALUES (ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 'active', NULL)`,
-            [lng, lat]
+             VALUES (ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 'active', ?)`,
+            [lng, lat, userId]
           );
           pointId = pointResult.insertId;
           if (!pointId) {
@@ -367,8 +375,8 @@ function createRoadInfoHandler({ sendJson }) {
 
         const [noteResult] = await conn.query(
           `INSERT INTO roadinfo.road_info_note (point_id, body, created_by, is_deleted)
-           VALUES (?, ?, NULL, false)`,
-          [pointId, detail]
+           VALUES (?, ?, ?, false)`,
+          [pointId, detail, userId]
         );
         const noteId = noteResult.insertId;
         if (!noteId) {
@@ -380,8 +388,8 @@ function createRoadInfoHandler({ sendJson }) {
           savedFiles.push(saved.absPath);
           await conn.query(
             `INSERT INTO roadinfo.road_info_media (note_id, media_type, url, created_by, is_deleted)
-             VALUES (?, 'image', ?, NULL, false)`,
-            [noteId, saved.url]
+             VALUES (?, 'image', ?, ?, false)`,
+            [noteId, saved.url, userId]
           );
         }
 

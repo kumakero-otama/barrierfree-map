@@ -37,10 +37,8 @@
 - 後でプロフィール画面で username を設定する運用がシンプル
 
 ```sql
-CREATE SCHEMA IF NOT EXISTS login;
-
 CREATE TABLE login.users (
-    user_id SERIAL PRIMARY KEY,
+    user_id BIGSERIAL PRIMARY KEY,
 
     username VARCHAR(50),  -- allow NULL (set later)
     icon_url TEXT,
@@ -69,22 +67,17 @@ CREATE TABLE login.users (
   - emailとgoogleで同じemailを持っても衝突しない
 
 ```sql
-CREATE TABLE login.user_auth_providers (
+CCREATE TABLE login.user_auth_providers (
     auth_id SERIAL PRIMARY KEY,
-
-    user_id INTEGER NOT NULL
+    user_id BIGINT NOT NULL
         REFERENCES login.users(user_id)
         ON DELETE CASCADE,
-
     provider VARCHAR(20) NOT NULL
         CHECK (provider IN ('email','google')),
-
     provider_user_id TEXT,   -- google: sub, email: NULL
     email VARCHAR(255),      -- email: required, google: optional
     password_hash TEXT,      -- email: required, google: NULL
-
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT chk_uap_fields_by_provider CHECK (
       (provider='email'  AND email IS NOT NULL AND password_hash IS NOT NULL AND provider_user_id IS NULL)
       OR
@@ -101,10 +94,6 @@ WHERE provider = 'email';
 CREATE UNIQUE INDEX uix_uap_google_sub
 ON login.user_auth_providers (provider_user_id)
 WHERE provider = 'google';
-
--- Optional: If you want to allow only one google account per user, enable this.
--- CREATE UNIQUE INDEX uix_uap_user_provider_once
--- ON login.user_auth_providers (user_id, provider);
 ```
 
 ## 1.3 login.email_verification_tokens（メール確認）
