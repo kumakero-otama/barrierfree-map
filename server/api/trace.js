@@ -34,6 +34,12 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
   try {
     await conn.beginTransaction();
 
+    const [existingPathRows] = await conn.query(
+      "SELECT session_id FROM tactile.session_paths WHERE session_id = ? LIMIT 1",
+      [sessionId]
+    );
+    const isNewSessionPath = !Array.isArray(existingPathRows) || existingPathRows.length < 1;
+
     // 本体のライン情報（session_paths）は upsert で更新する。
     await conn.query(
       `INSERT INTO tactile.session_paths (session_id, geom, source)
@@ -57,6 +63,32 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
         "INSERT INTO tactile.session_path_edges (session_id, seq, edge_id) VALUES (?, ?, ?) RETURNING session_id",
         [sessionId, i + 1, validEdges[i]]
       );
+    }
+
+    if (isNewSessionPath) {
+      const [sessionRows] = await conn.query(
+        "SELECT user_id FROM tactile.sessions WHERE session_id = ? LIMIT 1",
+        [sessionId]
+      );
+      const ownerUserId = Array.isArray(sessionRows) && sessionRows.length > 0
+        ? Number(sessionRows[0].user_id)
+        : null;
+
+      if (Number.isFinite(ownerUserId) && ownerUserId > 0) {
+        await conn.query(
+          `UPDATE login.users
+           SET total_tactile_length = COALESCE((
+                 SELECT (COALESCE(SUM(ST_Length(sp.geom)), 0) / 1000.0)::numeric(10,3)
+                 FROM tactile.sessions s
+                 JOIN tactile.session_paths sp
+                   ON sp.session_id = s.session_id
+                 WHERE s.user_id = ?
+               ), 0),
+               updated_at = NOW()
+           WHERE user_id = ?`,
+          [ownerUserId, ownerUserId]
+        );
+      }
     }
 
     await conn.commit();

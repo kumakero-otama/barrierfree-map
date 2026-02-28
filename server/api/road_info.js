@@ -358,6 +358,14 @@ function createRoadInfoHandler({ sendJson }) {
             throw new Error("point_insert_failed");
           }
 
+          await conn.query(
+            `UPDATE login.users
+             SET total_road_posts = COALESCE(total_road_posts, 0) + 1,
+                 updated_at = NOW()
+             WHERE user_id = ?`,
+            [userId]
+          );
+
           if (tagCodes.length > 0) {
             const placeholders = tagCodes.map(() => "?").join(", ");
             const [tagRows] = await conn.query(

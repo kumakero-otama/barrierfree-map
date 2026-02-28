@@ -6,12 +6,12 @@ const totalHeartsEl = document.getElementById("total-hearts");
 const logoutBtnEl = document.getElementById("profile-logout-btn");
 const editBtnEl = document.getElementById("profile-edit-btn");
 
-function formatKm(value) {
+function formatMetersFromKm(value) {
   const num = Number(value || 0);
   if (!Number.isFinite(num)) {
     return "0";
   }
-  return num.toFixed(1);
+  return Math.round(num * 1000).toLocaleString("ja-JP");
 }
 
 async function loadProfile() {
@@ -45,7 +45,7 @@ async function loadProfile() {
       profileUsernameEl.textContent = username;
     }
     if (totalTactileEl) {
-      totalTactileEl.textContent = `${formatKm(totalTactile)}km`;
+      totalTactileEl.textContent = `${formatMetersFromKm(totalTactile)}m`;
     }
     if (totalRoadPostsEl) {
       totalRoadPostsEl.textContent = `${Number(totalRoadPosts || 0)}件`;
