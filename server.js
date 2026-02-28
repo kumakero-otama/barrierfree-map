@@ -306,7 +306,15 @@ function handleRequest(req, res) {
     handleRoadInfo(req, res);
     return;
   }
-  if (req.url && (req.url.startsWith("/auth/google") || req.url.startsWith("/auth/me"))) {
+  if (
+    req.url &&
+    (
+      req.url.startsWith("/auth/google") ||
+      req.url.startsWith("/auth/me") ||
+      req.url.startsWith("/auth/logout") ||
+      req.url.startsWith("/auth/profile")
+    )
+  ) {
     handleGoogleAuth(req, res);
     return;
   }

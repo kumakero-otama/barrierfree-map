@@ -32,19 +32,20 @@ body {
 
 .profile-mini-actions {
   position: absolute;
-  right: -92px;
+  right: -132px;
   top: 6px;
   display: inline-flex;
   gap: 8px;
 }
 
 .profile-mini-btn {
-  width: 30px;
-  height: 30px;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: default;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: 1px solid rgba(61, 83, 104, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 6px;
+  cursor: pointer;
 }
 
 .profile-mini-btn img {
@@ -96,12 +97,13 @@ body {
   }
 
   .profile-mini-btn {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
+    padding: 5px;
   }
 
   .profile-mini-actions {
-    right: -58px;
+    right: -86px;
     top: 4px;
   }
 

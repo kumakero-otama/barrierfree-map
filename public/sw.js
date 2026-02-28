@@ -1,6 +1,6 @@
 // キャッシュの論理バージョン。
 // デプロイやアセット更新時に値が変わると、別名キャッシュとして再作成される。
-const CACHE_VERSION = "1.16.0"; // このバージョンはpackage.jsonから自動生成されます
+const CACHE_VERSION = "1.16.1"; // このバージョンはpackage.jsonから自動生成されます
 // 同一バージョンでも「今回インストールしたSW用」のキャッシュをユニーク化するため時刻を付与。
 // activate時に prefix で古い世代を掃除する設計なので、ここを都度変えることで確実に入れ替えられる。
 const CACHE_NAME = `barrierfree-map-v${CACHE_VERSION}-${Date.now()}`;
@@ -27,6 +27,9 @@ const CORE_ASSETS = [
   "/profile/Index.html",
   "/profile/profile.css",
   "/profile/profile.js",
+  "/profile/edit.html",
+  "/profile/edit.css",
+  "/profile/edit.js",
   "/pwa.js",
 ];
 
@@ -75,9 +78,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) {
     return;
   }
-  // /api は動的データ前提なのでSWキャッシュから除外。
+  // /api と /auth は動的データ前提なのでSWキャッシュから除外。
   // 常にネットワーク要求にして最新データ取得を優先する。
-  if (url.pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) {
     return;
   }
   // HTMLナビゲーション要求:

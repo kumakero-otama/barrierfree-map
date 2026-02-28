@@ -3,6 +3,8 @@ const profileUsernameEl = document.getElementById("profile-username");
 const totalTactileEl = document.getElementById("total-tactile-length");
 const totalRoadPostsEl = document.getElementById("total-road-posts");
 const totalHeartsEl = document.getElementById("total-hearts");
+const logoutBtnEl = document.getElementById("profile-logout-btn");
+const editBtnEl = document.getElementById("profile-edit-btn");
 
 function formatKm(value) {
   const num = Number(value || 0);
@@ -14,7 +16,10 @@ function formatKm(value) {
 
 async function loadProfile() {
   try {
-    const res = await fetch("/auth/me", { credentials: "same-origin" });
+    const res = await fetch("/auth/me", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
     if (!res.ok) {
       window.location.replace("/auth/login.html");
       return;
@@ -51,6 +56,37 @@ async function loadProfile() {
   } catch {
     window.location.replace("/auth/login.html");
   }
+}
+
+async function logout() {
+  try {
+    const res = await fetch("/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      throw new Error("logout_failed");
+    }
+  } catch {
+    // Always redirect so the user can recover by logging in again.
+  }
+  window.location.replace("/auth/login.html");
+}
+
+if (logoutBtnEl) {
+  logoutBtnEl.addEventListener("click", () => {
+    const ok = window.confirm("ログアウトしてもよろしいですか？");
+    if (!ok) {
+      return;
+    }
+    logout();
+  });
+}
+
+if (editBtnEl) {
+  editBtnEl.addEventListener("click", () => {
+    window.location.href = "/profile/edit.html";
+  });
 }
 
 loadProfile();

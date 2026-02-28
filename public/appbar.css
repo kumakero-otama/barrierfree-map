@@ -4,14 +4,12 @@
   left: 0;
   right: 0;
   width: 100%;
+  box-sizing: border-box;
   background: #348f82;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: calc(10px + env(safe-area-inset-top));
-  padding-right: calc(32px + env(safe-area-inset-right));
-  padding-bottom: 10px;
-  padding-left: 14px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
   z-index: 2600;
 }
 

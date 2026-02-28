@@ -56,6 +56,9 @@ const CORE_ASSETS = [
   "/profile/Index.html",
   "/profile/profile.css",
   "/profile/profile.js",
+  "/profile/edit.html",
+  "/profile/edit.css",
+  "/profile/edit.js",
   "/pwa.js",
 ];
 
@@ -96,7 +99,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) {
     return;
   }
-  if (url.pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) {
     return;
   }
   if (request.mode === "navigate") {

@@ -41,6 +41,20 @@ function createSessionCookie(sessionId, { secure = false, maxAge = SESSION_MAX_A
   return parts.join("; ");
 }
 
+function clearSessionCookie({ secure = false } = {}) {
+  const parts = [
+    `${SESSION_COOKIE_NAME}=`,
+    "HttpOnly",
+    "Path=/",
+    "SameSite=Lax",
+    "Max-Age=0",
+  ];
+  if (secure) {
+    parts.push("Secure");
+  }
+  return parts.join("; ");
+}
+
 function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
@@ -410,6 +424,86 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     return rows[0] || null;
   }
 
+  async function deleteSession(sessionId) {
+    if (!sessionId) {
+      return;
+    }
+    if (!pool) {
+      memoryStore.sessions.delete(sessionId);
+      return;
+    }
+    await ensureSchema();
+    await pool.query("DELETE FROM login.user_sessions WHERE session_id = ?", [sessionId]);
+  }
+
+  async function getGoogleSubByUserId(userId) {
+    if (!pool) {
+      for (const [sub, user] of memoryStore.usersBySub.entries()) {
+        if (user.user_id === userId) {
+          return sub;
+        }
+      }
+      return `user-${userId}`;
+    }
+    await ensureSchema();
+    const [rows] = await pool.query(
+      `SELECT provider_user_id
+       FROM login.user_auth_providers
+       WHERE user_id = ? AND provider = 'google'
+       LIMIT 1`,
+      [userId]
+    );
+    return (rows[0] && rows[0].provider_user_id) || `user-${userId}`;
+  }
+
+  async function updateProfile({ userId, username, iconUrl }) {
+    if (!pool) {
+      for (const user of memoryStore.usersBySub.values()) {
+        if (user.user_id === userId) {
+          user.username = username;
+          if (iconUrl) {
+            user.icon_url = iconUrl;
+          }
+          user.updated_at = new Date().toISOString();
+          return user;
+        }
+      }
+      return null;
+    }
+
+    await ensureSchema();
+    let result;
+    if (iconUrl) {
+      [result] = await pool.query(
+        `UPDATE login.users
+         SET username = ?,
+             icon_url = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = ?`,
+        [username, iconUrl, userId]
+      );
+    } else {
+      [result] = await pool.query(
+        `UPDATE login.users
+         SET username = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = ?`,
+        [username, userId]
+      );
+    }
+    if (!result || Number(result.affectedRows || 0) < 1) {
+      return null;
+    }
+    const [rows] = await pool.query(
+      `SELECT user_id, username, icon_url
+       FROM login.users
+       WHERE user_id = ?
+       LIMIT 1`,
+      [userId]
+    );
+    return rows[0] || null;
+  }
+
   async function verifyGoogleToken(idToken) {
     const ticket = await client.verifyIdToken({
       idToken,
@@ -638,6 +732,94 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     });
   }
 
+  async function handleLogout(req, res) {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return;
+    }
+    const cookies = parseCookies(req.headers.cookie || "");
+    const sessionId = cookies[SESSION_COOKIE_NAME];
+    try {
+      await deleteSession(sessionId);
+    } catch {
+      // Continue and clear cookie even if DB delete fails.
+    }
+    res.setHeader(
+      "Set-Cookie",
+      clearSessionCookie({
+        secure: isSecureRequest(req),
+      })
+    );
+    sendJson(res, 200, { ok: true });
+  }
+
+  async function handleProfileUpdate(req, res) {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return;
+    }
+
+    const cookies = parseCookies(req.headers.cookie || "");
+    const sessionId = cookies[SESSION_COOKIE_NAME];
+    const sessionUser = await findSession(sessionId);
+    if (!sessionUser) {
+      sendJson(res, 401, { authenticated: false });
+      return;
+    }
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return;
+    }
+
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    const iconDataUrl = typeof body.icon_data_url === "string" ? body.icon_data_url : "";
+
+    if (!username) {
+      sendJson(res, 400, { error: "missing_username" });
+      return;
+    }
+    if (username.length > 50) {
+      sendJson(res, 400, { error: "username_too_long" });
+      return;
+    }
+
+    try {
+      let iconUrl = null;
+      if (iconDataUrl) {
+        const sub = await getGoogleSubByUserId(sessionUser.user_id);
+        iconUrl = saveUserIcon({ sub, iconDataUrl });
+      }
+      const updatedUser = await updateProfile({
+        userId: sessionUser.user_id,
+        username,
+        iconUrl,
+      });
+      if (!updatedUser) {
+        sendJson(res, 404, { error: "user_not_found" });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        user: {
+          userId: updatedUser.user_id,
+          username: updatedUser.username || null,
+          iconUrl: updatedUser.icon_url || null,
+        },
+      });
+    } catch (err) {
+      if (err.message === "invalid_icon_image") {
+        sendJson(res, 400, { error: "invalid_icon_image" });
+        return;
+      }
+      console.error(`[auth/profile] profile_update_failed: ${err.message}`);
+      sendJson(res, 500, { error: "profile_update_failed", message: err.message });
+    }
+  }
+
   return async function handleGoogleAuth(req, res) {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (url.pathname === "/auth/google") {
@@ -650,6 +832,14 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     }
     if (url.pathname === "/auth/me") {
       await handleMe(req, res);
+      return;
+    }
+    if (url.pathname === "/auth/logout") {
+      await handleLogout(req, res);
+      return;
+    }
+    if (url.pathname === "/auth/profile") {
+      await handleProfileUpdate(req, res);
       return;
     }
     sendJson(res, 404, { error: "not_found" });
