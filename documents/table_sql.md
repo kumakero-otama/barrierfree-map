@@ -1,6 +1,20 @@
 # table_sql.md
 PostGreのテーブルを作るSQLコマンドのまとめ
 
+## login.user_sessions
+1レコードが一つのCookie（ログインしてからログアウトするまで）
+```SQL
+CREATE TABLE IF NOT EXISTS login.user_sessions (
+  session_id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_user_sessions_user_id
+ON login.user_sessions (user_id);
+```
+
 ## login.user_auth_providers
 1レコードが1つのログイン方法
 ```SQL

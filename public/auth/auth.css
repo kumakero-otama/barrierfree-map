@@ -97,6 +97,11 @@ body {
   color: #fff;
 }
 
+.google-signin-button {
+  display: flex;
+  justify-content: center;
+}
+
 .helper-text {
   margin-top: 8px;
   font-size: 0.84rem;

@@ -13,11 +13,26 @@
   <body>
     <script>
       // 認証機能未実装の暫定対応:
-      // 明示的なデバッグ遷移（?debug=1）以外はログイン画面へ戻す。
-      const query = new URLSearchParams(window.location.search);
-      if (query.get("debug") !== "1") {
-        window.location.replace("/auth/login.html");
-      }
+      // 明示的なデバッグ遷移（?debug=1）または有効なセッションがある場合のみ表示する。
+      (async () => {
+        const query = new URLSearchParams(window.location.search);
+        if (query.get("debug") === "1") {
+          return;
+        }
+        try {
+          const res = await fetch("/auth/me", { credentials: "same-origin" });
+          if (!res.ok) {
+            window.location.replace("/auth/login.html");
+            return;
+          }
+          const payload = await res.json();
+          if (!payload || !payload.authenticated) {
+            window.location.replace("/auth/login.html");
+          }
+        } catch {
+          window.location.replace("/auth/login.html");
+        }
+      })();
     </script>
     <main class="wrap">
       <!-- 地図本体と制御パネル -->

@@ -11,6 +11,7 @@ const createTraceHandler = require("./server/api/trace");
 const createOsmTactileWaysHandler = require("./server/api/osm_tactile");
 const createPostTagsHandler = require("./server/api/post_tags");
 const createRoadInfoHandler = require("./server/api/road_info");
+const createGoogleAuthHandler = require("./server/api/google_auth");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -21,6 +22,9 @@ const TLS_CERT_PATH = process.env.TLS_CERT_PATH || "";
 const MIN_INTERVAL_MS = parseInt(process.env.MIN_INTERVAL_MS, 10) || 1000;
 const CLIENT_MIN_INTERVAL_MS = parseInt(process.env.CLIENT_MIN_INTERVAL_MS, 10) || 2000;
 const MAX_MATCH_CALLS_PER_MONTH = 100000;
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID ||
+  "808129330394-dagp56961vbank89vi7bc50pp4u7mgv8.apps.googleusercontent.com";
 const COUNT_FILE = path.join(__dirname, "data", "mapbox-count.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const UPLOADS_DIR = path.join(__dirname, "uploads");
@@ -258,6 +262,11 @@ const handleRoadInfo = createRoadInfoHandler({
   sendJson,
 });
 
+const handleGoogleAuth = createGoogleAuthHandler({
+  sendJson,
+  GOOGLE_CLIENT_ID,
+});
+
 function handleRequest(req, res) {
   // APIパスを先に判定し、それ以外は静的配信へフォールバックする。
   if (req.url && req.url.startsWith("/api/match")) {
@@ -294,6 +303,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/road-info")) {
     handleRoadInfo(req, res);
+    return;
+  }
+  if (req.url && (req.url.startsWith("/auth/google") || req.url.startsWith("/auth/me"))) {
+    handleGoogleAuth(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/uploads/")) {

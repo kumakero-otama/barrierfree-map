@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#0f766e" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="stylesheet" href="/auth/auth.css" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <main class="auth-shell">
@@ -30,18 +31,20 @@
           </div>
           <div class="actions">
             <button class="btn btn-primary" id="login-button" type="submit">ログイン</button>
+            <div id="google-signin-button" class="google-signin-button"></div>
             <a class="btn btn-outline" href="/auth/signup.html">サインアップ画面へ</a>
             <a class="btn btn-debug" href="/map/Index.html?debug=1">Draggable Map へ（デバッグ）</a>
           </div>
         </form>
-        <p class="helper-text">ログイン機能は未実装です。ボタンは画面遷移しません。</p>
+        <p id="google-auth-status" class="helper-text"></p>
+        <p class="helper-text">メール/パスワードログインは未実装です。Googleログインを使ってください。</p>
       </section>
       <footer class="version-footer">
-        <span id="app-version">v1.14.0</span>
+        <span id="app-version">v1.15.0</span>
       </footer>
     </main>
 
-    <script src="/auth/auth.js"></script>
+    <script src="/auth/auth.js?v=20260228"></script>
     <script src="/version.js"></script>
     <script src="/pwa.js"></script>
   </body>
