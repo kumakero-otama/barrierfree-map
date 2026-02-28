@@ -100,6 +100,10 @@ async function loginWithGoogle(idToken) {
         );
         return false;
       }
+      if (errorMessage === "login_failed") {
+        setGoogleStatus("ログイン処理に失敗しました。サーバーログを確認してください。");
+        return false;
+      }
       setGoogleStatus(`Googleログインに失敗しました: ${errorMessage}`);
       return false;
     }
@@ -225,6 +229,10 @@ if (signupForm) {
         setGoogleStatus(
           "Googleトークン検証に失敗しました。Google CloudのClient IDとAuthorized JavaScript originsを確認してください。"
         );
+        return;
+      }
+      if (err.message === "signup_failed") {
+        setGoogleStatus("サインアップ処理に失敗しました。サーバーログを確認してください。");
         return;
       }
       setGoogleStatus(`Googleサインアップに失敗しました: ${err.message}`);

@@ -352,7 +352,8 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     await ensureSchema();
     await pool.query(
       `INSERT INTO login.user_sessions (session_id, user_id, expires_at)
-       VALUES (?, ?, CURRENT_TIMESTAMP + INTERVAL '7 days')`,
+       VALUES (?, ?, CURRENT_TIMESTAMP + INTERVAL '7 days')
+       RETURNING session_id`,
       [sessionId, userId]
     );
     return sessionId;
@@ -409,6 +410,18 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     return payload;
   }
 
+  function isTokenError(err) {
+    const msg = err && err.message ? String(err.message) : "";
+    return (
+      msg.includes("Token used too late") ||
+      msg.includes("Wrong number of segments") ||
+      msg.includes("No pem found for envelope") ||
+      msg.includes("audience") ||
+      msg.includes("issuer") ||
+      msg.includes("invalid_token_payload")
+    );
+  }
+
   async function handleGoogleLogin(req, res) {
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "method_not_allowed" });
@@ -433,8 +446,15 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       return;
     }
 
+    let payload;
     try {
-      const payload = await verifyGoogleToken(idToken);
+      payload = await verifyGoogleToken(idToken);
+    } catch (err) {
+      sendJson(res, 401, { error: "invalid_token", message: err.message });
+      return;
+    }
+
+    try {
       const user = await findGoogleUserBySub(payload.sub);
       if (!user) {
         sendJson(res, 404, { error: "account_not_found" });
@@ -461,11 +481,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         },
       });
     } catch (err) {
-      if (err.message === "invalid_icon_image") {
-        sendJson(res, 400, { error: "invalid_icon_image" });
-        return;
-      }
-      sendJson(res, 401, { error: "invalid_token", message: err.message });
+      sendJson(res, 500, { error: "login_failed", message: err.message });
     }
   }
 
@@ -508,8 +524,15 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       return;
     }
 
+    let payload;
     try {
-      const payload = await verifyGoogleToken(idToken);
+      payload = await verifyGoogleToken(idToken);
+    } catch (err) {
+      sendJson(res, 401, { error: "invalid_token", message: err.message });
+      return;
+    }
+
+    try {
       const iconUrl = saveUserIcon({ sub: payload.sub, iconDataUrl });
       const existing = await findGoogleUserBySub(payload.sub);
       if (existing) {
@@ -569,7 +592,11 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         sendJson(res, 400, { error: "invalid_icon_image" });
         return;
       }
-      sendJson(res, 401, { error: "invalid_token", message: err.message });
+      if (isTokenError(err)) {
+        sendJson(res, 401, { error: "invalid_token", message: err.message });
+        return;
+      }
+      sendJson(res, 500, { error: "signup_failed", message: err.message });
     }
   }
 
