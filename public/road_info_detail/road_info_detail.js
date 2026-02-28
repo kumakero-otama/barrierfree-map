@@ -91,14 +91,19 @@ function renderPosts(posts) {
   postsListEl.innerHTML = safePosts
     .map((post) => {
       const media = Array.isArray(post.media) ? post.media : [];
+      const authorName = post && post.authorUsername ? post.authorUsername : "ユーザー";
+      const authorIconUrl = post && post.authorIconUrl
+        ? post.authorIconUrl
+        : "/assets/account_default.png";
       const mediaHtml = media
         .map((item) => `<img src="${escapeHtml(item.url)}" alt="投稿画像" loading="lazy" />`)
         .join("");
       return `
         <article class="post-card">
           <div class="post-head">
-            <img class="avatar-img" src="/assets/account_default.png" alt="アカウント" />
-            <span>${escapeHtml(formatDate(post.createdAt))}</span>
+            <img class="avatar-img" src="${escapeHtml(authorIconUrl)}" alt="${escapeHtml(authorName)}のアイコン" />
+            <span class="post-author">${escapeHtml(authorName)}</span>
+            <span class="post-date">${escapeHtml(formatDate(post.createdAt))}</span>
           </div>
           <div class="post-body">${escapeHtml(post.body)}</div>
           <div class="media-list">${mediaHtml}</div>

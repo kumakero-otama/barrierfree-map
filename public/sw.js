@@ -1,6 +1,6 @@
 // キャッシュの論理バージョン。
 // デプロイやアセット更新時に値が変わると、別名キャッシュとして再作成される。
-const CACHE_VERSION = "1.15.2"; // このバージョンはpackage.jsonから自動生成されます
+const CACHE_VERSION = "1.15.3"; // このバージョンはpackage.jsonから自動生成されます
 // 同一バージョンでも「今回インストールしたSW用」のキャッシュをユニーク化するため時刻を付与。
 // activate時に prefix で古い世代を掃除する設計なので、ここを都度変えることで確実に入れ替えられる。
 const CACHE_NAME = `barrierfree-map-v${CACHE_VERSION}-${Date.now()}`;

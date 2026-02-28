@@ -91,6 +91,17 @@ h1 {
   font-size: 14px;
 }
 
+.post-author {
+  color: #222;
+  font-weight: 700;
+}
+
+.post-date {
+  color: #666;
+  margin-left: auto;
+  text-align: right;
+}
+
 .avatar-img {
   width: 34px;
   height: 34px;

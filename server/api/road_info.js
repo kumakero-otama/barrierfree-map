@@ -159,9 +159,15 @@ function createRoadInfoHandler({ sendJson }) {
             );
 
             const [noteRows] = await pool.query(
-              `SELECT id, body, created_at
-               FROM roadinfo.road_info_note
-               WHERE point_id = ? AND is_deleted = false
+              `SELECT n.id,
+                      n.body,
+                      n.created_at,
+                      n.created_by,
+                      u.username AS created_by_username,
+                      u.icon_url AS created_by_icon_url
+               FROM roadinfo.road_info_note n
+               LEFT JOIN login.users u ON u.user_id = n.created_by
+               WHERE n.point_id = ? AND n.is_deleted = false
                ORDER BY created_at DESC, id DESC`,
               [pointId]
             );
@@ -209,6 +215,9 @@ function createRoadInfoHandler({ sendJson }) {
                   id: row.id,
                   body: row.body,
                   createdAt: row.created_at,
+                  createdBy: row.created_by || null,
+                  authorUsername: row.created_by_username || null,
+                  authorIconUrl: row.created_by_icon_url || null,
                   media: mediaByNoteId.get(row.id) || [],
                 })),
               },
