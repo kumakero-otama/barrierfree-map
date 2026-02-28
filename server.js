@@ -136,6 +136,7 @@ function handleStatic(req, res) {
     "/index.html": "/auth/login.html",
     "/home/index.html": "/auth/login.html",
     "/map/index.html": "/map/Index.html",
+    "/profile/index.html": "/profile/Index.html",
     "/analog/index.html": "/auth/login.html",
     "/post_road.html": "/post_road/Index.html",
     "/post_road/index.html": "/post_road/Index.html",

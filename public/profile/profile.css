@@ -1,0 +1,119 @@
+body {
+  margin: 0;
+  background: #efefef;
+  color: #2f3f4f;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+}
+
+.profile-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+.profile-card {
+  padding: 16px 0 8px;
+}
+
+.profile-avatar-wrap {
+  position: relative;
+  width: 180px;
+  margin: 0 auto;
+}
+
+.profile-avatar {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 10px solid #6a6e73;
+  background: #fff;
+}
+
+.profile-mini-actions {
+  position: absolute;
+  right: -92px;
+  top: 6px;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.profile-mini-btn {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+}
+
+.profile-mini-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.profile-username {
+  margin: 16px 0 12px;
+  text-align: center;
+  font-size: 3rem;
+  font-weight: 800;
+  color: #3d5368;
+  line-height: 1.15;
+}
+
+.achievement-title {
+  margin: 12px 0 8px;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #1f2d3a;
+}
+
+.achievement-list {
+  margin: 0;
+  padding-left: 1.2em;
+  list-style: disc;
+  display: grid;
+  gap: 6px;
+  font-size: 2rem;
+  color: #111;
+}
+
+.achievement-list li {
+  line-height: 1.35;
+}
+
+@media (max-width: 720px) {
+  .profile-avatar-wrap {
+    width: 130px;
+  }
+
+  .profile-avatar {
+    width: 130px;
+    height: 130px;
+    border-width: 7px;
+  }
+
+  .profile-mini-btn {
+    width: 24px;
+    height: 24px;
+  }
+
+  .profile-mini-actions {
+    right: -58px;
+    top: 4px;
+  }
+
+  .profile-username {
+    font-size: 2rem;
+  }
+
+  .achievement-title {
+    font-size: 1.5rem;
+  }
+
+  .achievement-list {
+    font-size: 1.35rem;
+  }
+}

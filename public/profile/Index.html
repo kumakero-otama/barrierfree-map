@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>プロフィール</title>
+    <meta name="theme-color" content="#348f82" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/appbar.css" />
+    <link rel="stylesheet" href="/profile/profile.css" />
+  </head>
+  <body>
+    <header class="app-bar">
+      <h1 class="app-bar-title">PROFILE</h1>
+      <div class="app-bar-actions" aria-label="アプリメニュー">
+        <a class="app-bar-icon-link" href="/map/Index.html" aria-label="ホーム">
+          <img src="/assets/buttons/home.png" alt="" />
+        </a>
+        <a class="app-bar-icon-link" href="/otasuke/Index.html" aria-label="設定">
+          <img src="/assets/buttons/setting.png" alt="" />
+        </a>
+      </div>
+    </header>
+    <div class="app-bar-spacer" aria-hidden="true"></div>
+
+    <main class="profile-page">
+      <section class="profile-card">
+        <div class="profile-avatar-wrap">
+          <img
+            id="profile-avatar"
+            class="profile-avatar"
+            src="/assets/account_default.png"
+            alt="プロフィールアイコン"
+          />
+          <div class="profile-mini-actions" aria-label="プロフィール操作">
+            <button class="profile-mini-btn" type="button" aria-label="プロフィール編集">
+              <img src="/assets/buttons/profile_edit.png" alt="" />
+            </button>
+            <button class="profile-mini-btn" type="button" aria-label="ログアウト">
+              <img src="/assets/buttons/logout.png" alt="" />
+            </button>
+          </div>
+        </div>
+
+        <h2 id="profile-username" class="profile-username">username</h2>
+
+        <h3 class="achievement-title">実績</h3>
+        <ul class="achievement-list">
+          <li>総点字ブロック記録距離: <span id="total-tactile-length">0km</span></li>
+          <li>総道情報投稿件数: <span id="total-road-posts">0件</span></li>
+          <li>送られた総ハート数: <span id="total-hearts">0個</span></li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="/profile/profile.js"></script>
+    <script src="/version.js"></script>
+    <script src="/pwa.js"></script>
+  </body>
+</html>

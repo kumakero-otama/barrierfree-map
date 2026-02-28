@@ -53,6 +53,9 @@ const CORE_ASSETS = [
   "/auth/signup.html",
   "/auth/auth.css",
   "/auth/auth.js",
+  "/profile/Index.html",
+  "/profile/profile.css",
+  "/profile/profile.js",
   "/pwa.js",
 ];
 

@@ -240,6 +240,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         icon_url: finalIconUrl,
         email,
         email_verified: emailVerified,
+        total_tactile_length: 0,
+        total_road_posts: 0,
+        total_hearts: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         last_login_at: new Date().toISOString(),
@@ -377,6 +380,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
             username: user.username,
             icon_url: user.icon_url,
             email: user.email || null,
+            total_tactile_length: user.total_tactile_length || 0,
+            total_road_posts: user.total_road_posts || 0,
+            total_hearts: user.total_hearts || 0,
           };
         }
       }
@@ -385,7 +391,13 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
 
     await ensureSchema();
     const [rows] = await pool.query(
-      `SELECT s.user_id, u.username, u.icon_url, p.email
+      `SELECT s.user_id,
+              u.username,
+              u.icon_url,
+              p.email,
+              u.total_tactile_length,
+              u.total_road_posts,
+              u.total_hearts
        FROM login.user_sessions s
        JOIN login.users u ON u.user_id = s.user_id
        LEFT JOIN login.user_auth_providers p
@@ -619,6 +631,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         email: sessionUser.email || null,
         username: sessionUser.username || null,
         iconUrl: sessionUser.icon_url || null,
+        totalTactileLength: Number(sessionUser.total_tactile_length || 0),
+        totalRoadPosts: Number(sessionUser.total_road_posts || 0),
+        totalHearts: Number(sessionUser.total_hearts || 0),
       },
     });
   }

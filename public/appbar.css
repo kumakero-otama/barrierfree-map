@@ -1,0 +1,54 @@
+.app-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  background: #348f82;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  padding-right: calc(32px + env(safe-area-inset-right));
+  padding-bottom: 10px;
+  padding-left: 14px;
+  z-index: 2600;
+}
+
+.app-bar .app-bar-title {
+  margin: 0;
+  color: #fff;
+  font-weight: 900;
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.app-bar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-bar-icon-link {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  text-decoration: none;
+}
+
+.app-bar-icon-link img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+}
+
+.app-bar-spacer {
+  height: calc(56px + env(safe-area-inset-top));
+}

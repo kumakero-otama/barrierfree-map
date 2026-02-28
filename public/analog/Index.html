@@ -6,9 +6,25 @@
     <title>Analog Clock</title>
     <meta name="theme-color" content="#222222" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/appbar.css" />
     <link rel="stylesheet" href="analog.css" />
   </head>
   <body>
+    <header class="app-bar">
+      <h1 class="app-bar-title">ANALOG CLOCK</h1>
+      <div class="app-bar-actions" aria-label="アプリメニュー">
+        <a class="app-bar-icon-link" href="/profile/Index.html" aria-label="アカウント">
+          <img src="/assets/buttons/account.png" alt="" />
+        </a>
+        <a class="app-bar-icon-link" href="/map/Index.html" aria-label="ホーム">
+          <img src="/assets/buttons/home.png" alt="" />
+        </a>
+        <a class="app-bar-icon-link" href="/otasuke/Index.html" aria-label="設定">
+          <img src="/assets/buttons/setting.png" alt="" />
+        </a>
+      </div>
+    </header>
+    <div class="app-bar-spacer" aria-hidden="true"></div>
     <!-- アナログ時計の表示領域 -->
     <main class="wrap">
       <h1>Analog Clock</h1>

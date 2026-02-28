@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>道情報の投稿</title>
+    <link rel="stylesheet" href="/appbar.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
       /* ページ全体で使う色と余白の基準値 */
@@ -437,10 +438,23 @@
     </style>
   </head>
   <body>
+    <header class="app-bar">
+      <h1 class="app-bar-title">道情報の投稿</h1>
+      <div class="app-bar-actions" aria-label="アプリメニュー">
+        <a class="app-bar-icon-link" href="/profile/Index.html" aria-label="アカウント">
+          <img src="/assets/buttons/account.png" alt="" />
+        </a>
+        <a class="app-bar-icon-link" href="/map/Index.html" aria-label="ホーム">
+          <img src="/assets/buttons/home.png" alt="" />
+        </a>
+        <a class="app-bar-icon-link" href="/otasuke/Index.html" aria-label="設定">
+          <img src="/assets/buttons/setting.png" alt="" />
+        </a>
+      </div>
+    </header>
+    <div class="app-bar-spacer" aria-hidden="true"></div>
     <!-- 道情報投稿フォーム全体 -->
     <main class="page">
-      <h1>道情報の投稿</h1>
-
       <section aria-label="位置の微調整">
         <div class="location-map-wrap">
           <div id="post-map"></div>
