@@ -1,7 +1,7 @@
 {
   "name": "Barrierfree Map",
   "short_name": "BF Map",
-  "start_url": "/map/Index.html",
+  "start_url": "/auth/login.html",
   "display": "standalone",
   "background_color": "#f7f5f0",
   "theme_color": "#222222",

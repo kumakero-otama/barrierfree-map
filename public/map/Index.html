@@ -11,6 +11,14 @@
     <link rel="stylesheet" href="map.css" />
   </head>
   <body>
+    <script>
+      // 認証機能未実装の暫定対応:
+      // 明示的なデバッグ遷移（?debug=1）以外はログイン画面へ戻す。
+      const query = new URLSearchParams(window.location.search);
+      if (query.get("debug") !== "1") {
+        window.location.replace("/auth/login.html");
+      }
+    </script>
     <main class="wrap">
       <!-- 地図本体と制御パネル -->
       <h1>Draggable Map</h1>
@@ -74,7 +82,7 @@
       </div>
       <p id="coords">Lat: --, Lng: --</p>
       <p id="raw-coords">Raw: --, --</p>
-      <p><a class="btn" href="/home/Index.html">Back</a></p>
+      <p><a class="btn" href="/auth/login.html">ログインへ戻る</a></p>
       <!-- 共通バージョン表示 -->
       <footer class="version-footer">
         <span id="app-version">v1.13.4</span>

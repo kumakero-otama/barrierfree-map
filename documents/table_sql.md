@@ -1,6 +1,73 @@
 # table_sql.md
 PostGreのテーブルを作るSQLコマンドのまとめ
 
+## login.user_auth_providers
+1レコードが1つのログイン方法
+```SQL
+CREATE TABLE login.user_auth_providers (
+    auth_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL
+        REFERENCES login.users(user_id)
+        ON DELETE CASCADE,
+    provider VARCHAR(20) NOT NULL
+        CHECK (provider IN ('email','google')),
+    provider_user_id TEXT,   -- google: sub, email: NULL
+    email VARCHAR(255),      -- email: required, google: optional
+    password_hash TEXT,      -- email: required, google: NULL
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_uap_fields_by_provider CHECK (
+      (provider='email'  AND email IS NOT NULL AND password_hash IS NOT NULL AND provider_user_id IS NULL)
+      OR
+      (provider='google' AND provider_user_id IS NOT NULL AND password_hash IS NULL)
+    )
+);
+
+-- email login: email unique only among email providers
+CREATE UNIQUE INDEX uix_uap_email_only
+ON login.user_auth_providers (email)
+WHERE provider = 'email';
+
+-- google login: sub unique only among google providers
+CREATE UNIQUE INDEX uix_uap_google_sub
+ON login.user_auth_providers (provider_user_id)
+WHERE provider = 'google';
+```
+
+## login.email_verification_tokens
+1レコードが1つのトークン
+```SQL
+CREATE TABLE login.email_verification_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL
+        REFERENCES login.users(user_id)
+        ON DELETE CASCADE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## login.users
+1レコードが一つのユーザ
+```SQL
+CREATE TABLE login.users (
+    user_id SERIAL PRIMARY KEY,
+
+    username VARCHAR(50),  -- allow NULL (set later)
+    icon_url TEXT,
+
+    total_tactile_length NUMERIC(10,3) DEFAULT 0,
+    total_road_posts INTEGER DEFAULT 0,
+    total_hearts INTEGER DEFAULT 0,
+
+    is_active BOOLEAN DEFAULT TRUE,
+    email_verified BOOLEAN DEFAULT FALSE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP
+);
+```
+
 ## roadinfo.road_info_point
 1レコードが1つの道情報のポイント
 ```SQL

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>サインアップ | Draggable Map</title>
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/auth/auth.css" />
+  </head>
+  <body>
+    <main class="auth-shell">
+      <section class="auth-card" aria-labelledby="signup-title">
+        <h1 id="signup-title">サインアップ</h1>
+        <p class="auth-subtitle">アカウント登録画面です。登録処理はまだ未実装です。</p>
+
+        <form id="signup-form" novalidate>
+          <div class="form-row">
+            <label for="signup-email">メールアドレス</label>
+            <input id="signup-email" name="email" type="email" autocomplete="email" />
+          </div>
+          <div class="form-row">
+            <label for="signup-password">パスワード</label>
+            <input
+              id="signup-password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="form-row">
+            <label for="signup-username">ユーザー名</label>
+            <input id="signup-username" name="username" type="text" autocomplete="username" />
+          </div>
+          <div class="form-row">
+            <label for="signup-icon">アイコン画像</label>
+            <input id="signup-icon" name="icon" type="file" accept="image/*" />
+            <img
+              id="signup-icon-preview"
+              class="signup-icon-preview hidden"
+              alt="選択したアイコン画像のプレビュー"
+            />
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" id="signup-button" type="submit">登録</button>
+          </div>
+        </form>
+        <p class="auth-footer">
+          すでにアカウントをお持ちですか？
+          <a href="/auth/login.html">ログイン画面へ</a>
+        </p>
+      </section>
+      <footer class="version-footer">
+        <span id="app-version">v1.14.0</span>
+      </footer>
+    </main>
+
+    <script src="/auth/auth.js"></script>
+    <script src="/version.js"></script>
+    <script src="/pwa.js"></script>
+  </body>
+</html>

@@ -49,6 +49,10 @@ const CORE_ASSETS = [
   "/map/map.js",
   "/manifest.webmanifest",
   "/assets/icon.svg",
+  "/auth/login.html",
+  "/auth/signup.html",
+  "/auth/auth.css",
+  "/auth/auth.js",
   "/pwa.js",
 ];
 

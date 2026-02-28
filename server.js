@@ -129,10 +129,10 @@ function handleStatic(req, res) {
   const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   // 旧パスでアクセスされた場合は新しいページ構成へリダイレクトする。
   const legacyPathMap = {
-    "/index.html": "/home/Index.html",
-    "/home/index.html": "/home/Index.html",
+    "/index.html": "/auth/login.html",
+    "/home/index.html": "/auth/login.html",
     "/map/index.html": "/map/Index.html",
-    "/analog/index.html": "/analog/Index.html",
+    "/analog/index.html": "/auth/login.html",
     "/post_road.html": "/post_road/Index.html",
     "/post_road/index.html": "/post_road/Index.html",
     "/otasuke.html": "/otasuke/Index.html",
@@ -142,7 +142,7 @@ function handleStatic(req, res) {
   };
   const lowerPath = requestUrl.pathname.toLowerCase();
   const canonicalPath = requestUrl.pathname === "/"
-    ? "/home/Index.html"
+    ? "/auth/login.html"
     : (legacyPathMap[lowerPath] || requestUrl.pathname);
   if (requestUrl.pathname !== canonicalPath) {
     res.writeHead(302, { Location: canonicalPath });
