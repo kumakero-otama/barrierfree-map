@@ -133,7 +133,7 @@
     <header class="app-bar">
       <h1 class="app-bar-title">SETTING</h1>
       <div class="app-bar-actions" aria-label="アプリメニュー">
-        <a class="app-bar-icon-link" href="/profile/Index.html" aria-label="アカウント">
+        <a class="app-bar-icon-link" href="/profile/Index.html" aria-label="プロフィール">
           <img src="/assets/buttons/account.png" alt="" />
         </a>
         <a class="app-bar-icon-link" href="/map/Index.html" aria-label="ホーム">
@@ -153,29 +153,59 @@
             地図の表示
           </button>
           <div id="panel-map-display" class="accordion-panel" hidden>
-            <div class="record-toggle" role="group" aria-label="アプリの点字ブロック表示 toggle">
-              <span class="record-title">アプリの点字ブロック表示</span>
+            <div class="record-toggle" role="group" aria-label="自分で投稿した点字ブロック toggle">
+              <span class="record-title">自分で投稿した点字ブロック</span>
               <span class="record-label">OFF</span>
               <label class="switch">
-                <input id="setting-show-app-tactile" type="checkbox" aria-label="アプリの点字ブロック表示" />
+                <input
+                  id="setting-show-only-my-tactile"
+                  type="checkbox"
+                  aria-label="自分で投稿した点字ブロック"
+                />
                 <span class="slider"></span>
               </label>
               <span class="record-label">ON</span>
             </div>
-            <div class="record-toggle" role="group" aria-label="OSMの点字ブロック表示 toggle">
-              <span class="record-title">OSMの点字ブロック表示</span>
+            <div class="record-toggle" role="group" aria-label="アプリで投稿された点字ブロック toggle">
+              <span class="record-title">アプリで投稿された点字ブロック</span>
               <span class="record-label">OFF</span>
               <label class="switch">
-                <input id="setting-show-osm-tactile" type="checkbox" aria-label="OSMの点字ブロック表示" />
+                <input id="setting-show-app-tactile" type="checkbox" aria-label="アプリで投稿された点字ブロック" />
                 <span class="slider"></span>
               </label>
               <span class="record-label">ON</span>
             </div>
-            <div class="record-toggle" role="group" aria-label="全ての道情報表示 toggle">
-              <span class="record-title">全ての道情報表示</span>
+            <div class="record-toggle" role="group" aria-label="OSMで投稿された点字ブロック toggle">
+              <span class="record-title">OSMで投稿された点字ブロック</span>
               <span class="record-label">OFF</span>
               <label class="switch">
-                <input id="setting-show-all-road-info" type="checkbox" aria-label="全ての道情報表示" />
+                <input id="setting-show-osm-tactile" type="checkbox" aria-label="OSMで投稿された点字ブロック" />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
+            <div class="record-toggle" role="group" aria-label="自分で投稿した道情報 toggle">
+              <span class="record-title">自分で投稿した道情報</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input
+                  id="setting-show-only-my-road-info"
+                  type="checkbox"
+                  aria-label="自分で投稿した道情報"
+                />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
+            <div class="record-toggle" role="group" aria-label="すべての道情報 toggle">
+              <span class="record-title">すべての道情報</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input
+                  id="setting-show-all-road-info"
+                  type="checkbox"
+                  aria-label="すべての道情報"
+                />
                 <span class="slider"></span>
               </label>
               <span class="record-label">ON</span>
@@ -197,6 +227,9 @@
           <div id="panel-language" class="accordion-panel placeholder-panel" hidden></div>
         </div>
       </section>
+      <footer class="version-footer">
+        <span id="app-version">v1.16.4</span>
+      </footer>
     </main>
 
     <script>
@@ -205,6 +238,8 @@
         showAppTactile: true,
         showOsmTactile: true,
         showAllRoadInfo: true,
+        showOnlyMyTactile: false,
+        showOnlyMyRoadInfo: false,
       };
 
       function loadSettings() {
@@ -218,6 +253,8 @@
             showAppTactile: Boolean(parsed && parsed.showAppTactile),
             showOsmTactile: Boolean(parsed && parsed.showOsmTactile),
             showAllRoadInfo: Boolean(parsed && parsed.showAllRoadInfo),
+            showOnlyMyTactile: Boolean(parsed && parsed.showOnlyMyTactile),
+            showOnlyMyRoadInfo: Boolean(parsed && parsed.showOnlyMyRoadInfo),
           };
         } catch {
           return { ...DEFAULT_MAP_DISPLAY_SETTINGS };
@@ -232,21 +269,29 @@
       const appTactileToggle = document.getElementById("setting-show-app-tactile");
       const osmTactileToggle = document.getElementById("setting-show-osm-tactile");
       const allRoadInfoToggle = document.getElementById("setting-show-all-road-info");
+      const onlyMyTactileToggle = document.getElementById("setting-show-only-my-tactile");
+      const onlyMyRoadInfoToggle = document.getElementById("setting-show-only-my-road-info");
 
       appTactileToggle.checked = settings.showAppTactile;
       osmTactileToggle.checked = settings.showOsmTactile;
       allRoadInfoToggle.checked = settings.showAllRoadInfo;
+      onlyMyTactileToggle.checked = settings.showOnlyMyTactile;
+      onlyMyRoadInfoToggle.checked = settings.showOnlyMyRoadInfo;
 
       function handleMapDisplayToggleChange() {
         settings.showAppTactile = Boolean(appTactileToggle.checked);
         settings.showOsmTactile = Boolean(osmTactileToggle.checked);
         settings.showAllRoadInfo = Boolean(allRoadInfoToggle.checked);
+        settings.showOnlyMyTactile = Boolean(onlyMyTactileToggle.checked);
+        settings.showOnlyMyRoadInfo = Boolean(onlyMyRoadInfoToggle.checked);
         saveSettings(settings);
       }
 
       appTactileToggle.addEventListener("change", handleMapDisplayToggleChange);
       osmTactileToggle.addEventListener("change", handleMapDisplayToggleChange);
       allRoadInfoToggle.addEventListener("change", handleMapDisplayToggleChange);
+      onlyMyTactileToggle.addEventListener("change", handleMapDisplayToggleChange);
+      onlyMyRoadInfoToggle.addEventListener("change", handleMapDisplayToggleChange);
 
       document.querySelectorAll(".accordion-trigger").forEach((trigger) => {
         trigger.addEventListener("click", () => {

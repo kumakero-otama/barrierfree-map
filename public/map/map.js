@@ -119,6 +119,8 @@ const DEFAULT_MAP_DISPLAY_SETTINGS = {
   showAppTactile: true,
   showOsmTactile: true,
   showAllRoadInfo: true,
+  showOnlyMyTactile: false,
+  showOnlyMyRoadInfo: false,
 };
 
 function loadMapDisplaySettings() {
@@ -132,6 +134,8 @@ function loadMapDisplaySettings() {
       showAppTactile: Boolean(parsed && parsed.showAppTactile),
       showOsmTactile: Boolean(parsed && parsed.showOsmTactile),
       showAllRoadInfo: Boolean(parsed && parsed.showAllRoadInfo),
+      showOnlyMyTactile: Boolean(parsed && parsed.showOnlyMyTactile),
+      showOnlyMyRoadInfo: Boolean(parsed && parsed.showOnlyMyRoadInfo),
     };
   } catch (err) {
     console.warn("[Settings] Failed to parse map display settings. Use defaults.", err);
@@ -140,6 +144,15 @@ function loadMapDisplaySettings() {
 }
 
 const mapDisplaySettings = loadMapDisplaySettings();
+
+function refreshMapDisplaySettings() {
+  const latest = loadMapDisplaySettings();
+  mapDisplaySettings.showAppTactile = Boolean(latest.showAppTactile);
+  mapDisplaySettings.showOsmTactile = Boolean(latest.showOsmTactile);
+  mapDisplaySettings.showAllRoadInfo = Boolean(latest.showAllRoadInfo);
+  mapDisplaySettings.showOnlyMyTactile = Boolean(latest.showOnlyMyTactile);
+  mapDisplaySettings.showOnlyMyRoadInfo = Boolean(latest.showOnlyMyRoadInfo);
+}
 
 function loadMapControlsCollapsed() {
   try {
@@ -197,7 +210,7 @@ function isMapInfoEnabled() {
 }
 
 function shouldShowAppTactile() {
-  return isMapInfoEnabled() && mapDisplaySettings.showAppTactile;
+  return isMapInfoEnabled() && (mapDisplaySettings.showAppTactile || mapDisplaySettings.showOnlyMyTactile);
 }
 
 function shouldShowOsmTactile() {
@@ -205,7 +218,15 @@ function shouldShowOsmTactile() {
 }
 
 function shouldShowRoadInfo() {
-  return isMapInfoEnabled() && mapDisplaySettings.showAllRoadInfo;
+  return isMapInfoEnabled() && (mapDisplaySettings.showAllRoadInfo || mapDisplaySettings.showOnlyMyRoadInfo);
+}
+
+function shouldShowOnlyMyTactile() {
+  return Boolean(mapDisplaySettings.showOnlyMyTactile);
+}
+
+function shouldShowOnlyMyRoadInfo() {
+  return Boolean(mapDisplaySettings.showOnlyMyRoadInfo);
 }
 
 function shouldIgnoreMapTap(event) {
@@ -251,6 +272,10 @@ map.on("click", (event) => {
 });
 
 initMapControlsPanelGesture();
+window.addEventListener("pageshow", () => {
+  refreshMapDisplaySettings();
+  applyMapInfoVisibility();
+});
 
 // UUID v4 生成関数
 function generateUUID() {
@@ -682,6 +707,7 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
 
 // session_pathsを取得して表示
 function loadAndShowAllRecords() {
+  refreshMapDisplaySettings();
   const requestSeq = ++recordsLoadRequestSeq;
   setRecordsLoadingVisible(true);
   console.log("[loadAndShowAllRecords] Fetching all session paths...");
@@ -691,6 +717,9 @@ function loadAndShowAllRecords() {
     centerLng: center.lng.toString(),
     radiusKm: "10",
   });
+  if (shouldShowOnlyMyTactile()) {
+    params.set("mine", "1");
+  }
   fetch(`/api/records?${params.toString()}`)
     .then((res) => {
       if (!res.ok) {
@@ -724,10 +753,17 @@ function loadAndShowAllRecords() {
 // session_pathsの全軌跡を地図上に表示
 function showAllSessionPathsOnMap(paths) {
   clearAllRecordsFromMap();
+  const visiblePaths = paths.filter((path) => {
+    if (!shouldShowOnlyMyTactile()) {
+      return true;
+    }
+    const ownerUserId = Number(path && path.user_id);
+    return Number.isFinite(ownerUserId) && Number.isFinite(currentUserId) && ownerUserId === currentUserId;
+  });
 
-  console.log(`[showAllSessionPathsOnMap] Showing ${paths.length} paths`);
+  console.log(`[showAllSessionPathsOnMap] Showing ${visiblePaths.length}/${paths.length} paths`);
 
-  paths.forEach((path) => {
+  visiblePaths.forEach((path) => {
     let geom;
     try {
       geom = typeof path.geom_geojson === "string"
@@ -894,6 +930,7 @@ function setOsmLoadingVisible(visible) {
 }
 
 function loadAndShowRoadInfoPoints() {
+  refreshMapDisplaySettings();
   const requestSeq = ++roadInfoLoadRequestSeq;
   // 地図中心から10kmの道情報ポイントを取得する。
   console.log("[loadAndShowRoadInfoPoints] Fetching road info points...");
@@ -903,6 +940,9 @@ function loadAndShowRoadInfoPoints() {
     centerLng: center.lng.toString(),
     radiusKm: "10",
   });
+  if (shouldShowOnlyMyRoadInfo()) {
+    params.set("mine", "1");
+  }
   fetch(`/api/road-info?${params.toString()}`)
     .then((res) => {
       if (!res.ok) {
@@ -932,8 +972,15 @@ function loadAndShowRoadInfoPoints() {
 function showRoadInfoPointsOnMap(points) {
   // 既存ピンを消してから最新結果だけを表示する。
   clearRoadInfoPointsFromMap();
+  const visiblePoints = points.filter((point) => {
+    if (!shouldShowOnlyMyRoadInfo()) {
+      return true;
+    }
+    const createdBy = Number(point && point.createdBy);
+    return Number.isFinite(createdBy) && Number.isFinite(currentUserId) && createdBy === currentUserId;
+  });
 
-  points.forEach((point) => {
+  visiblePoints.forEach((point) => {
     const lat = Number(point && point.lat);
     const lng = Number(point && point.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -953,7 +1000,7 @@ function showRoadInfoPointsOnMap(points) {
     roadInfoMarkers.push(pin);
   });
 
-  console.log(`[showRoadInfoPointsOnMap] Displayed ${roadInfoMarkers.length} points`);
+  console.log(`[showRoadInfoPointsOnMap] Displayed ${roadInfoMarkers.length}/${points.length} points`);
 }
 
 function clearRoadInfoPointsFromMap() {
@@ -966,6 +1013,7 @@ function clearRoadInfoPointsFromMap() {
 }
 
 function applyMapInfoVisibility() {
+  refreshMapDisplaySettings();
   if (!isMapInfoEnabled()) {
     recordsLoadRequestSeq += 1;
     osmTactileLoadRequestSeq += 1;

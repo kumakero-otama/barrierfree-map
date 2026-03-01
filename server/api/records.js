@@ -1,4 +1,5 @@
 const { createDbPool } = require("../db");
+const { resolveAuthenticatedUserId } = require("../auth_user");
 
 function createRecordsHandler({ sendJson }) {
   const dbResult = createDbPool();
@@ -29,30 +30,50 @@ function createRecordsHandler({ sendJson }) {
       const centerLat = Number(url.searchParams.get("centerLat"));
       const centerLng = Number(url.searchParams.get("centerLng"));
       const radiusKm = Number(url.searchParams.get("radiusKm"));
+      const mineOnly = url.searchParams.get("mine") === "1";
+      let currentUserId = null;
+      if (mineOnly) {
+        currentUserId = await resolveAuthenticatedUserId(req, pool);
+        if (!currentUserId) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+      }
 
       // 基本は全経路を取得し、条件があれば範囲検索を追加する。
       let query = `
         SELECT
-          session_id,
+          sp.session_id,
+          s.user_id,
           source,
-          created_at,
-          ST_AsGeoJSON(geom) AS geom_geojson
-        FROM tactile.session_paths
+          sp.created_at,
+          ST_AsGeoJSON(sp.geom) AS geom_geojson
+        FROM tactile.session_paths sp
+        LEFT JOIN tactile.sessions s ON s.session_id = sp.session_id
       `;
       const params = [];
+      const whereClauses = [];
 
       if (Number.isFinite(centerLat) && Number.isFinite(centerLng) && Number.isFinite(radiusKm) && radiusKm > 0) {
-        query += `
-          WHERE ST_DWithin(
-            geom,
+        whereClauses.push(`
+          ST_DWithin(
+            sp.geom,
             ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
             ?
           )
-        `;
+        `);
         params.push(centerLng, centerLat, radiusKm * 1000);
       }
+      if (mineOnly) {
+        whereClauses.push("s.user_id = ?");
+        params.push(currentUserId);
+      }
 
-      query += " ORDER BY created_at DESC";
+      if (whereClauses.length > 0) {
+        query += ` WHERE ${whereClauses.join(" AND ")}`;
+      }
+
+      query += " ORDER BY sp.created_at DESC";
 
       const [paths] = await pool.query(query, params);
 

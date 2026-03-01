@@ -234,6 +234,7 @@ function createRoadInfoHandler({ sendJson }) {
       const centerLng = Number(requestUrl.searchParams.get("centerLng"));
       const radiusKmRaw = Number(requestUrl.searchParams.get("radiusKm"));
       const radiusKm = Number.isFinite(radiusKmRaw) ? radiusKmRaw : 10;
+      const mineOnly = requestUrl.searchParams.get("mine") === "1";
 
       if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || Math.abs(centerLat) > 90 || Math.abs(centerLng) > 180) {
         sendJson(res, 400, { error: "invalid_coordinates" });
@@ -246,23 +247,42 @@ function createRoadInfoHandler({ sendJson }) {
 
       // 地図用一覧は中心点 + 半径でactiveポイントのみ返す。
       const radiusMeters = Math.min(radiusKm, 20) * 1000;
-      pool.query(
-        `SELECT
-           id,
-           ST_Y(geom::geometry) AS lat,
-           ST_X(geom::geometry) AS lng
-         FROM roadinfo.road_info_point
-         WHERE status = 'active'
-           AND ST_DWithin(
-             geom,
-             ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
-             ?
-           )
-         ORDER BY created_at DESC
-         LIMIT 3000`,
-        [centerLng, centerLat, radiusMeters]
-      )
-        .then(([rows]) => {
+      (async () => {
+        let currentUserId = null;
+        if (mineOnly) {
+          currentUserId = await resolveAuthenticatedUserId(req, pool);
+          if (!currentUserId) {
+            sendJson(res, 401, { error: "unauthorized" });
+            return;
+          }
+        }
+
+        const params = [centerLng, centerLat, radiusMeters];
+        let query = `SELECT
+                       id,
+                       ST_Y(geom::geometry) AS lat,
+                       ST_X(geom::geometry) AS lng,
+                       created_by
+                     FROM roadinfo.road_info_point
+                     WHERE status = 'active'
+                       AND ST_DWithin(
+                         geom,
+                         ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+                         ?
+                       )`;
+        if (mineOnly) {
+          query += " AND created_by = ?";
+          params.push(currentUserId);
+        }
+        query += " ORDER BY created_at DESC LIMIT 3000";
+
+        return pool.query(query, params);
+      })()
+        .then((queryResult) => {
+          if (!queryResult) {
+            return;
+          }
+          const [rows] = queryResult;
           sendJson(res, 200, {
             success: true,
             count: rows.length,
@@ -270,6 +290,7 @@ function createRoadInfoHandler({ sendJson }) {
               id: row.id,
               lat: Number(row.lat),
               lng: Number(row.lng),
+              createdBy: row.created_by == null ? null : Number(row.created_by),
             })),
           });
         })
