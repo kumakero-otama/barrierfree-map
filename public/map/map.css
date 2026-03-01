@@ -75,6 +75,32 @@ body {
   pointer-events: none;
 }
 
+/* パネルを閉じたときはハンドルを画面下に固定し、常に再表示できるようにする */
+.map-layout.panel-collapsed .map-controls-panel {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  z-index: 1700;
+  width: auto;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  overflow: visible;
+}
+
+.map-layout.panel-collapsed .map-controls-handle {
+  border: 2px solid #222;
+  border-radius: 999px;
+  background: #ececec;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+/* 固定ハンドルと地図が重ならないよう、閉じたときは下余白を確保する */
+.map-layout.panel-collapsed {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 58px);
+}
+
 /* トグルと補助情報の縦並び */
 .meta {
   display: grid;
@@ -251,6 +277,11 @@ body {
 
   .record-title {
     font-size: 12px;
+  }
+
+  .map-layout.panel-collapsed .map-controls-panel {
+    left: 8px;
+    right: 8px;
   }
 }
 
