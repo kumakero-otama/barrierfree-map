@@ -47,11 +47,26 @@
         }
       })();
     </script>
-    <main class="wrap">
-      <!-- 地図本体と制御パネル -->
+    <main id="map-layout" class="wrap map-layout">
+      <!-- 地図本体 -->
       <div class="map-row">
         <div id="map" aria-label="Map"></div>
-        <aside class="map-side">
+      </div>
+      <!-- 共通バージョン表示 -->
+      <footer class="version-footer">
+        <span id="app-version">v1.13.4</span>
+      </footer>
+      <section id="map-controls-panel" class="map-controls-panel" aria-label="地図コントロール">
+        <button
+          id="map-controls-handle"
+          class="map-controls-handle"
+          type="button"
+          aria-label="地図コントロールの表示切替"
+          aria-expanded="true"
+        >
+          <span class="map-controls-handle-bar"></span>
+        </button>
+        <div id="map-controls-content" class="map-controls-content">
           <div class="meta">
             <div id="last-updated">Last update: --:--:--</div>
             <div class="record-toggle" role="group" aria-label="Record toggle">
@@ -63,29 +78,11 @@
               </label>
               <span class="record-label">ON</span>
             </div>
-            <div class="record-toggle" role="group" aria-label="Show all records toggle">
-              <span class="record-title">アプリ点字ブロック表示:</span>
+            <div class="record-toggle" role="group" aria-label="地図の情報を表示 toggle">
+              <span class="record-title">地図の情報を表示:</span>
               <span class="record-label">OFF</span>
               <label class="switch">
-                <input id="toggle-show-all" type="checkbox" aria-label="Show All Records" />
-                <span class="slider"></span>
-              </label>
-              <span class="record-label">ON</span>
-            </div>
-            <div class="record-toggle" role="group" aria-label="OSM点字ブロック表示 toggle">
-              <span class="record-title">OSM点字ブロック表示:</span>
-              <span class="record-label">OFF</span>
-              <label class="switch">
-                <input id="toggle-show-osm" type="checkbox" aria-label="OSM点字ブロック表示" />
-                <span class="slider"></span>
-              </label>
-              <span class="record-label">ON</span>
-            </div>
-            <div class="record-toggle" role="group" aria-label="道情報の表示 toggle">
-              <span class="record-title">道情報の表示:</span>
-              <span class="record-label">OFF</span>
-              <label class="switch">
-                <input id="toggle-show-road-info" type="checkbox" aria-label="道情報の表示" />
+                <input id="toggle-show-map-info" type="checkbox" aria-label="地図の情報を表示" />
                 <span class="slider"></span>
               </label>
               <span class="record-label">ON</span>
@@ -104,15 +101,11 @@
               </label>
               <span class="record-label">ON</span>
             </div>
+            <div id="coords">Lat: --, Lng: --</div>
+            <div id="raw-coords">Raw: --, --</div>
           </div>
-        </aside>
-      </div>
-      <p id="coords">Lat: --, Lng: --</p>
-      <p id="raw-coords">Raw: --, --</p>
-      <!-- 共通バージョン表示 -->
-      <footer class="version-footer">
-        <span id="app-version">v1.13.4</span>
-      </footer>
+        </div>
+      </section>
     </main>
     <div id="osm-loading-overlay" class="osm-loading-overlay hidden" aria-live="polite" aria-busy="true">
       <div class="osm-loading-spinner" aria-hidden="true"></div>

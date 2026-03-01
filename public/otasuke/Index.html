@@ -3,13 +3,129 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>お助け投稿</title>
+    <title>設定 | Draggable Map</title>
     <link rel="stylesheet" href="/appbar.css" />
     <style>
-      html, body {
-        height: 100%;
+      html,
+      body {
         margin: 0;
+        background: #f7f7f7;
+      }
+
+      .settings-wrap {
+        width: min(860px, calc(100vw - 24px));
+        margin: 0 auto;
+        padding: 16px 0 28px;
+      }
+
+      .settings-card {
+        border: 2px solid #222;
+        border-radius: 14px;
         background: #fff;
+        overflow: hidden;
+      }
+
+      .accordion-item + .accordion-item {
+        border-top: 1px solid #d8d8d8;
+      }
+
+      .accordion-trigger {
+        width: 100%;
+        border: 0;
+        background: #fff;
+        padding: 16px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #111;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .accordion-trigger::after {
+        content: "＋";
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .accordion-trigger[aria-expanded="true"]::after {
+        content: "－";
+      }
+
+      .accordion-panel {
+        padding: 0 16px 16px;
+      }
+
+      .accordion-panel[hidden] {
+        display: none;
+      }
+
+      .record-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .record-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #222;
+      }
+
+      .record-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #222;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: #ddd;
+        border: 1px solid #222;
+        border-radius: 999px;
+        transition: 0.2s ease;
+      }
+
+      .slider::before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 2px;
+        top: 2px;
+        background-color: #222;
+        border-radius: 50%;
+        transition: 0.2s ease;
+      }
+
+      .switch input:checked + .slider {
+        background-color: #b9f5c5;
+      }
+
+      .switch input:checked + .slider::before {
+        transform: translateX(22px);
+      }
+
+      .placeholder-panel {
+        min-height: 24px;
       }
     </style>
   </head>
@@ -29,6 +145,123 @@
       </div>
     </header>
     <div class="app-bar-spacer" aria-hidden="true"></div>
-    <!-- お助け投稿ページのプレースホルダー（将来実装予定） -->
+
+    <main class="settings-wrap">
+      <section class="settings-card" aria-label="設定一覧">
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button" aria-expanded="false" aria-controls="panel-map-display">
+            地図の表示
+          </button>
+          <div id="panel-map-display" class="accordion-panel" hidden>
+            <div class="record-toggle" role="group" aria-label="アプリの点字ブロック表示 toggle">
+              <span class="record-title">アプリの点字ブロック表示</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input id="setting-show-app-tactile" type="checkbox" aria-label="アプリの点字ブロック表示" />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
+            <div class="record-toggle" role="group" aria-label="OSMの点字ブロック表示 toggle">
+              <span class="record-title">OSMの点字ブロック表示</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input id="setting-show-osm-tactile" type="checkbox" aria-label="OSMの点字ブロック表示" />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
+            <div class="record-toggle" role="group" aria-label="全ての道情報表示 toggle">
+              <span class="record-title">全ての道情報表示</span>
+              <span class="record-label">OFF</span>
+              <label class="switch">
+                <input id="setting-show-all-road-info" type="checkbox" aria-label="全ての道情報表示" />
+                <span class="slider"></span>
+              </label>
+              <span class="record-label">ON</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button" aria-expanded="false" aria-controls="panel-theme">
+            ダーク/ライト
+          </button>
+          <div id="panel-theme" class="accordion-panel placeholder-panel" hidden></div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button" aria-expanded="false" aria-controls="panel-language">
+            言語
+          </button>
+          <div id="panel-language" class="accordion-panel placeholder-panel" hidden></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const MAP_DISPLAY_SETTINGS_KEY = "mapDisplaySettings.v1";
+      const DEFAULT_MAP_DISPLAY_SETTINGS = {
+        showAppTactile: true,
+        showOsmTactile: true,
+        showAllRoadInfo: true,
+      };
+
+      function loadSettings() {
+        try {
+          const raw = localStorage.getItem(MAP_DISPLAY_SETTINGS_KEY);
+          if (!raw) {
+            return { ...DEFAULT_MAP_DISPLAY_SETTINGS };
+          }
+          const parsed = JSON.parse(raw);
+          return {
+            showAppTactile: Boolean(parsed && parsed.showAppTactile),
+            showOsmTactile: Boolean(parsed && parsed.showOsmTactile),
+            showAllRoadInfo: Boolean(parsed && parsed.showAllRoadInfo),
+          };
+        } catch {
+          return { ...DEFAULT_MAP_DISPLAY_SETTINGS };
+        }
+      }
+
+      function saveSettings(next) {
+        localStorage.setItem(MAP_DISPLAY_SETTINGS_KEY, JSON.stringify(next));
+      }
+
+      const settings = loadSettings();
+      const appTactileToggle = document.getElementById("setting-show-app-tactile");
+      const osmTactileToggle = document.getElementById("setting-show-osm-tactile");
+      const allRoadInfoToggle = document.getElementById("setting-show-all-road-info");
+
+      appTactileToggle.checked = settings.showAppTactile;
+      osmTactileToggle.checked = settings.showOsmTactile;
+      allRoadInfoToggle.checked = settings.showAllRoadInfo;
+
+      function handleMapDisplayToggleChange() {
+        settings.showAppTactile = Boolean(appTactileToggle.checked);
+        settings.showOsmTactile = Boolean(osmTactileToggle.checked);
+        settings.showAllRoadInfo = Boolean(allRoadInfoToggle.checked);
+        saveSettings(settings);
+      }
+
+      appTactileToggle.addEventListener("change", handleMapDisplayToggleChange);
+      osmTactileToggle.addEventListener("change", handleMapDisplayToggleChange);
+      allRoadInfoToggle.addEventListener("change", handleMapDisplayToggleChange);
+
+      document.querySelectorAll(".accordion-trigger").forEach((trigger) => {
+        trigger.addEventListener("click", () => {
+          const targetId = trigger.getAttribute("aria-controls");
+          const panel = targetId ? document.getElementById(targetId) : null;
+          if (!panel) {
+            return;
+          }
+          const expanded = trigger.getAttribute("aria-expanded") === "true";
+          trigger.setAttribute("aria-expanded", expanded ? "false" : "true");
+          panel.hidden = expanded;
+        });
+      });
+    </script>
+    <script src="/version.js"></script>
+    <script src="/pwa.js"></script>
   </body>
 </html>

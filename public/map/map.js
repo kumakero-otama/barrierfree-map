@@ -1,11 +1,12 @@
 const map = L.map("map", { zoomControl: true }).setView([35.681236, 139.767125], 13);
+const mapLayoutEl = document.getElementById("map-layout");
 const coordsEl = document.getElementById("coords");
 const rawCoordsEl = document.getElementById("raw-coords");
 const lastUpdatedEl = document.getElementById("last-updated");
+const mapControlsPanelEl = document.getElementById("map-controls-panel");
+const mapControlsHandleEl = document.getElementById("map-controls-handle");
 const toggleRecordBtn = document.getElementById("toggle-record");
-const toggleShowAllBtn = document.getElementById("toggle-show-all");
-const toggleShowOsmBtn = document.getElementById("toggle-show-osm");
-const toggleShowRoadInfoBtn = document.getElementById("toggle-show-road-info");
+const toggleShowMapInfoBtn = document.getElementById("toggle-show-map-info");
 const toggleCenterCurrentBtn = document.getElementById("toggle-center-current");
 const osmLoadingOverlayEl = document.getElementById("osm-loading-overlay");
 const recordsLoadingOverlayEl = document.getElementById("records-loading-overlay");
@@ -54,6 +55,8 @@ let traceConfirmMap = null;
 let traceConfirmPathLayer = null;
 let isHandlingRecordToggle = false;
 let currentUserId = null;
+let latestSnappedLocation = null;
+let mapLayoutSyncTimer = null;
 
 // Valhallaの6桁精度ポリラインをデコードする関数
 function decodePolyline(str, precision) {
@@ -101,7 +104,6 @@ function decodePolyline(str, precision) {
   return coordinates;
 }
 
-let showAllRecords = false;
 let allRecordsMarkers = [];
 let osmTactileMarkers = [];
 let roadInfoMarkers = [];
@@ -109,7 +111,102 @@ let isZooming = false;
 let suppressMapTapUntil = 0;
 let osmTactileLoadRequestSeq = 0;
 let recordsLoadRequestSeq = 0;
+let roadInfoLoadRequestSeq = 0;
 const MAP_TAP_SUPPRESS_AFTER_ZOOM_MS = 400;
+const MAP_DISPLAY_SETTINGS_KEY = "mapDisplaySettings.v1";
+const MAP_CONTROLS_COLLAPSED_KEY = "mapControlsCollapsed.v1";
+const DEFAULT_MAP_DISPLAY_SETTINGS = {
+  showAppTactile: true,
+  showOsmTactile: true,
+  showAllRoadInfo: true,
+};
+
+function loadMapDisplaySettings() {
+  try {
+    const raw = localStorage.getItem(MAP_DISPLAY_SETTINGS_KEY);
+    if (!raw) {
+      return { ...DEFAULT_MAP_DISPLAY_SETTINGS };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      showAppTactile: Boolean(parsed && parsed.showAppTactile),
+      showOsmTactile: Boolean(parsed && parsed.showOsmTactile),
+      showAllRoadInfo: Boolean(parsed && parsed.showAllRoadInfo),
+    };
+  } catch (err) {
+    console.warn("[Settings] Failed to parse map display settings. Use defaults.", err);
+    return { ...DEFAULT_MAP_DISPLAY_SETTINGS };
+  }
+}
+
+const mapDisplaySettings = loadMapDisplaySettings();
+
+function loadMapControlsCollapsed() {
+  try {
+    return localStorage.getItem(MAP_CONTROLS_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveMapControlsCollapsed(collapsed) {
+  try {
+    localStorage.setItem(MAP_CONTROLS_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    // ignore storage failure
+  }
+}
+
+function setMapControlsCollapsed(collapsed) {
+  if (!mapLayoutEl || !mapControlsPanelEl || !mapControlsHandleEl) {
+    return;
+  }
+  mapControlsPanelEl.classList.toggle("collapsed", collapsed);
+  mapLayoutEl.classList.toggle("panel-collapsed", collapsed);
+  mapControlsHandleEl.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  saveMapControlsCollapsed(collapsed);
+  // 1) 即時反映 2) アニメーション終了後反映 の2段でズレを防ぐ。
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    recenterToLatestLocation();
+  });
+  if (mapLayoutSyncTimer) {
+    clearTimeout(mapLayoutSyncTimer);
+  }
+  mapLayoutSyncTimer = setTimeout(() => {
+    map.invalidateSize();
+    recenterToLatestLocation();
+  }, 320);
+}
+
+function initMapControlsPanelGesture() {
+  if (!mapControlsPanelEl || !mapControlsHandleEl) {
+    return;
+  }
+
+  mapControlsHandleEl.addEventListener("click", () => {
+    const collapsed = mapControlsPanelEl.classList.contains("collapsed");
+    setMapControlsCollapsed(!collapsed);
+  });
+
+  setMapControlsCollapsed(loadMapControlsCollapsed());
+}
+
+function isMapInfoEnabled() {
+  return Boolean(toggleShowMapInfoBtn && toggleShowMapInfoBtn.checked);
+}
+
+function shouldShowAppTactile() {
+  return isMapInfoEnabled() && mapDisplaySettings.showAppTactile;
+}
+
+function shouldShowOsmTactile() {
+  return isMapInfoEnabled() && mapDisplaySettings.showOsmTactile;
+}
+
+function shouldShowRoadInfo() {
+  return isMapInfoEnabled() && mapDisplaySettings.showAllRoadInfo;
+}
 
 function shouldIgnoreMapTap(event) {
   if (isZooming || Date.now() < suppressMapTapUntil) {
@@ -152,6 +249,8 @@ map.on("click", (event) => {
   }
   window.location.assign("/post_road/Index.html");
 });
+
+initMapControlsPanelGesture();
 
 // UUID v4 生成関数
 function generateUUID() {
@@ -508,6 +607,27 @@ function isCenterCurrentEnabled() {
   return toggleCenterCurrentBtn ? toggleCenterCurrentBtn.checked : true;
 }
 
+function recenterToLatestLocation() {
+  if (!isCenterCurrentEnabled()) {
+    return;
+  }
+  const currentZoom = map.getZoom();
+  if (latestSnappedLocation) {
+    map.setView([latestSnappedLocation.lat, latestSnappedLocation.lng], currentZoom, { animate: false });
+    return;
+  }
+  if (marker) {
+    const pos = marker.getLatLng();
+    if (pos && Number.isFinite(pos.lat) && Number.isFinite(pos.lng)) {
+      map.setView([pos.lat, pos.lng], currentZoom, { animate: false });
+      return;
+    }
+  }
+  if (latestLocation && Number.isFinite(latestLocation.lat) && Number.isFinite(latestLocation.lng)) {
+    map.setView([latestLocation.lat, latestLocation.lng], currentZoom, { animate: false });
+  }
+}
+
 function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = false) {
   console.log(`[updateDisplay] Updating display: raw=(${rawLat}, ${rawLng}), snapped=(${snappedLat}, ${snappedLng})`);
   
@@ -522,6 +642,14 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
 
   coordsEl.textContent = `Lat: ${snappedLat.toFixed(6)}, Lng: ${snappedLng.toFixed(6)}`;
   rawCoordsEl.textContent = `Raw: ${rawLat.toFixed(6)}, ${rawLng.toFixed(6)}`;
+  latestSnappedLocation = { lat: snappedLat, lng: snappedLng };
+
+  // 「現在地の中央表示」がONのときのみ地図の表示位置を更新
+  if (isCenterCurrentEnabled()) {
+    const currentZoom = map.getZoom();
+    console.log(`[updateDisplay] Moving map to (${snappedLat}, ${snappedLng}) with zoom ${currentZoom}`);
+    map.setView([snappedLat, snappedLng], currentZoom, { animate: false });
+  }
 
   if (skipMarker) return;
   
@@ -532,13 +660,6 @@ function updateDisplay(rawLat, rawLng, snappedLat, snappedLng, skipMarker = fals
   } else {
     console.log('[updateDisplay] Updating existing marker position');
     marker.setLatLng([snappedLat, snappedLng]);
-  }
-  
-  // 「現在地の中央表示」がONのときのみ地図の表示位置を更新
-  if (isCenterCurrentEnabled()) {
-    const currentZoom = map.getZoom();
-    console.log(`[updateDisplay] Moving map to (${snappedLat}, ${snappedLng}) with zoom ${currentZoom}`);
-    map.setView([snappedLat, snappedLng], currentZoom, { animate: true });
   }
 
   // ドット（点）だけを表示
@@ -578,7 +699,7 @@ function loadAndShowAllRecords() {
       return res.json();
     })
     .then((data) => {
-      if (requestSeq !== recordsLoadRequestSeq || !toggleShowAllBtn || !toggleShowAllBtn.checked) {
+      if (requestSeq !== recordsLoadRequestSeq || !shouldShowAppTactile()) {
         return;
       }
       console.log(`[loadAndShowAllRecords] Loaded ${data.count} paths`);
@@ -678,7 +799,7 @@ function loadAndShowOsmTactileWays() {
       return res.json();
     })
     .then((data) => {
-      if (requestSeq !== osmTactileLoadRequestSeq || !toggleShowOsmBtn || !toggleShowOsmBtn.checked) {
+      if (requestSeq !== osmTactileLoadRequestSeq || !shouldShowOsmTactile()) {
         return;
       }
       if (!data || !Array.isArray(data.features)) {
@@ -693,9 +814,6 @@ function loadAndShowOsmTactileWays() {
       }
       console.error("[loadAndShowOsmTactileWays] Error:", err);
       alert("OSM点字ブロックデータの取得に失敗しました。");
-      if (toggleShowOsmBtn) {
-        toggleShowOsmBtn.checked = false;
-      }
       clearOsmTactileWaysFromMap();
     })
     .finally(() => {
@@ -776,6 +894,7 @@ function setOsmLoadingVisible(visible) {
 }
 
 function loadAndShowRoadInfoPoints() {
+  const requestSeq = ++roadInfoLoadRequestSeq;
   // 地図中心から10kmの道情報ポイントを取得する。
   console.log("[loadAndShowRoadInfoPoints] Fetching road info points...");
   const center = map.getCenter();
@@ -792,17 +911,20 @@ function loadAndShowRoadInfoPoints() {
       return res.json();
     })
     .then((data) => {
+      if (requestSeq !== roadInfoLoadRequestSeq || !shouldShowRoadInfo()) {
+        return;
+      }
       if (!data || !Array.isArray(data.points)) {
         throw new Error("invalid road-info payload");
       }
       showRoadInfoPointsOnMap(data.points);
     })
     .catch((err) => {
+      if (requestSeq !== roadInfoLoadRequestSeq) {
+        return;
+      }
       console.error("[loadAndShowRoadInfoPoints] Error:", err);
       alert("道情報データの取得に失敗しました。");
-      if (toggleShowRoadInfoBtn) {
-        toggleShowRoadInfoBtn.checked = false;
-      }
       clearRoadInfoPointsFromMap();
     });
 }
@@ -841,6 +963,43 @@ function clearRoadInfoPointsFromMap() {
     map.removeLayer(marker);
   });
   roadInfoMarkers = [];
+}
+
+function applyMapInfoVisibility() {
+  if (!isMapInfoEnabled()) {
+    recordsLoadRequestSeq += 1;
+    osmTactileLoadRequestSeq += 1;
+    roadInfoLoadRequestSeq += 1;
+    setRecordsLoadingVisible(false);
+    setOsmLoadingVisible(false);
+    clearAllRecordsFromMap();
+    clearOsmTactileWaysFromMap();
+    clearRoadInfoPointsFromMap();
+    return;
+  }
+
+  if (shouldShowAppTactile()) {
+    loadAndShowAllRecords();
+  } else {
+    recordsLoadRequestSeq += 1;
+    setRecordsLoadingVisible(false);
+    clearAllRecordsFromMap();
+  }
+
+  if (shouldShowOsmTactile()) {
+    loadAndShowOsmTactileWays();
+  } else {
+    osmTactileLoadRequestSeq += 1;
+    setOsmLoadingVisible(false);
+    clearOsmTactileWaysFromMap();
+  }
+
+  if (shouldShowRoadInfo()) {
+    loadAndShowRoadInfoPoints();
+  } else {
+    roadInfoLoadRequestSeq += 1;
+    clearRoadInfoPointsFromMap();
+  }
 }
 
 // サーバーから設定を取得
@@ -912,6 +1071,9 @@ if ("geolocation" in navigator) {
     setInterval(pollAndSendLocation, 2000);
 
     updateRecordButton();
+    if (toggleShowMapInfoBtn) {
+      toggleShowMapInfoBtn.checked = false;
+    }
     
     // レコードボタンのイベントハンドラー
     toggleRecordBtn.addEventListener("change", async () => {
@@ -962,51 +1124,20 @@ if ("geolocation" in navigator) {
       }
     });
     
-    // 全レコード表示トグルのイベントリスナー
-    toggleShowAllBtn.addEventListener("change", () => {
-      showAllRecords = toggleShowAllBtn.checked;
-      if (showAllRecords) {
-        console.log("[toggleShowAll] Showing all records");
-        loadAndShowAllRecords();
-      } else {
-        console.log("[toggleShowAll] Hiding all records");
-        recordsLoadRequestSeq += 1;
-        setRecordsLoadingVisible(false);
-        clearAllRecordsFromMap();
-      }
-    });
-
-    if (toggleShowOsmBtn) {
-      toggleShowOsmBtn.addEventListener("change", () => {
-        const showOsmTactile = toggleShowOsmBtn.checked;
-        if (showOsmTactile) {
-          console.log("[toggleShowOsm] Showing OSM tactile ways");
-          loadAndShowOsmTactileWays();
-        } else {
-          console.log("[toggleShowOsm] Hiding OSM tactile ways");
-          osmTactileLoadRequestSeq += 1;
-          setOsmLoadingVisible(false);
-          clearOsmTactileWaysFromMap();
-        }
+    if (toggleShowMapInfoBtn) {
+      toggleShowMapInfoBtn.addEventListener("change", () => {
+        console.log(`[toggleShowMapInfo] showMapInfo=${toggleShowMapInfoBtn.checked}`);
+        applyMapInfoVisibility();
       });
     }
-
-    if (toggleShowRoadInfoBtn) {
-      // 道情報トグルでAPI取得と描画ON/OFFを切り替える。
-      toggleShowRoadInfoBtn.addEventListener("change", () => {
-        const showRoadInfo = toggleShowRoadInfoBtn.checked;
-        if (showRoadInfo) {
-          loadAndShowRoadInfoPoints();
-        } else {
-          clearRoadInfoPointsFromMap();
-        }
-      });
-    }
+    // 初期化中にユーザーが先にトグルを変更した場合でも表示状態を同期する。
+    applyMapInfoVisibility();
 
     // 現在地の中央表示トグル（ログのみ）
     if (toggleCenterCurrentBtn) {
       toggleCenterCurrentBtn.addEventListener("change", () => {
         console.log(`[toggleCenterCurrent] centerCurrentLocation=${toggleCenterCurrentBtn.checked}`);
+        recenterToLatestLocation();
       });
     }
     

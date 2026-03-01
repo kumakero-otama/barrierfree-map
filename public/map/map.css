@@ -1,38 +1,84 @@
-/* 地図 + サイドパネルの2カラム配置 */
+body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.map-layout {
+  height: calc(100dvh - (56px + env(safe-area-inset-top)));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px env(safe-area-inset-bottom);
+}
+
+/* 地図エリア */
 .map-row {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) 220px;
-  gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  align-items: start;
+  margin: 0;
 }
 
 /* 地図キャンバスの見た目 */
 #map {
   width: 100%;
-  aspect-ratio: 1 / 1;
-  height: auto;
-  max-height: min(60vh, 520px);
+  height: 100%;
   border: 2px solid #222;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  transition: height 0.25s ease;
 }
 
-/* 右側の情報パネル */
-.map-side {
+/* 下部のスワイプ式コントロールパネル */
+.map-controls-panel {
+  flex: 0 0 auto;
+  width: 100%;
+  margin: 0;
   border: 2px solid #222;
   border-radius: 12px;
-  padding: 12px;
+  overflow: hidden;
   background: #fff;
+}
+
+.map-controls-handle {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: #ececec;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.map-controls-handle-bar {
+  width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  border: 1px solid #989898;
+  background: #d8d8d8;
+}
+
+.map-controls-content {
+  overflow: hidden;
+  max-height: 100dvh;
+  padding: 12px;
+  transition:
+    max-height 0.25s ease,
+    padding 0.2s ease;
+}
+
+.map-controls-panel.collapsed .map-controls-content {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
 }
 
 /* トグルと補助情報の縦並び */
 .meta {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 /* ON/OFFトグル共通スタイル */
@@ -100,6 +146,14 @@
 #last-updated {
   font-size: 14px;
   color: #222;
+}
+
+.map-layout .version-footer {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border-top: 0;
 }
 
 /* OSMデータ取得中に中央へ表示するローディングオーバーレイ */
@@ -191,8 +245,12 @@
 }
 
 @media (max-width: 720px) {
-  .map-row {
-    grid-template-columns: 1fr;
+  .map-layout {
+    padding: 8px 8px env(safe-area-inset-bottom);
+  }
+
+  .record-title {
+    font-size: 12px;
   }
 }
 
