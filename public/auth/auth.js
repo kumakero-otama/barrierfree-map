@@ -3,6 +3,7 @@ const googleStatusElement = document.getElementById("google-auth-status");
 const signupPage = window.location.pathname.endsWith("/auth/signup.html");
 const signupProfilePage = window.location.pathname.endsWith("/auth/signup_profile.html");
 const PENDING_SIGNUP_ID_TOKEN_KEY = "pending_google_signup_id_token";
+const PROFILE_CACHE_KEY = "cached_profile_user.v1";
 
 function setGoogleStatus(message) {
   if (!googleStatusElement) {
@@ -155,6 +156,25 @@ function clearPendingSignupIdToken() {
   }
 }
 
+function cacheProfileUser(user) {
+  if (!user || typeof user !== "object") {
+    return;
+  }
+  const normalized = {
+    userId: Number(user.userId || user.user_id || 0) || null,
+    username: user.username == null ? null : String(user.username),
+    iconUrl: user.iconUrl || user.icon_url || null,
+    totalTactileLength: Number(user.totalTactileLength || user.total_tactile_length || 0) || 0,
+    totalRoadPosts: Number(user.totalRoadPosts || user.total_road_posts || 0) || 0,
+    totalHearts: Number(user.totalHearts || user.total_hearts || 0) || 0,
+  };
+  try {
+    window.sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(normalized));
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 async function loginWithGoogle(idToken) {
   try {
     const res = await fetch("/auth/google", {
@@ -187,6 +207,9 @@ async function loginWithGoogle(idToken) {
     }
 
     const username = payload && payload.user ? payload.user.username : null;
+    if (payload && payload.user) {
+      cacheProfileUser(payload.user);
+    }
     if (!username || !String(username).trim()) {
       setGoogleStatus("ログイン成功。サインアップ画面へ移動します...");
       window.location.href = "/auth/signup_profile.html";
@@ -415,6 +438,14 @@ async function initSignupProfilePage() {
         return;
       }
 
+      try {
+        const payload = await res.json().catch(() => ({}));
+        if (payload && payload.user) {
+          cacheProfileUser(payload.user);
+        }
+      } catch {
+        // Ignore parse/cache failure.
+      }
       clearPendingSignupIdToken();
       setGoogleStatus("保存しました。地図画面へ移動します...");
       window.location.href = "/map/Index.html";

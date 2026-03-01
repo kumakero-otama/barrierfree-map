@@ -39,6 +39,9 @@ body {
   border-radius: 12px;
   overflow: hidden;
   background: #fff;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  transition: grid-template-rows 0.25s ease;
 }
 
 .map-controls-handle {
@@ -61,44 +64,22 @@ body {
 
 .map-controls-content {
   overflow: hidden;
-  max-height: 100dvh;
+  min-height: 0;
   padding: 12px;
   transition:
-    max-height 0.25s ease,
-    padding 0.2s ease;
+    padding 0.25s ease,
+    opacity 0.2s ease;
 }
 
 .map-controls-panel.collapsed .map-controls-content {
-  max-height: 0;
+  opacity: 0;
   padding-top: 0;
   padding-bottom: 0;
   pointer-events: none;
 }
 
-/* パネルを閉じたときはハンドルを画面下に固定し、常に再表示できるようにする */
-.map-layout.panel-collapsed .map-controls-panel {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(env(safe-area-inset-bottom) + 8px);
-  z-index: 1700;
-  width: auto;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  overflow: visible;
-}
-
-.map-layout.panel-collapsed .map-controls-handle {
-  border: 2px solid #222;
-  border-radius: 999px;
-  background: #ececec;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
-}
-
-/* 固定ハンドルと地図が重ならないよう、閉じたときは下余白を確保する */
-.map-layout.panel-collapsed {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 58px);
+.map-controls-panel.collapsed {
+  grid-template-rows: auto 0fr;
 }
 
 /* トグルと補助情報の縦並び */
@@ -279,10 +260,6 @@ body {
     font-size: 12px;
   }
 
-  .map-layout.panel-collapsed .map-controls-panel {
-    left: 8px;
-    right: 8px;
-  }
 }
 
 /* 記録停止時の確認モーダル */

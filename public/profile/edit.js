@@ -5,9 +5,29 @@ const uploadInputEl = document.getElementById("profile-icon-upload-input");
 const backBtnEl = document.getElementById("profile-edit-back-btn");
 const saveBtnEl = document.getElementById("profile-edit-save-btn");
 const saveToastEl = document.getElementById("profile-save-toast");
+const PROFILE_CACHE_KEY = "cached_profile_user.v1";
 
 let selectedIconDataUrl = null;
 let saving = false;
+
+function saveCachedProfileUser(user) {
+  if (!user || typeof user !== "object") {
+    return;
+  }
+  const normalized = {
+    userId: Number(user.userId || user.user_id || 0) || null,
+    username: user.username == null ? null : String(user.username),
+    iconUrl: user.iconUrl || user.icon_url || null,
+    totalTactileLength: Number(user.totalTactileLength || user.total_tactile_length || 0) || 0,
+    totalRoadPosts: Number(user.totalRoadPosts || user.total_road_posts || 0) || 0,
+    totalHearts: Number(user.totalHearts || user.total_hearts || 0) || 0,
+  };
+  try {
+    window.sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(normalized));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function showSaveToast() {
   if (!saveToastEl) {
@@ -62,6 +82,7 @@ async function loadCurrentProfile() {
       iconPreviewEl.src = iconUrl;
       iconPreviewEl.alt = `${username || "ユーザー"}のアイコン`;
     }
+    saveCachedProfileUser(user);
   } catch {
     window.location.replace("/auth/login.html");
   }
@@ -104,6 +125,10 @@ async function saveProfile() {
         // ignore json parse error
       }
       throw new Error(reason);
+    }
+    const payload = await res.json().catch(() => ({}));
+    if (payload && payload.user) {
+      saveCachedProfileUser(payload.user);
     }
     showSaveToast();
     window.setTimeout(() => {

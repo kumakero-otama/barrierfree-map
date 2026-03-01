@@ -189,7 +189,7 @@ function setMapControlsCollapsed(collapsed) {
   mapLayoutSyncTimer = setTimeout(() => {
     map.invalidateSize();
     recenterToLatestLocation();
-  }, 320);
+  }, 280);
 }
 
 function initMapControlsPanelGesture() {
@@ -200,6 +200,14 @@ function initMapControlsPanelGesture() {
   mapControlsHandleEl.addEventListener("click", () => {
     const collapsed = mapControlsPanelEl.classList.contains("collapsed");
     setMapControlsCollapsed(!collapsed);
+  });
+
+  mapControlsPanelEl.addEventListener("transitionend", (event) => {
+    if (event.propertyName !== "grid-template-rows") {
+      return;
+    }
+    map.invalidateSize();
+    recenterToLatestLocation();
   });
 
   setMapControlsCollapsed(loadMapControlsCollapsed());
