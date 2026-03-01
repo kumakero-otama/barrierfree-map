@@ -12,35 +12,14 @@
   <body>
     <main class="auth-shell">
       <section class="auth-card" aria-labelledby="login-title">
-        <h1 id="login-title">ログイン</h1>
-        <p class="auth-subtitle">Draggable Map を利用するためのログイン画面です。</p>
-
-        <form id="login-form" novalidate>
-          <div class="form-row">
-            <label for="login-email">メールアドレス</label>
-            <input id="login-email" name="email" type="email" autocomplete="email" />
-          </div>
-          <div class="form-row">
-            <label for="login-password">パスワード</label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-            />
-          </div>
-          <div class="actions">
-            <button class="btn btn-primary" id="login-button" type="submit">ログイン</button>
-            <div id="google-signin-button" class="google-signin-button"></div>
-            <a class="btn btn-outline" href="/auth/signup.html">サインアップ画面へ</a>
-            <a class="btn btn-debug" href="/map/Index.html?debug=1">Draggable Map へ（デバッグ）</a>
-          </div>
-        </form>
+        <div class="actions">
+          <div id="google-signin-button" class="google-signin-button"></div>
+          <a class="btn btn-debug" href="/map/Index.html?debug=1">ホーム画面に移動（デバッグ用）</a>
+        </div>
         <p id="google-auth-status" class="helper-text"></p>
-        <p class="helper-text">メール/パスワードログインは未実装です。Googleログインを使ってください。</p>
       </section>
       <footer class="version-footer">
-        <span id="app-version">v1.16.4</span>
+        <span id="app-version">v1.16.5</span>
       </footer>
     </main>
 

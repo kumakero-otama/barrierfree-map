@@ -621,7 +621,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       sendJson(res, 400, { error: "missing_username" });
       return;
     }
-    if (username.length > 50) {
+    if (username && username.length > 50) {
       sendJson(res, 400, { error: "username_too_long" });
       return;
     }
@@ -639,12 +639,13 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     }
 
     try {
-      const iconUrl = saveUserIcon({ sub: payload.sub, iconDataUrl });
       const existing = await findGoogleUserBySub(payload.sub);
+      let iconUrl = saveUserIcon({ sub: payload.sub, iconDataUrl });
       if (existing) {
+        const finalUsername = username;
         await updateSignupProfile({
           userId: existing.user_id,
-          username,
+          username: finalUsername,
           iconUrl,
           payload,
         });
@@ -662,7 +663,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           user: {
             userId: existing.user_id,
             email: existing.email || null,
-            username,
+            username: finalUsername,
             iconUrl,
           },
         });

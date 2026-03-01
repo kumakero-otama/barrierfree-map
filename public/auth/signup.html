@@ -13,40 +13,10 @@
     <main class="auth-shell">
       <section class="auth-card" aria-labelledby="signup-title">
         <h1 id="signup-title">サインアップ</h1>
-        <p class="auth-subtitle">Googleでサインアップ後、ユーザー名とアイコン画像を設定して登録します。</p>
-
-        <form id="signup-form" novalidate>
-          <div id="signup-email-row" class="form-row">
-            <label for="signup-email">メールアドレス</label>
-            <input id="signup-email" name="email" type="email" autocomplete="email" />
-          </div>
-          <div id="signup-password-row" class="form-row">
-            <label for="signup-password">パスワード</label>
-            <input
-              id="signup-password"
-              name="password"
-              type="password"
-              autocomplete="new-password"
-            />
-          </div>
-          <div class="form-row">
-            <label for="signup-username">ユーザー名</label>
-            <input id="signup-username" name="username" type="text" autocomplete="username" />
-          </div>
-          <div class="form-row">
-            <label for="signup-icon">アイコン画像</label>
-            <input id="signup-icon" name="icon" type="file" accept="image/*" />
-            <img
-              id="signup-icon-preview"
-              class="signup-icon-preview hidden"
-              alt="選択したアイコン画像のプレビュー"
-            />
-          </div>
-          <div class="actions">
-            <button class="btn btn-primary" id="signup-button" type="submit">登録</button>
-            <div id="google-signin-button" class="google-signin-button"></div>
-          </div>
-        </form>
+        <p class="auth-subtitle">Googleアカウントでサインアップしてください。</p>
+        <div class="actions">
+          <div id="google-signin-button" class="google-signin-button"></div>
+        </div>
         <p id="google-auth-status" class="helper-text"></p>
         <p class="auth-footer">
           すでにアカウントをお持ちですか？
@@ -54,7 +24,7 @@
         </p>
       </section>
       <footer class="version-footer">
-        <span id="app-version">v1.16.4</span>
+        <span id="app-version">v1.16.5</span>
       </footer>
     </main>
 

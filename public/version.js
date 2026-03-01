@@ -1,5 +1,5 @@
 // アプリケーションバージョン
-const APP_VERSION = "1.16.4";
+const APP_VERSION = "1.16.5";
 
 // バージョン番号を表示する関数
 function displayVersion() {

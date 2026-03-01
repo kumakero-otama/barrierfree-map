@@ -7,3 +7,4 @@ logs/
 node_modules/
 data/mapbox-count.json
 uploads/
+documents/google_clientID.md

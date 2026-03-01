@@ -144,6 +144,7 @@ function handleStatic(req, res) {
     "/otasuke/index.html": "/otasuke/Index.html",
     "/road_info_detail.html": "/road_info_detail/Index.html",
     "/road_info_detail/index.html": "/road_info_detail/Index.html",
+    "/auth/signup_profile": "/auth/signup_profile.html",
   };
   const lowerPath = requestUrl.pathname.toLowerCase();
   const canonicalPath = requestUrl.pathname === "/"

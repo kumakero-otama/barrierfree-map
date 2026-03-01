@@ -86,6 +86,14 @@ body {
   color: #fff;
 }
 
+.btn:disabled,
+.btn[disabled] {
+  background: #c4c9d1;
+  color: #eef2f7;
+  border-color: #c4c9d1;
+  cursor: not-allowed;
+}
+
 .btn-outline {
   background: #fff;
   color: #0f766e;
@@ -130,6 +138,149 @@ body {
 
 .hidden {
   display: none;
+}
+
+.agreement-row {
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.agreement-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  color: #1f2937;
+  margin-bottom: 6px;
+}
+
+.agreement-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.agreement-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1d4ed8;
+  text-decoration: underline;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.agreement-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.agreement-modal.hidden {
+  display: none;
+}
+
+.agreement-panel {
+  width: min(640px, 100%);
+  max-height: 80vh;
+  background: #fff;
+  border: 1px solid #d6dde4;
+  border-radius: 14px;
+  box-shadow: 0 18px 30px rgba(31, 41, 55, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.agreement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #d6dde4;
+}
+
+.agreement-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.agreement-close-btn {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.agreement-close-btn img {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.agreement-content {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  word-break: break-word;
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.agreement-content h1,
+.agreement-content h2,
+.agreement-content h3 {
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.agreement-content h1 {
+  font-size: 1.2rem;
+}
+
+.agreement-content h2 {
+  font-size: 1.08rem;
+}
+
+.agreement-content h3 {
+  font-size: 1rem;
+}
+
+.agreement-content p,
+.agreement-content ul,
+.agreement-content ol,
+.agreement-content blockquote,
+.agreement-content hr {
+  margin: 0 0 10px;
+}
+
+.agreement-content ul,
+.agreement-content ol {
+  padding-left: 20px;
+}
+
+.agreement-content blockquote {
+  border-left: 3px solid #cbd5e1;
+  padding-left: 10px;
+  color: #475569;
+}
+
+.agreement-content a {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.agreement-content code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-family: "Courier New", monospace;
 }
 
 .version-footer {
