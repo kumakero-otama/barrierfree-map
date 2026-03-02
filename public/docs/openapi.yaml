@@ -1,0 +1,952 @@
+openapi: 3.0.3
+info:
+  title: Barrierfree Map API
+  version: 1.18.0
+  description: |
+    barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
+    一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
+    フィールドが追加される場合があります。
+servers:
+  - url: http://localhost:3000
+    description: Local HTTP
+  - url: https://localhost:3001
+    description: Local HTTPS
+
+tags:
+  - name: Match
+  - name: Session
+  - name: Config
+  - name: Records
+  - name: Trace
+  - name: OSM
+  - name: RoadInfo
+  - name: PostTags
+  - name: Auth
+
+paths:
+  /api/config:
+    get:
+      tags: [Config]
+      summary: クライアント初期化用設定を取得
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  serverMinIntervalMs: { type: integer }
+                  clientMinIntervalMs: { type: integer }
+                  roadInfoImageMaxBytes: { type: integer }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /api/count:
+    get:
+      tags: [Match]
+      summary: マップマッチング月次カウントを取得
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  max: { type: integer }
+                  month:
+                    type: string
+                    example: '2026-03'
+                  allMonths:
+                    type: object
+                    additionalProperties:
+                      type: integer
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /api/match:
+    get:
+      tags: [Match]
+      summary: 1点マップマッチング（Valhalla locate）
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema: { type: number, format: double }
+        - in: query
+          name: lng
+          required: true
+          schema: { type: number, format: double }
+        - in: query
+          name: prevLat
+          schema: { type: number, format: double }
+        - in: query
+          name: prevLng
+          schema: { type: number, format: double }
+        - in: query
+          name: sessionId
+          schema: { type: string }
+          description: sessionUuid でも指定可能
+        - in: query
+          name: sessionUuid
+          schema: { type: string }
+        - in: query
+          name: userId
+          schema: { type: string }
+        - in: query
+          name: deviceUuid
+          schema: { type: string }
+        - in: query
+          name: seq
+          schema: { type: integer }
+        - in: query
+          name: record
+          schema: { type: string, enum: ['1'] }
+          description: 1 の場合 realtime 記録を試行
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lat, lng, count, month]
+                properties:
+                  lat: { type: number, format: double }
+                  lng: { type: number, format: double }
+                  count: { type: integer }
+                  month: { type: string }
+        '204':
+          description: 上限到達または上流応答を処理できない場合
+        '400':
+          description: invalid_coordinates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          description: rate_limited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: rate_limited
+                  retryAfterMs:
+                    type: integer
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /api/session/start:
+    post:
+      tags: [Session]
+      summary: セッション開始
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId: { type: string }
+                sessionUuid: { type: string }
+                startedAt: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SessionSuccess'
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      dbDisabled: { type: boolean, example: true }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/session/end:
+    post:
+      tags: [Session]
+      summary: セッション終了
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId: { type: string }
+                sessionUuid: { type: string }
+                endedAt: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      updated: { type: integer }
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      dbDisabled: { type: boolean, example: true }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/session/cancel:
+    post:
+      tags: [Session]
+      summary: セッション関連データを削除
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId: { type: string }
+                sessionUuid: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      canceled: { type: boolean, example: true }
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      dbDisabled: { type: boolean, example: true }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: session_not_found_or_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/records:
+    get:
+      tags: [Records]
+      summary: 保存済み経路一覧を取得
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      parameters:
+        - in: query
+          name: centerLat
+          schema: { type: number, format: double }
+        - in: query
+          name: centerLng
+          schema: { type: number, format: double }
+        - in: query
+          name: radiusKm
+          schema: { type: number, format: double }
+        - in: query
+          name: mine
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  count: { type: integer }
+                  paths:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        session_id: { type: string }
+                        user_id: { type: integer, nullable: true }
+                        source: { type: string, nullable: true }
+                        created_at: { type: string, format: date-time }
+                        geom_geojson: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/trace:
+    post:
+      tags: [Trace]
+      summary: Valhalla trace_attributes を呼び出し
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shape]
+              properties:
+                userId: { type: string }
+                sessionId: { type: string }
+                source:
+                  type: string
+                  default: valhalla
+                costing:
+                  type: string
+                  default: pedestrian
+                shape_match:
+                  type: string
+                  default: map_snap
+                filters:
+                  type: object
+                  additionalProperties: true
+                shape:
+                  type: array
+                  items:
+                    type: object
+                    required: [lat, lon]
+                    properties:
+                      lat: { type: number }
+                      lon: { type: number }
+                      type: { type: string }
+      responses:
+        '200':
+          description: OK (Valhallaレスポンス)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: invalid_json
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/osm-tactile-ways:
+    get:
+      tags: [OSM]
+      summary: Overpass経由で点字ブロック関連地物を取得
+      parameters:
+        - in: query
+          name: centerLat
+          required: true
+          schema: { type: number, format: double }
+        - in: query
+          name: centerLng
+          required: true
+          schema: { type: number, format: double }
+        - in: query
+          name: radiusKm
+          schema: { type: number, format: double, default: 10 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  centerLat: { type: number }
+                  centerLng: { type: number }
+                  radiusKm: { type: number }
+                  count: { type: integer }
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string, example: Feature }
+                        properties:
+                          type: object
+                          additionalProperties: true
+                        geometry:
+                          type: object
+                          properties:
+                            type: { type: string }
+                            coordinates:
+                              oneOf:
+                                - type: array
+                                  items: { type: number }
+                                - type: array
+                                  items:
+                                    type: array
+                                    items: { type: number }
+        '400':
+          description: invalid_center
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          description: osm_upstream_error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorWithMessage' }
+
+  /api/post-tags:
+    get:
+      tags: [PostTags]
+      summary: 投稿タグ一覧を取得
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  count: { type: integer }
+                  tags:
+                    type: array
+                    items: { $ref: '#/components/schemas/PostTag' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+    post:
+      tags: [PostTags]
+      summary: 投稿タグを追加
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string }
+      responses:
+        '200':
+          description: 既存タグ（新規作成なし）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostTagWriteResult' }
+        '201':
+          description: 新規作成
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostTagWriteResult' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/road-info:
+    get:
+      tags: [RoadInfo]
+      summary: 道情報（一覧または詳細）
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      parameters:
+        - in: query
+          name: pointId
+          schema: { type: integer }
+          description: 指定時は詳細取得モード
+        - in: query
+          name: centerLat
+          schema: { type: number, format: double }
+        - in: query
+          name: centerLng
+          schema: { type: number, format: double }
+        - in: query
+          name: radiusKm
+          schema: { type: number, format: double, default: 10 }
+        - in: query
+          name: mine
+          schema: { type: string, enum: ['1'] }
+          description: 1 の場合ログインユーザー投稿のみ
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RoadInfoListResponse'
+                  - $ref: '#/components/schemas/RoadInfoDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+    post:
+      tags: [RoadInfo]
+      summary: 道情報を投稿
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pointId:
+                  type: integer
+                  description: 既存ポイントに投稿する場合
+                lat:
+                  type: number
+                  format: double
+                lng:
+                  type: number
+                  format: double
+                detail:
+                  type: string
+                tagIds:
+                  type: array
+                  items: { type: string }
+                images:
+                  type: array
+                  items:
+                    type: object
+                    required: [dataUrl]
+                    properties:
+                      name: { type: string }
+                      dataUrl:
+                        type: string
+                        description: data:image/...;base64,... 形式
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  pointId: { type: integer }
+                  noteId: { type: integer }
+                  tagsCount: { type: integer }
+                  mediaCount: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: point_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/google:
+    post:
+      tags: [Auth]
+      summary: Google IDトークンでログイン
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token: { type: string }
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: session Cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: invalid_token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorWithMessage' }
+        '404':
+          description: account_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/google/signup:
+    post:
+      tags: [Auth]
+      summary: Googleアカウントで新規登録またはプロフィール初期設定
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token, username, icon_data_url]
+              properties:
+                id_token: { type: string }
+                username: { type: string, maxLength: 50 }
+                icon_data_url:
+                  type: string
+                  description: data:image/...;base64,... 形式
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AuthSuccessResponse'
+                  - type: object
+                    properties:
+                      updated: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: invalid_token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorWithMessage' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: ログインユーザー情報を取得
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 認証済み
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated: { type: boolean, example: true }
+                  user: { $ref: '#/components/schemas/AuthUser' }
+        '401':
+          description: 未認証または無効トークン
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated: { type: boolean, example: false }
+                  error: { type: string, nullable: true }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: ログアウト
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+              description: session Cookie 削除
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+        '401':
+          description: invalid_access_token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /auth/profile:
+    post:
+      tags: [Auth]
+      summary: ユーザープロフィール更新
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username: { type: string, maxLength: 50 }
+                icon_data_url:
+                  type: string
+                  description: 任意。data:image/...;base64,... 形式
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  user:
+                    type: object
+                    properties:
+                      userId: { type: integer }
+                      username: { type: string, nullable: true }
+                      iconUrl: { type: string, nullable: true }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: user_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+
+  responses:
+    BadRequest:
+      description: リクエスト不正
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: 認証エラー
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    MethodNotAllowed:
+      description: method_not_allowed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InternalError:
+      description: サーバー内部エラー
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorWithMessage' }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error: { type: string }
+
+    ErrorWithMessage:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            message: { type: string }
+
+    SessionSuccess:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        sessionId: { type: string }
+
+    PostTag:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        dbId: { type: integer }
+        sortOrder: { type: integer }
+
+    PostTagWriteResult:
+      type: object
+      properties:
+        success: { type: boolean }
+        created: { type: boolean }
+        tag: { $ref: '#/components/schemas/PostTag' }
+        count: { type: integer }
+
+    RoadInfoListResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        count: { type: integer }
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              lat: { type: number }
+              lng: { type: number }
+              createdBy: { type: integer, nullable: true }
+
+    RoadInfoDetailResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        point:
+          type: object
+          properties:
+            id: { type: integer }
+            lat: { type: number }
+            lng: { type: number }
+            status: { type: string }
+            createdAt: { type: string, format: date-time }
+            tags:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  code: { type: string }
+                  labelJa: { type: string }
+            posts:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  body: { type: string }
+                  createdAt: { type: string, format: date-time }
+                  createdBy: { type: integer, nullable: true }
+                  authorUsername: { type: string, nullable: true }
+                  authorIconUrl: { type: string, nullable: true }
+                  media:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        mediaType: { type: string }
+                        url: { type: string }
+                        createdAt: { type: string, format: date-time }
+
+    AuthUser:
+      type: object
+      properties:
+        userId: { type: integer }
+        email: { type: string, nullable: true }
+        username: { type: string, nullable: true }
+        iconUrl: { type: string, nullable: true }
+        totalTactileLength: { type: number }
+        totalRoadPosts: { type: integer }
+        totalHearts: { type: integer }
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+        access_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer }
+        user: { $ref: '#/components/schemas/AuthUser' }

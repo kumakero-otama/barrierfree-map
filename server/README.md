@@ -8,6 +8,8 @@
 - `server.js` でURLパスごとに `server/api/*.js` のハンドラを呼び分けます。
 - DBアクセスは `server/db.js` の互換ラッパー経由で実行されます。
 - ログは `server/logger.js` のCSVロガーで `logs/*.csv` に追記されます。
+- API仕様書（OpenAPI）は `public/docs/openapi.yaml` に配置されています。
+- Swagger UI は `https://barrierfree-map.loophole.site/docs/index.html`で閲覧できます。
 
 ---
 
@@ -41,6 +43,11 @@
 
 ## `server/api/` 一覧
 
+### 認証方式（現行）
+- 認証付きAPIは **Bearerトークン**（`Authorization: Bearer <token>`）を優先して受け付けます。
+- 一部エンドポイントでは移行互換のため **session Cookie** でも認証可能です。
+- 実装は `server/auth_token.js`（トークン生成/検証）と `server/auth_user.js`（ユーザー解決）にあります。
+
 ### `server/api/config.js`
 - エンドポイント: `GET /api/config`
 - 返す内容:
@@ -71,6 +78,8 @@
     - `tactile.gps_raw`
     - `tactile.sessions`
   - `canceledSessionIds` / `deletedSessionKeys` にも反映（後続保存を抑止）
+- 認証:
+  - Bearer または session Cookie が必要（未認証は `401`）
 - ログ:
   - `logs/sessions.csv` にイベントを追記
 
@@ -79,7 +88,11 @@
 - 主な役割:
   - `tactile.session_paths` から保存済み経路を取得
   - `centerLat/centerLng/radiusKm` があれば `ST_DWithin` で範囲絞り込み
+  - `mine=1` 指定時はログインユーザーの経路のみ返却
   - `ST_AsGeoJSON(geom)` でフロントが扱いやすい形で返却
+- 認証:
+  - 通常取得は不要
+  - `mine=1` 指定時のみ Bearer または session Cookie が必要
 
 ### `server/api/match_valhalla.js`（現行で使用）
 - エンドポイント: `GET /api/match`
@@ -136,6 +149,23 @@
   - 失敗時:
     - DBトランザクションをロールバック
     - 保存済み画像ファイルを削除して整合性維持
+- 認証:
+  - `POST` は Bearer または session Cookie が必要
+  - `GET` は通常不要（`mine=1` 指定時のみ必要）
+
+### `server/api/google_auth.js`
+- エンドポイント:
+  - `POST /auth/google`（Google IDトークンでログイン）
+  - `POST /auth/google/signup`（新規登録/初回プロフィール設定）
+  - `GET /auth/me`（ログイン状態とユーザー情報取得）
+  - `POST /auth/logout`（ログアウト）
+  - `POST /auth/profile`（プロフィール更新）
+- 主な役割:
+  - Google IDトークン検証（`google-auth-library`）
+  - アプリ用 Access Token（JWT）発行
+  - session Cookie の発行/削除（互換運用）
+  - `login.*` スキーマのユーザー/セッション管理
+  - アイコン画像保存（`/uploads/user_icons/`）
 
 ### `server/api/match_mapbox.js`（現在未使用）
 - 旧方式の `/api/match` 実装（Mapbox Matching API版）です。
@@ -150,4 +180,3 @@
 2. DB周り確認: `server/db.js`
 3. 対象APIハンドラ: `server/api/*.js`
 4. 設定値確認: `config.yaml`, `config/road_info.yaml`, `config/osm_tactile_rules.yaml`
-
