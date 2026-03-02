@@ -1,3 +1,5 @@
+const { extractBearerToken, verifyAccessToken } = require("./auth_token");
+
 function parseCookies(rawCookieHeader) {
   const cookieHeader = rawCookieHeader || "";
   return cookieHeader
@@ -17,9 +19,35 @@ function parseCookies(rawCookieHeader) {
 }
 
 async function resolveAuthenticatedUserId(req, pool) {
+  const bearerToken = extractBearerToken(req);
+  if (bearerToken) {
+    try {
+      const verified = verifyAccessToken(bearerToken);
+      if (verified && Number.isFinite(verified.userId) && verified.userId > 0) {
+        if (!pool) {
+          return verified.userId;
+        }
+        const [userRows] = await pool.query(
+          `SELECT user_id
+           FROM login.users
+           WHERE user_id = ? AND is_active = true
+           LIMIT 1`,
+          [verified.userId]
+        );
+        if (Array.isArray(userRows) && userRows.length > 0) {
+          return verified.userId;
+        }
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
   if (!pool) {
     return null;
   }
+
   const cookies = parseCookies(req && req.headers ? req.headers.cookie : "");
   const sessionId = cookies.session;
   if (!sessionId) {

@@ -3,6 +3,12 @@ const fs = require("fs");
 const path = require("path");
 const { OAuth2Client } = require("google-auth-library");
 const { createDbPool } = require("../db");
+const {
+  createAccessToken,
+  verifyAccessToken,
+  extractBearerToken,
+  getAccessTokenExpiresInSeconds,
+} = require("../auth_token");
 
 const SESSION_COOKIE_NAME = "session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -233,6 +239,62 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       [sub]
     );
     return rows[0] || null;
+  }
+
+  async function findUserById(userId) {
+    const safeUserId = Number(userId);
+    if (!Number.isFinite(safeUserId) || safeUserId <= 0) {
+      return null;
+    }
+    if (!pool) {
+      for (const user of memoryStore.usersBySub.values()) {
+        if (Number(user.user_id) === safeUserId) {
+          return user;
+        }
+      }
+      return null;
+    }
+    await ensureSchema();
+    const [rows] = await pool.query(
+      `SELECT u.user_id, u.username, u.icon_url, u.email_verified, p.email,
+              u.total_tactile_length, u.total_road_posts, u.total_hearts
+       FROM login.users u
+       LEFT JOIN login.user_auth_providers p
+         ON p.user_id = u.user_id AND p.provider = 'google'
+       WHERE u.user_id = ?
+       LIMIT 1`,
+      [safeUserId]
+    );
+    return rows[0] || null;
+  }
+
+  function toAuthUserPayload(user) {
+    return {
+      userId: user.user_id,
+      email: user.email || null,
+      username: user.username || null,
+      iconUrl: user.icon_url || null,
+      totalTactileLength: Number(user.total_tactile_length || 0),
+      totalRoadPosts: Number(user.total_road_posts || 0),
+      totalHearts: Number(user.total_hearts || 0),
+    };
+  }
+
+  async function resolveUserFromAccessToken(req) {
+    const bearerToken = extractBearerToken(req);
+    if (!bearerToken) {
+      return { user: null, authError: null };
+    }
+    try {
+      const verified = verifyAccessToken(bearerToken);
+      const user = await findUserById(verified.userId);
+      if (!user) {
+        return { user: null, authError: "user_not_found" };
+      }
+      return { user, authError: null };
+    } catch (err) {
+      return { user: null, authError: err.message || "invalid_access_token" };
+    }
   }
 
   async function createGoogleUser({ payload, username, iconUrl }) {
@@ -567,6 +629,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         return;
       }
       await updateLoginMeta({ userId: user.user_id, payload });
+      const accessToken = createAccessToken(user.user_id);
       const sessionId = await createSession(user.user_id);
 
       res.setHeader(
@@ -579,12 +642,10 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
 
       sendJson(res, 200, {
         ok: true,
-        user: {
-          userId: user.user_id,
-          email: user.email || null,
-          username: user.username || null,
-          iconUrl: user.icon_url || null,
-        },
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: getAccessTokenExpiresInSeconds(),
+        user: toAuthUserPayload(user),
       });
     } catch (err) {
       sendJson(res, 500, { error: "login_failed", message: err.message });
@@ -649,6 +710,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           iconUrl,
           payload,
         });
+        const accessToken = createAccessToken(existing.user_id);
         const sessionId = await createSession(existing.user_id);
         res.setHeader(
           "Set-Cookie",
@@ -660,6 +722,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         sendJson(res, 200, {
           ok: true,
           updated: true,
+          access_token: accessToken,
+          token_type: "Bearer",
+          expires_in: getAccessTokenExpiresInSeconds(),
           user: {
             userId: existing.user_id,
             email: existing.email || null,
@@ -675,6 +740,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         username,
         iconUrl,
       });
+      const accessToken = createAccessToken(user.user_id);
       const sessionId = await createSession(user.user_id);
 
       res.setHeader(
@@ -687,6 +753,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
 
       sendJson(res, 200, {
         ok: true,
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: getAccessTokenExpiresInSeconds(),
         user: {
           userId: user.user_id,
           email: user.email || null,
@@ -712,24 +781,24 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
     }
-    const cookies = parseCookies(req.headers.cookie || "");
-    const sessionId = cookies[SESSION_COOKIE_NAME];
-    const sessionUser = await findSession(sessionId);
+    const bearerResolved = await resolveUserFromAccessToken(req);
+    if (bearerResolved.authError) {
+      sendJson(res, 401, { authenticated: false, error: "invalid_access_token" });
+      return;
+    }
+    let sessionUser = bearerResolved.user;
+    if (!sessionUser) {
+      const cookies = parseCookies(req.headers.cookie || "");
+      const sessionId = cookies[SESSION_COOKIE_NAME];
+      sessionUser = await findSession(sessionId);
+    }
     if (!sessionUser) {
       sendJson(res, 401, { authenticated: false });
       return;
     }
     sendJson(res, 200, {
       authenticated: true,
-      user: {
-        userId: sessionUser.user_id,
-        email: sessionUser.email || null,
-        username: sessionUser.username || null,
-        iconUrl: sessionUser.icon_url || null,
-        totalTactileLength: Number(sessionUser.total_tactile_length || 0),
-        totalRoadPosts: Number(sessionUser.total_road_posts || 0),
-        totalHearts: Number(sessionUser.total_hearts || 0),
-      },
+      user: toAuthUserPayload(sessionUser),
     });
   }
 
@@ -737,6 +806,15 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
+    }
+    const bearerToken = extractBearerToken(req);
+    if (bearerToken) {
+      try {
+        verifyAccessToken(bearerToken);
+      } catch {
+        sendJson(res, 401, { error: "invalid_access_token" });
+        return;
+      }
     }
     const cookies = parseCookies(req.headers.cookie || "");
     const sessionId = cookies[SESSION_COOKIE_NAME];
@@ -760,9 +838,17 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       return;
     }
 
-    const cookies = parseCookies(req.headers.cookie || "");
-    const sessionId = cookies[SESSION_COOKIE_NAME];
-    const sessionUser = await findSession(sessionId);
+    const bearerResolved = await resolveUserFromAccessToken(req);
+    if (bearerResolved.authError) {
+      sendJson(res, 401, { error: "invalid_access_token" });
+      return;
+    }
+    let sessionUser = bearerResolved.user;
+    if (!sessionUser) {
+      const cookies = parseCookies(req.headers.cookie || "");
+      const sessionId = cookies[SESSION_COOKIE_NAME];
+      sessionUser = await findSession(sessionId);
+    }
     if (!sessionUser) {
       sendJson(res, 401, { authenticated: false });
       return;

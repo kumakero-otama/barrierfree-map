@@ -506,9 +506,13 @@
         <div class="submit-loading-spinner" aria-hidden="true"></div>
       </div>
     </main>
+    <script src="/auth/token_client.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
       // 投稿画面の状態管理・画像処理・送信を扱うメインスクリプト。
+      const authFetch = window.AuthToken && typeof window.AuthToken.authFetch === "function"
+        ? window.AuthToken.authFetch
+        : fetch;
       const fallbackTags = [
         { id: "step", label: "段差" },
         { id: "construction", label: "工事中" },
@@ -650,7 +654,7 @@
       // サーバー設定から画像の上限バイト数を取得する。
       async function refreshImageLimitFromConfig() {
         try {
-          const res = await fetch("/api/config");
+          const res = await authFetch("/api/config");
           if (!res.ok) {
             return;
           }
@@ -666,7 +670,7 @@
 
       void refreshImageLimitFromConfig();
 
-      fetch("/api/post-tags")
+      authFetch("/api/post-tags")
         .then((res) => {
           if (!res.ok) {
             throw new Error("tags_fetch_failed");
@@ -699,7 +703,7 @@
           }
 
           try {
-            const res = await fetch("/api/post-tags", {
+            const res = await authFetch("/api/post-tags", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ label: raw }),
@@ -803,7 +807,7 @@
           try {
             await refreshImageLimitFromConfig();
             const images = await buildImagePayloads();
-            const res = await fetch("/api/road-info", {
+            const res = await authFetch("/api/road-info", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({

@@ -6,6 +6,20 @@ const backBtnEl = document.getElementById("profile-edit-back-btn");
 const saveBtnEl = document.getElementById("profile-edit-save-btn");
 const saveToastEl = document.getElementById("profile-save-toast");
 const PROFILE_CACHE_KEY = "cached_profile_user.v1";
+const authTokenApi = window.AuthToken || null;
+
+function authFetch(input, init) {
+  if (authTokenApi && typeof authTokenApi.authFetch === "function") {
+    return authTokenApi.authFetch(input, init);
+  }
+  return fetch(input, init);
+}
+
+function clearAccessToken() {
+  if (authTokenApi && typeof authTokenApi.clearAccessToken === "function") {
+    authTokenApi.clearAccessToken();
+  }
+}
 
 let selectedIconDataUrl = null;
 let saving = false;
@@ -58,17 +72,18 @@ async function applySelectedIcon(file) {
 
 async function loadCurrentProfile() {
   try {
-    const res = await fetch("/auth/me", {
-      credentials: "same-origin",
+    const res = await authFetch("/auth/me", {
       cache: "no-store",
     });
     if (!res.ok) {
+      clearAccessToken();
       window.location.replace("/auth/login.html");
       return;
     }
     const payload = await res.json();
     const user = payload && payload.user ? payload.user : null;
     if (!user) {
+      clearAccessToken();
       window.location.replace("/auth/login.html");
       return;
     }
@@ -84,6 +99,7 @@ async function loadCurrentProfile() {
     }
     saveCachedProfileUser(user);
   } catch {
+    clearAccessToken();
     window.location.replace("/auth/login.html");
   }
 }
@@ -108,9 +124,8 @@ async function saveProfile() {
     if (saveBtnEl) {
       saveBtnEl.disabled = true;
     }
-    const res = await fetch("/auth/profile", {
+    const res = await authFetch("/auth/profile", {
       method: "POST",
-      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });

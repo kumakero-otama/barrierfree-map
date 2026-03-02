@@ -4,6 +4,7 @@ const signupPage = window.location.pathname.endsWith("/auth/signup.html");
 const signupProfilePage = window.location.pathname.endsWith("/auth/signup_profile.html");
 const PENDING_SIGNUP_ID_TOKEN_KEY = "pending_google_signup_id_token";
 const PROFILE_CACHE_KEY = "cached_profile_user.v1";
+const authTokenApi = window.AuthToken || null;
 
 function setGoogleStatus(message) {
   if (!googleStatusElement) {
@@ -156,6 +157,25 @@ function clearPendingSignupIdToken() {
   }
 }
 
+function setAccessToken(token) {
+  if (authTokenApi && typeof authTokenApi.setAccessToken === "function") {
+    authTokenApi.setAccessToken(token);
+  }
+}
+
+function clearAccessToken() {
+  if (authTokenApi && typeof authTokenApi.clearAccessToken === "function") {
+    authTokenApi.clearAccessToken();
+  }
+}
+
+function authFetch(input, init) {
+  if (authTokenApi && typeof authTokenApi.authFetch === "function") {
+    return authTokenApi.authFetch(input, init);
+  }
+  return fetch(input, init);
+}
+
 function cacheProfileUser(user) {
   if (!user || typeof user !== "object") {
     return;
@@ -206,6 +226,9 @@ async function loginWithGoogle(idToken) {
       return false;
     }
 
+    if (payload && payload.access_token) {
+      setAccessToken(payload.access_token);
+    }
     const username = payload && payload.user ? payload.user.username : null;
     if (payload && payload.user) {
       cacheProfileUser(payload.user);
@@ -236,7 +259,7 @@ function fileToDataUrl(file) {
 
 async function ensureSignupProfileSession() {
   try {
-    const res = await fetch("/auth/me", { credentials: "same-origin" });
+    const res = await authFetch("/auth/me");
     if (!res.ok) {
       window.location.replace("/auth/login.html");
       return null;
@@ -394,7 +417,7 @@ async function initSignupProfilePage() {
           }),
         });
       } else {
-        res = await fetch("/auth/profile", {
+        res = await authFetch("/auth/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -430,6 +453,7 @@ async function initSignupProfilePage() {
         }
         if (errorMessage === "invalid_token") {
           clearPendingSignupIdToken();
+          clearAccessToken();
           setGoogleStatus("Google認証の有効期限が切れました。ログイン画面から再度お試しください。");
           window.location.replace("/auth/login.html");
           return;
@@ -440,6 +464,9 @@ async function initSignupProfilePage() {
 
       try {
         const payload = await res.json().catch(() => ({}));
+        if (payload && payload.access_token) {
+          setAccessToken(payload.access_token);
+        }
         if (payload && payload.user) {
           cacheProfileUser(payload.user);
         }

@@ -6,6 +6,20 @@ const totalHeartsEl = document.getElementById("total-hearts");
 const logoutBtnEl = document.getElementById("profile-logout-btn");
 const editBtnEl = document.getElementById("profile-edit-btn");
 const PROFILE_CACHE_KEY = "cached_profile_user.v1";
+const authTokenApi = window.AuthToken || null;
+
+function authFetch(input, init) {
+  if (authTokenApi && typeof authTokenApi.authFetch === "function") {
+    return authTokenApi.authFetch(input, init);
+  }
+  return fetch(input, init);
+}
+
+function clearAccessToken() {
+  if (authTokenApi && typeof authTokenApi.clearAccessToken === "function") {
+    authTokenApi.clearAccessToken();
+  }
+}
 
 function formatMetersFromKm(value) {
   const num = Number(value || 0);
@@ -80,32 +94,33 @@ async function loadProfile() {
     applyProfileUser(cached);
   }
   try {
-    const res = await fetch("/auth/me", {
-      credentials: "same-origin",
+    const res = await authFetch("/auth/me", {
       cache: "no-store",
     });
     if (!res.ok) {
+      clearAccessToken();
       window.location.replace("/auth/login.html");
       return;
     }
     const payload = await res.json();
     const user = payload && payload.user ? payload.user : null;
     if (!user) {
+      clearAccessToken();
       window.location.replace("/auth/login.html");
       return;
     }
     applyProfileUser(user);
     saveCachedProfileUser(user);
   } catch {
+    clearAccessToken();
     window.location.replace("/auth/login.html");
   }
 }
 
 async function logout() {
   try {
-    const res = await fetch("/auth/logout", {
+    const res = await authFetch("/auth/logout", {
       method: "POST",
-      credentials: "same-origin",
     });
     if (!res.ok) {
       throw new Error("logout_failed");
@@ -113,6 +128,7 @@ async function logout() {
   } catch {
     // Always redirect so the user can recover by logging in again.
   }
+  clearAccessToken();
   window.location.replace("/auth/login.html");
 }
 

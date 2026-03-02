@@ -27,6 +27,7 @@
       </div>
     </header>
     <div class="app-bar-spacer" aria-hidden="true"></div>
+    <script src="/auth/token_client.js"></script>
     <script>
       // 認証機能未実装の暫定対応:
       // 明示的なデバッグ遷移（?debug=1）または有効なセッションがある場合のみ表示する。
@@ -36,16 +37,28 @@
           return;
         }
         try {
-          const res = await fetch("/auth/me", { credentials: "same-origin" });
+          const authFetch = window.AuthToken && typeof window.AuthToken.authFetch === "function"
+            ? window.AuthToken.authFetch
+            : fetch;
+          const res = await authFetch("/auth/me");
           if (!res.ok) {
+            if (window.AuthToken && typeof window.AuthToken.clearAccessToken === "function") {
+              window.AuthToken.clearAccessToken();
+            }
             window.location.replace("/auth/login.html");
             return;
           }
           const payload = await res.json();
           if (!payload || !payload.authenticated) {
+            if (window.AuthToken && typeof window.AuthToken.clearAccessToken === "function") {
+              window.AuthToken.clearAccessToken();
+            }
             window.location.replace("/auth/login.html");
           }
         } catch {
+          if (window.AuthToken && typeof window.AuthToken.clearAccessToken === "function") {
+            window.AuthToken.clearAccessToken();
+          }
           window.location.replace("/auth/login.html");
         }
       })();

@@ -21,6 +21,14 @@ const commentResultMessageEl = document.getElementById("comment-result-message")
 const commentResultOkBtn = document.getElementById("comment-result-ok-btn");
 const selectedCommentImages = [];
 let currentPointId = null;
+const authTokenApi = window.AuthToken || null;
+
+function authFetch(input, init) {
+  if (authTokenApi && typeof authTokenApi.authFetch === "function") {
+    return authTokenApi.authFetch(input, init);
+  }
+  return fetch(input, init);
+}
 
 // ユーザー投稿本文を安全に表示するためのHTMLエスケープ。
 function escapeHtml(text) {
@@ -293,7 +301,7 @@ async function submitComment() {
   setCommentSubmittingVisible(true);
   try {
     const images = await buildCommentImagePayloads();
-    const res = await fetch("/api/road-info", {
+    const res = await authFetch("/api/road-info", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -435,7 +443,7 @@ function loadRoadInfoDetail() {
     return;
   }
 
-  fetch(`/api/road-info?pointId=${pointId}`)
+  authFetch(`/api/road-info?pointId=${pointId}`)
     .then((res) => {
       if (res.status === 404) {
         throw new Error("not_found");

@@ -15,6 +15,20 @@ const traceConfirmMapEl = document.getElementById("trace-confirm-map");
 const traceConfirmMessageEl = document.getElementById("trace-confirm-message");
 const traceConfirmOkBtn = document.getElementById("trace-confirm-ok");
 const traceConfirmCancelBtn = document.getElementById("trace-confirm-cancel");
+const authTokenApi = window.AuthToken || null;
+
+function authFetch(input, init) {
+  if (authTokenApi && typeof authTokenApi.authFetch === "function") {
+    return authTokenApi.authFetch(input, init);
+  }
+  return fetch(input, init);
+}
+
+function clearAccessToken() {
+  if (authTokenApi && typeof authTokenApi.clearAccessToken === "function") {
+    authTokenApi.clearAccessToken();
+  }
+}
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -295,14 +309,16 @@ function generateUUID() {
 }
 
 async function loadCurrentUserId() {
-  const res = await fetch("/auth/me", { credentials: "same-origin" });
+  const res = await authFetch("/auth/me");
   if (!res.ok) {
+    clearAccessToken();
     window.location.replace("/auth/login.html");
     throw new Error("unauthorized");
   }
   const payload = await res.json();
   const userId = payload && payload.user ? Number(payload.user.userId) : NaN;
   if (!Number.isFinite(userId) || userId <= 0) {
+    clearAccessToken();
     window.location.replace("/auth/login.html");
     throw new Error("invalid_user");
   }
@@ -314,7 +330,7 @@ function updateRecordButton() {
 }
 
 function postSessionLifecycle(action, payload) {
-  return fetch(`/api/session/${action}`, {
+  return authFetch(`/api/session/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -382,7 +398,7 @@ function requestTraceData(shape, { sessionId = null, persist = false } = {}) {
     requestBody.source = "valhalla";
   }
 
-  return fetch("/api/trace", {
+  return authFetch("/api/trace", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
@@ -571,7 +587,7 @@ function requestSnappedLocation(latitude, longitude) {
 
   console.log(`[requestSnappedLocation] Requesting: lat=${latitude}, lng=${longitude}`);
 
-  fetch(`/api/match?${params.toString()}`)
+  authFetch(`/api/match?${params.toString()}`)
     .then((res) => {
       console.log(`[requestSnappedLocation] Response status: ${res.status}`);
       if (res.status === 204) {
@@ -728,7 +744,7 @@ function loadAndShowAllRecords() {
   if (shouldShowOnlyMyTactile()) {
     params.set("mine", "1");
   }
-  fetch(`/api/records?${params.toString()}`)
+  authFetch(`/api/records?${params.toString()}`)
     .then((res) => {
       if (!res.ok) {
         throw new Error(`records fetch failed: ${res.status}`);
@@ -835,7 +851,7 @@ function loadAndShowOsmTactileWays() {
     centerLng: center.lng.toString(),
     radiusKm: "10",
   });
-  fetch(`/api/osm-tactile-ways?${params.toString()}`)
+  authFetch(`/api/osm-tactile-ways?${params.toString()}`)
     .then((res) => {
       if (!res.ok) {
         throw new Error(`osm tactile fetch failed: ${res.status}`);
@@ -951,7 +967,7 @@ function loadAndShowRoadInfoPoints() {
   if (shouldShowOnlyMyRoadInfo()) {
     params.set("mine", "1");
   }
-  fetch(`/api/road-info?${params.toString()}`)
+  authFetch(`/api/road-info?${params.toString()}`)
     .then((res) => {
       if (!res.ok) {
         throw new Error(`road-info fetch failed: ${res.status}`);
@@ -1060,7 +1076,7 @@ function applyMapInfoVisibility() {
 
 // サーバーから設定を取得
 function loadConfig() {
-  return fetch("/api/config")
+  return authFetch("/api/config")
     .then((res) => {
       if (!res.ok) {
         throw new Error("config fetch failed");
