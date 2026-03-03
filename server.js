@@ -31,6 +31,10 @@ const UPLOADS_DIR = path.join(__dirname, "uploads");
 const LOG_DIR = path.join(__dirname, "logs");
 const SERVER_LOG = path.join(LOG_DIR, "server.csv");
 let monthlyCounts = {};
+const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 const logger = createLogger(SERVER_LOG);
 const { appendLog } = logger;
@@ -208,6 +212,45 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function isCorsOriginAllowed(origin) {
+  if (!origin || typeof origin !== "string") {
+    return false;
+  }
+  if (CORS_ALLOWED_ORIGINS.includes(origin)) {
+    return true;
+  }
+  if (/^https:\/\/[a-z0-9-]+\.github\.io$/i.test(origin)) {
+    return true;
+  }
+  if (/^https?:\/\/localhost(?::\d+)?$/i.test(origin)) {
+    return true;
+  }
+  if (/^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(origin)) {
+    return true;
+  }
+  return false;
+}
+
+function applyCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  if (!isCorsOriginAllowed(origin)) {
+    return false;
+  }
+
+  const requestedHeaders = req.headers["access-control-request-headers"];
+  const allowHeaders = requestedHeaders && String(requestedHeaders).trim()
+    ? String(requestedHeaders)
+    : "Content-Type, Authorization";
+
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", allowHeaders);
+  res.setHeader("Access-Control-Max-Age", "86400");
+  return true;
+}
+
 const deletedSessionKeys = new Set();
 const canceledSessionIds = new Set();
 
@@ -272,6 +315,13 @@ const handleGoogleAuth = createGoogleAuthHandler({
 });
 
 function handleRequest(req, res) {
+  const isCorsRequest = applyCorsHeaders(req, res);
+  if (req.method === "OPTIONS" && isCorsRequest) {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   // APIパスを先に判定し、それ以外は静的配信へフォールバックする。
   if (req.url && req.url.startsWith("/api/match")) {
     handleMatch(req, res);
