@@ -3,6 +3,130 @@ const { createLogger } = require("../logger");
 const path = require("path");
 const http = require("http");
 
+const SIDEWALK_PRIORITY_RADIUS_METERS = 10;
+const PEDESTRIAN_SIDEWALK_COSTING_OPTIONS = Object.freeze({
+  // Valhallaはfactorが1未満だと優先、1超で回避する。
+  walkway_factor: 0.1,
+  sidewalk_factor: 0.1,
+});
+
+function toFiniteNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
+  const r = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return r * c;
+}
+
+function extractEdgeWayId(edgeCandidate) {
+  if (!edgeCandidate || typeof edgeCandidate !== "object") {
+    return null;
+  }
+  const directWayId = Number(edgeCandidate.way_id);
+  if (Number.isFinite(directWayId)) {
+    return directWayId;
+  }
+  const nestedWayId = Number(edgeCandidate.edge_info && edgeCandidate.edge_info.way_id);
+  if (Number.isFinite(nestedWayId)) {
+    return nestedWayId;
+  }
+  return null;
+}
+
+function getCorrelatedPoint(edgeCandidate) {
+  if (!edgeCandidate || typeof edgeCandidate !== "object") {
+    return null;
+  }
+  const correlatedLat = toFiniteNumber(edgeCandidate.correlated_lat);
+  const correlatedLon = toFiniteNumber(edgeCandidate.correlated_lon);
+  if (correlatedLat === null || correlatedLon === null) {
+    return null;
+  }
+  return { lat: correlatedLat, lon: correlatedLon };
+}
+
+function isTruthySidewalkTag(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value !== "string") {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "left" || normalized === "right" || normalized === "both" || normalized === "yes" || normalized === "true";
+}
+
+function isSidewalkLikeEdge(edgeCandidate) {
+  if (!edgeCandidate || typeof edgeCandidate !== "object") {
+    return false;
+  }
+  const edge = edgeCandidate.edge && typeof edgeCandidate.edge === "object" ? edgeCandidate.edge : edgeCandidate;
+  if (isTruthySidewalkTag(edge.sidewalk)) {
+    return true;
+  }
+  if (isTruthySidewalkTag(edge.sidewalk_left) || isTruthySidewalkTag(edge.sidewalk_right)) {
+    return true;
+  }
+  const use = typeof edge.use === "string" ? edge.use.toLowerCase() : "";
+  const classification = edge.classification && typeof edge.classification.classification === "string"
+    ? edge.classification.classification.toLowerCase()
+    : "";
+  return use === "footway" ||
+    use === "pedestrian" ||
+    use === "path" ||
+    use === "living_street" ||
+    classification === "footway" ||
+    classification === "pedestrian" ||
+    classification === "path";
+}
+
+function selectPreferredEdge(edges, rawLat, rawLng) {
+  if (!Array.isArray(edges) || edges.length < 1) {
+    return null;
+  }
+
+  const candidates = edges
+    .map((edgeCandidate) => {
+      const point = getCorrelatedPoint(edgeCandidate);
+      if (!point) {
+        return null;
+      }
+      return {
+        edge: edgeCandidate,
+        lat: point.lat,
+        lon: point.lon,
+        distanceMeters: haversineDistanceMeters(rawLat, rawLng, point.lat, point.lon),
+        sidewalkLike: isSidewalkLikeEdge(edgeCandidate),
+      };
+    })
+    .filter(Boolean);
+
+  if (candidates.length < 1) {
+    return null;
+  }
+
+  const sidewalkCandidates = candidates
+    .filter((candidate) => candidate.sidewalkLike && candidate.distanceMeters <= SIDEWALK_PRIORITY_RADIUS_METERS)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters);
+  if (sidewalkCandidates.length > 0) {
+    return { ...sidewalkCandidates[0], sidewalkPriorityApplied: true };
+  }
+
+  return { ...candidates[0], sidewalkPriorityApplied: false };
+}
+
 function createMatchHandler({
   MIN_INTERVAL_MS,
   MAX_MATCH_CALLS_PER_MONTH,
@@ -198,8 +322,14 @@ function createMatchHandler({
 
     // Valhallaのリクエストボディ（locateエンドポイント用）
     const valhallaRequest = {
-      locations: [{ lat, lon: lng }],
-      costing: "pedestrian"
+      verbose: true,
+      locations: [{ lat, lon: lng, radius: SIDEWALK_PRIORITY_RADIUS_METERS }],
+      costing: "pedestrian",
+      costing_options: {
+        pedestrian: {
+          ...PEDESTRIAN_SIDEWALK_COSTING_OPTIONS,
+        },
+      },
     };
 
     const requestBody = JSON.stringify(valhallaRequest);
@@ -235,11 +365,17 @@ function createMatchHandler({
           if (Array.isArray(data) && data.length > 0 && data[0]) {
             const result = data[0];
             if (result.edges && Array.isArray(result.edges) && result.edges.length > 0) {
-              const edge = result.edges[0];
-              if (typeof edge.correlated_lat === "number" && typeof edge.correlated_lon === "number") {
-                const snappedLat = edge.correlated_lat;
-                const snappedLng = edge.correlated_lon;
-                console.log(`${logPrefix} valhalla_snapped: lat=${snappedLat}, lng=${snappedLng} (input: ${result.input_lat}, ${result.input_lon})`);
+              const selectedEdge = selectPreferredEdge(result.edges, lat, lng);
+              if (selectedEdge) {
+                const snappedLat = selectedEdge.lat;
+                const snappedLng = selectedEdge.lon;
+                const edgeWayId = extractEdgeWayId(selectedEdge.edge);
+                console.log(
+                  `${logPrefix} valhalla_snapped: lat=${snappedLat}, lng=${snappedLng} ` +
+                  `(input: ${result.input_lat}, ${result.input_lon}), ` +
+                  `distance_m=${selectedEdge.distanceMeters.toFixed(2)}, ` +
+                  `sidewalk_priority=${selectedEdge.sidewalkPriorityApplied}`
+                );
                 
                 // デバッグログ追加
                 console.log(`${logPrefix} [DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
@@ -264,7 +400,7 @@ function createMatchHandler({
                     rawLng: lng,
                     snappedLat,
                     snappedLng,
-                    edgeId: edge.way_id,
+                    edgeId: edgeWayId,
                     confidence: null,
                     logPrefix,
                   }).catch((err) => {

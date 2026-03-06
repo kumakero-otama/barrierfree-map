@@ -1,6 +1,13 @@
 const http = require("http");
 const { createDbPool } = require("../db");
 
+const SIDEWALK_PRIORITY_RADIUS_METERS = 10;
+const PEDESTRIAN_SIDEWALK_COSTING_OPTIONS = Object.freeze({
+  // Valhallaはfactorが1未満だと優先、1超で回避する。
+  walkway_factor: 0.1,
+  sidewalk_factor: 0.1,
+});
+
 // matched_points から PostGISに保存できるLINESTRING WKTを組み立てる。
 function createLinestringWkt(points) {
   const coords = points
@@ -137,8 +144,17 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
 
       const valhallaRequest = {
         shape: requestData.shape,
-        costing: requestData.costing || "pedestrian",
+        costing: "pedestrian",
         shape_match: requestData.shape_match || "map_snap",
+        trace_options: {
+          ...(requestData.trace_options && typeof requestData.trace_options === "object" ? requestData.trace_options : {}),
+          search_radius: SIDEWALK_PRIORITY_RADIUS_METERS,
+        },
+        costing_options: {
+          pedestrian: {
+            ...PEDESTRIAN_SIDEWALK_COSTING_OPTIONS,
+          },
+        },
       };
 
       if (requestData.filters) {
