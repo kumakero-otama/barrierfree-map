@@ -53,6 +53,106 @@ function sanitizeTagIds(rawTagIds) {
   return [...new Set(tags)];
 }
 
+// ラベル文字列から英数字ベースのコード候補を作る。
+function buildBaseCode(label) {
+  const normalized = String(label || "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || "tag";
+}
+
+// 指定コードが既存タグに存在するか確認する。
+async function codeExists(conn, code) {
+  const [rows] = await conn.query(
+    "SELECT 1 FROM roadinfo.road_info_tag WHERE code = ? LIMIT 1",
+    [code]
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+// 重複しないタグコードを作る（base, base_2 ... の順に探索）。
+async function buildUniqueCode(conn, label) {
+  const base = buildBaseCode(label);
+  if (!(await codeExists(conn, base))) {
+    return base;
+  }
+
+  for (let i = 2; i <= 10000; i += 1) {
+    const candidate = `${base}_${i}`;
+    if (!(await codeExists(conn, candidate))) {
+      return candidate;
+    }
+  }
+
+  const fallback = `tag_${Date.now()}`;
+  if (!(await codeExists(conn, fallback))) {
+    return fallback;
+  }
+  throw new Error("tag_code_generation_failed");
+}
+
+// 指定タグコードを解決し、未登録タグは作成してtag_id配列を返す。
+async function resolveOrCreateTagIds(conn, rawTagCodes) {
+  const tagCodes = sanitizeTagIds(rawTagCodes);
+  if (tagCodes.length < 1) {
+    return { tagIds: [], createdTags: [] };
+  }
+
+  const placeholders = tagCodes.map(() => "?").join(", ");
+  const [existingRows] = await conn.query(
+    `SELECT id, code
+     FROM roadinfo.road_info_tag
+     WHERE code IN (${placeholders})`,
+    tagCodes
+  );
+
+  const tagIdByCode = new Map(existingRows.map((row) => [row.code, row.id]));
+  const missingCodes = tagCodes.filter((code) => !tagIdByCode.has(code));
+  const createdTags = [];
+
+  if (missingCodes.length > 0) {
+    const [maxRows] = await conn.query(
+      "SELECT COALESCE(MAX(sort_order), 0) AS max_sort_order FROM roadinfo.road_info_tag"
+    );
+    let nextSortOrder = Number(maxRows[0] && maxRows[0].max_sort_order) || 0;
+
+    for (const rawCode of missingCodes) {
+      const code = /^[a-z0-9_]+$/.test(rawCode) ? rawCode : await buildUniqueCode(conn, rawCode);
+      const labelJa = rawCode;
+      nextSortOrder += 1;
+
+      const [insertedRows] = await conn.query(
+        `WITH inserted AS (
+           INSERT INTO roadinfo.road_info_tag (code, label_ja, sort_order, is_active)
+           VALUES (?, ?, ?, true)
+           ON CONFLICT (code)
+           DO UPDATE SET label_ja = roadinfo.road_info_tag.label_ja
+           RETURNING id, code
+         )
+         SELECT id, code FROM inserted`,
+        [code, labelJa, nextSortOrder]
+      );
+
+      const inserted = Array.isArray(insertedRows) ? insertedRows[0] : null;
+      if (!inserted || !inserted.id || !inserted.code) {
+        throw new Error("tag_insert_failed");
+      }
+      tagIdByCode.set(rawCode, inserted.id);
+      createdTags.push(inserted.code);
+    }
+  }
+
+  return {
+    tagIds: tagCodes.map((code) => tagIdByCode.get(code)).filter(Boolean),
+    createdTags,
+  };
+}
+
 // data URL形式の画像を検証し、バイナリへ変換する。
 function parseDataUrl(dataUrl, maxImageBytes) {
   if (typeof dataUrl !== "string") {
@@ -387,28 +487,16 @@ function createRoadInfoHandler({ sendJson }) {
             [userId]
           );
 
-          if (tagCodes.length > 0) {
-            const placeholders = tagCodes.map(() => "?").join(", ");
-            const [tagRows] = await conn.query(
-              `SELECT id, code
-               FROM roadinfo.road_info_tag
-               WHERE is_active = true AND code IN (${placeholders})`,
-              tagCodes
-            );
+        }
 
-            const tagIdByCode = new Map(tagRows.map((row) => [row.code, row.id]));
-            const missingCodes = tagCodes.filter((code) => !tagIdByCode.has(code));
-            if (missingCodes.length > 0) {
-              throw new Error(`unknown_tags:${missingCodes.join(",")}`);
-            }
-
-            for (const code of tagCodes) {
-              await conn.query(
-                "INSERT INTO roadinfo.road_info_point_tag (point_id, tag_id) VALUES (?, ?) RETURNING point_id",
-                [pointId, tagIdByCode.get(code)]
-              );
-            }
-          }
+        const { tagIds: resolvedTagIds, createdTags } = await resolveOrCreateTagIds(conn, tagCodes);
+        for (const tagId of resolvedTagIds) {
+          await conn.query(
+            `INSERT INTO roadinfo.road_info_point_tag (point_id, tag_id)
+             VALUES (?, ?)
+             ON CONFLICT (point_id, tag_id) DO NOTHING`,
+            [pointId, tagId]
+          );
         }
 
         const [noteResult] = await conn.query(
@@ -431,12 +519,20 @@ function createRoadInfoHandler({ sendJson }) {
           );
         }
 
+        await conn.query(
+          `UPDATE roadinfo.road_info_point
+           SET updated_at = NOW()
+           WHERE id = ?`,
+          [pointId]
+        );
+
         await conn.commit();
         sendJson(res, 201, {
           success: true,
           pointId,
           noteId,
-          tagsCount: tagCodes.length,
+          tagsCount: resolvedTagIds.length,
+          createdTags,
           mediaCount: images.length,
         });
       } catch (err) {
@@ -447,10 +543,6 @@ function createRoadInfoHandler({ sendJson }) {
           } catch {
             // ignore cleanup failure
           }
-        }
-        if (String(err.message || "").startsWith("unknown_tags:")) {
-          sendJson(res, 400, { error: "unknown_tags" });
-          return;
         }
         if (err.message === "point_not_found") {
           sendJson(res, 404, { error: "point_not_found" });
