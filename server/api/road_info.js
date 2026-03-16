@@ -494,7 +494,8 @@ function createRoadInfoHandler({ sendJson }) {
           await conn.query(
             `INSERT INTO roadinfo.road_info_point_tag (point_id, tag_id)
              VALUES (?, ?)
-             ON CONFLICT (point_id, tag_id) DO NOTHING`,
+             ON CONFLICT (point_id, tag_id) DO NOTHING
+             RETURNING point_id`,
             [pointId, tagId]
           );
         }
