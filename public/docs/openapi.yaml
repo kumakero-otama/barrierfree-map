@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Barrierfree Map API
-  version: 1.18.6
+  version: 1.18.7
   description: |
     barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
     一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
@@ -587,8 +587,8 @@ paths:
                   items: { type: string }
                 status:
                   type: string
-                  enum: [active, inactive]
-                  description: 任意。指定時は対象ポイントのstatusを更新
+                  enum: [active, inactive, hidden]
+                  description: 任意。指定時は対象ポイントのstatusを更新。`hidden` は完了タグより優先される
                 images:
                   type: array
                   items:

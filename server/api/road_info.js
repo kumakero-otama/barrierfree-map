@@ -63,7 +63,7 @@ function normalizePointStatus(rawStatus) {
     return null;
   }
   const normalized = rawStatus.trim().toLowerCase();
-  if (normalized === "active" || normalized === "inactive") {
+  if (normalized === "active" || normalized === "inactive" || normalized === "hidden") {
     return normalized;
   }
   return null;
@@ -256,6 +256,30 @@ async function saveImage(image, index, maxImageBytes) {
     absPath,
     url: `/uploads/road_info_media/${fileName}`,
   };
+}
+
+// 受信JSONを安全にログ化する（巨大なdataUrlは長さのみ記録）。
+function buildRoadInfoPayloadLog(body) {
+  if (!body || typeof body !== "object") {
+    return body;
+  }
+  const summary = {
+    pointId: Object.prototype.hasOwnProperty.call(body, "pointId") ? body.pointId : undefined,
+    lat: Object.prototype.hasOwnProperty.call(body, "lat") ? body.lat : undefined,
+    lng: Object.prototype.hasOwnProperty.call(body, "lng") ? body.lng : undefined,
+    status: Object.prototype.hasOwnProperty.call(body, "status") ? body.status : undefined,
+    tagIds: Array.isArray(body.tagIds) ? body.tagIds : undefined,
+    detail: typeof body.detail === "string" ? body.detail : undefined,
+  };
+
+  if (Array.isArray(body.images)) {
+    summary.images = body.images.map((image) => ({
+      name: image && image.name ? image.name : null,
+      dataUrlLength: image && typeof image.dataUrl === "string" ? image.dataUrl.length : null,
+    }));
+  }
+
+  return summary;
 }
 
 function createRoadInfoHandler({ sendJson }) {
@@ -468,6 +492,7 @@ function createRoadInfoHandler({ sendJson }) {
         sendJson(res, 400, { error: code });
         return;
       }
+      console.log("[road_info] received_payload:", JSON.stringify(buildRoadInfoPayloadLog(body)));
 
       const pointIdFromBody = Number(body && body.pointId);
       const lat = Number(body && body.lat);
@@ -557,7 +582,10 @@ function createRoadInfoHandler({ sendJson }) {
         }
         const completionByRequest = tagCodes.some(isCompletionTagCode);
         const completionByDb = await hasCompletionTag(conn, resolvedTagIds);
-        const nextStatus = completionByRequest || completionByDb ? "inactive" : statusRequested;
+        let nextStatus = statusRequested;
+        if (statusRequested !== "hidden" && (completionByRequest || completionByDb)) {
+          nextStatus = "inactive";
+        }
 
         const [noteResult] = await conn.query(
           `INSERT INTO roadinfo.road_info_note (point_id, body, created_by, is_deleted)
