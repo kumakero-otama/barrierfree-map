@@ -69,6 +69,21 @@ function normalizePointStatus(rawStatus) {
   return null;
 }
 
+// リクエストで受け取ったタグコードが完了扱いか判定する。
+function isCompletionTagCode(rawCode) {
+  if (typeof rawCode !== "string") {
+    return false;
+  }
+  const code = rawCode.trim().toLowerCase();
+  if (!code) {
+    return false;
+  }
+  if (COMPLETION_TAG_CODES.has(code)) {
+    return true;
+  }
+  return code === "完了";
+}
+
 // 選択タグの中に「完了扱い」を含むか判定する。
 async function hasCompletionTag(conn, tagIds) {
   if (!Array.isArray(tagIds) || tagIds.length < 1) {
@@ -85,7 +100,7 @@ async function hasCompletionTag(conn, tagIds) {
   return safeRows.some((row) => {
     const code = String(row && row.code ? row.code : "").trim().toLowerCase();
     const labelJa = String(row && row.label_ja ? row.label_ja : "").trim();
-    return COMPLETION_TAG_CODES.has(code) || labelJa === "完了";
+    return COMPLETION_TAG_CODES.has(code) || labelJa.includes("完了");
   });
 }
 
@@ -540,8 +555,9 @@ function createRoadInfoHandler({ sendJson }) {
             [pointId, tagId]
           );
         }
-        const completionSelected = await hasCompletionTag(conn, resolvedTagIds);
-        const nextStatus = completionSelected ? "inactive" : statusRequested;
+        const completionByRequest = tagCodes.some(isCompletionTagCode);
+        const completionByDb = await hasCompletionTag(conn, resolvedTagIds);
+        const nextStatus = completionByRequest || completionByDb ? "inactive" : statusRequested;
 
         const [noteResult] = await conn.query(
           `INSERT INTO roadinfo.road_info_note (point_id, body, created_by, is_deleted)
@@ -585,7 +601,6 @@ function createRoadInfoHandler({ sendJson }) {
           success: true,
           pointId,
           noteId,
-          status: nextStatus || null,
           tagsCount: resolvedTagIds.length,
           createdTags,
           mediaCount: images.length,
