@@ -6,6 +6,7 @@ const { resolveAuthenticatedUserId } = require("../auth_user");
 const { loadRoadInfoConfig } = require("../road_info_config");
 
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "uploads", "road_info_media");
+const COMPLETION_TAG_CODES = new Set(["complete", "completed", "done", "resolved", "inactive"]);
 
 // JSONボディを受け取り、サイズ超過/JSON不正を共通処理する。
 function parseJsonBody(req, callback) {
@@ -51,6 +52,41 @@ function sanitizeTagIds(rawTagIds) {
     .map((tagId) => (typeof tagId === "string" ? tagId.trim() : ""))
     .filter(Boolean);
   return [...new Set(tags)];
+}
+
+// point.status に保存できる値を正規化する（未指定はnull）。
+function normalizePointStatus(rawStatus) {
+  if (rawStatus == null) {
+    return null;
+  }
+  if (typeof rawStatus !== "string") {
+    return null;
+  }
+  const normalized = rawStatus.trim().toLowerCase();
+  if (normalized === "active" || normalized === "inactive") {
+    return normalized;
+  }
+  return null;
+}
+
+// 選択タグの中に「完了扱い」を含むか判定する。
+async function hasCompletionTag(conn, tagIds) {
+  if (!Array.isArray(tagIds) || tagIds.length < 1) {
+    return false;
+  }
+  const placeholders = tagIds.map(() => "?").join(", ");
+  const [rows] = await conn.query(
+    `SELECT code, label_ja
+     FROM roadinfo.road_info_tag
+     WHERE id IN (${placeholders})`,
+    tagIds
+  );
+  const safeRows = Array.isArray(rows) ? rows : [];
+  return safeRows.some((row) => {
+    const code = String(row && row.code ? row.code : "").trim().toLowerCase();
+    const labelJa = String(row && row.label_ja ? row.label_ja : "").trim();
+    return COMPLETION_TAG_CODES.has(code) || labelJa === "完了";
+  });
 }
 
 // ラベル文字列から英数字ベースのコード候補を作る。
@@ -424,10 +460,15 @@ function createRoadInfoHandler({ sendJson }) {
       const detail = typeof body?.detail === "string" ? body.detail.trim() : "";
       const images = Array.isArray(body?.images) ? body.images : [];
       const tagCodes = sanitizeTagIds(body?.tagIds);
+      const statusRequested = normalizePointStatus(body?.status);
       const roadInfoConfig = loadRoadInfoConfig();
       const maxImageBytes = roadInfoConfig.imageMaxBytes;
       const hasExistingPointId = Number.isInteger(pointIdFromBody) && pointIdFromBody > 0;
       let userId = null;
+      if (body && Object.prototype.hasOwnProperty.call(body, "status") && !statusRequested) {
+        sendJson(res, 400, { error: "invalid_status" });
+        return;
+      }
 
       if (!hasExistingPointId) {
         if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
@@ -499,6 +540,8 @@ function createRoadInfoHandler({ sendJson }) {
             [pointId, tagId]
           );
         }
+        const completionSelected = await hasCompletionTag(conn, resolvedTagIds);
+        const nextStatus = completionSelected ? "inactive" : statusRequested;
 
         const [noteResult] = await conn.query(
           `INSERT INTO roadinfo.road_info_note (point_id, body, created_by, is_deleted)
@@ -520,18 +563,29 @@ function createRoadInfoHandler({ sendJson }) {
           );
         }
 
-        await conn.query(
-          `UPDATE roadinfo.road_info_point
-           SET updated_at = NOW()
-           WHERE id = ?`,
-          [pointId]
-        );
+        if (nextStatus) {
+          await conn.query(
+            `UPDATE roadinfo.road_info_point
+             SET status = ?,
+                 updated_at = NOW()
+             WHERE id = ?`,
+            [nextStatus, pointId]
+          );
+        } else {
+          await conn.query(
+            `UPDATE roadinfo.road_info_point
+             SET updated_at = NOW()
+             WHERE id = ?`,
+            [pointId]
+          );
+        }
 
         await conn.commit();
         sendJson(res, 201, {
           success: true,
           pointId,
           noteId,
+          status: nextStatus || null,
           tagsCount: resolvedTagIds.length,
           createdTags,
           mediaCount: images.length,

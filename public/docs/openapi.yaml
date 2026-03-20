@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Barrierfree Map API
-  version: 1.18.4
+  version: 1.18.5
   description: |
     barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
     一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
@@ -499,6 +499,8 @@ paths:
     get:
       tags: [RoadInfo]
       summary: 道情報（一覧または詳細）
+      description: |
+        一覧取得モード（`pointId` 未指定）では `roadinfo.road_info_point.status = active` のポイントのみ返します。
       security:
         - bearerAuth: []
         - sessionCookie: []
@@ -556,6 +558,7 @@ paths:
         - 既存タグコードはそのまま利用
         - 未登録コードは `roadinfo.road_info_tag` に新規作成
         - 解決されたタグは `roadinfo.road_info_point_tag` に紐付け（重複は無視）
+        - 完了タグ（code: `complete` / `completed` / `done` / `resolved` / `inactive` または label_ja: `完了`）が含まれる場合、対象ポイントの `roadinfo.road_info_point.status` は `inactive` に更新されます
         また、投稿成功時に対象ポイントの `roadinfo.road_info_point.updated_at` を更新します。
       security:
         - bearerAuth: []
@@ -582,6 +585,10 @@ paths:
                   type: array
                   description: タグコード配列。未登録コードは自動作成される
                   items: { type: string }
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  description: 任意。指定時は対象ポイントのstatusを更新
                 images:
                   type: array
                   items:
@@ -603,6 +610,11 @@ paths:
                   success: { type: boolean, example: true }
                   pointId: { type: integer }
                   noteId: { type: integer }
+                  status:
+                    type: string
+                    nullable: true
+                    enum: [active, inactive]
+                    description: この投稿で更新されたポイントstatus（未更新時はnull）
                   tagsCount: { type: integer }
                   createdTags:
                     type: array
