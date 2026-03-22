@@ -13,6 +13,7 @@ const createPostTagsHandler = require("./server/api/post_tags");
 const createRoadInfoHandler = require("./server/api/road_info");
 const createGoogleAuthHandler = require("./server/api/google_auth");
 const createProStatusHandler = require("./server/api/pro_status");
+const createTactileTagsHandler = require("./server/api/tactile_tags");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -319,6 +320,10 @@ const handleProStatus = createProStatusHandler({
   sendJson,
 });
 
+const handleTactileTags = createTactileTagsHandler({
+  sendJson,
+});
+
 function handleRequest(req, res) {
   const isCorsRequest = applyCorsHeaders(req, res);
   if (req.method === "OPTIONS" && isCorsRequest) {
@@ -366,6 +371,16 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/pro-status")) {
     handleProStatus(req, res);
+    return;
+  }
+  if (
+    req.url &&
+    (
+      req.url.startsWith("/api/tactile-tags") ||
+      req.url.startsWith("/api/session-tags")
+    )
+  ) {
+    handleTactileTags(req, res);
     return;
   }
   if (

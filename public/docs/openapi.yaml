@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Barrierfree Map API
-  version: 1.19.0
+  version: 1.20.0
   description: |
     barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
     一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
@@ -23,6 +23,7 @@ tags:
   - name: PostTags
   - name: Auth
   - name: ProStatus
+  - name: Tactile
 
 paths:
   /api/config:
@@ -711,6 +712,193 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /api/tactile-tags:
+    get:
+      tags: [Tactile]
+      summary: tactile.tags の一覧を取得
+      parameters:
+        - in: query
+          name: activeOnly
+          schema: { type: string, enum: ['1', 'true'] }
+          description: 指定時は is_active = true のタグのみ返す
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  count: { type: integer }
+                  tags:
+                    type: array
+                    items: { $ref: '#/components/schemas/TactileTag' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    post:
+      tags: [Tactile]
+      summary: tactile.tags にタグを追加
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, labelJa]
+              properties:
+                code: { type: string }
+                labelJa: { type: string }
+                sortOrder: { type: integer, default: 0 }
+                isActive: { type: boolean, default: true }
+      responses:
+        '200':
+          description: 既存タグ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  created: { type: boolean, example: false }
+                  requestedBy: { type: integer }
+                  tag: { $ref: '#/components/schemas/TactileTag' }
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  created: { type: boolean, example: true }
+                  requestedBy: { type: integer }
+                  tag: { $ref: '#/components/schemas/TactileTag' }
+        '400':
+          description: invalid_json / invalid_code / invalid_label_ja / invalid_sort_order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/session-tags:
+    get:
+      tags: [Tactile]
+      summary: 現在ログイン中ユーザーの tactile.session_tags 一覧を取得
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      parameters:
+        - in: query
+          name: sessionId
+          schema: { type: string, format: uuid }
+          description: 指定時は対象セッションのみ返す。sessionUuid でも指定可能
+        - in: query
+          name: sessionUuid
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  count: { type: integer }
+                  sessionTags:
+                    type: array
+                    items: { $ref: '#/components/schemas/SessionTag' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    post:
+      tags: [Tactile]
+      summary: tactile.session_tags に紐づけを追加
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId: { type: string, format: uuid }
+                sessionUuid: { type: string, format: uuid }
+                tagId: { type: integer }
+                tagCode: { type: string }
+      responses:
+        '200':
+          description: 既存紐づけ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  created: { type: boolean, example: false }
+                  sessionTag: { $ref: '#/components/schemas/SessionTag' }
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  created: { type: boolean, example: true }
+                  sessionTag: { $ref: '#/components/schemas/SessionTag' }
+        '400':
+          description: invalid_json / missing_session_id / missing_tag_id_or_tag_code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: session_not_found_or_forbidden or tag_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /auth/google:
     post:
       tags: [Auth]
@@ -1041,6 +1229,25 @@ components:
       properties:
         userId: { type: integer }
         isPro: { type: boolean }
+
+    TactileTag:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        labelJa: { type: string }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+
+    SessionTag:
+      type: object
+      properties:
+        sessionId: { type: string, format: uuid }
+        tagId: { type: integer }
+        tagCode: { type: string, nullable: true }
+        tagLabelJa: { type: string, nullable: true }
+        sortOrder: { type: integer, nullable: true }
+        isActive: { type: boolean, nullable: true }
 
     AuthSuccessResponse:
       type: object

@@ -78,7 +78,8 @@ CREATE TABLE login.users (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login_at TIMESTAMP
+    last_login_at TIMESTAMP,
+    is_pro BOOLEAN DEFAULT FALSE
 );
 ```
 
@@ -169,14 +170,44 @@ CREATE INDEX road_info_media_note_idx
 ```
 
 ## tactile.sessions
-1レコードが1つのセッション。セッションを作った時刻やデバイスがわかる
+1レコードが1つのセッション。セッションを作った時刻やユーザがわかる
 ```SQL
-CREATE TABLE sessions (
+CREATE TABLE tactile.sessions (
   session_id UUID PRIMARY KEY,
   user_id BIGINT NOT NULL
     REFERENCES login.users(user_id),
   started_at TIMESTAMP NOT NULL,
   ended_at TIMESTAMP
+);
+```
+
+## tactile.tags
+1レコードが1つのタグ
+```SQL
+CREATE TABLE tactile.tags (
+    id BIGSERIAL PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL,
+    label_ja TEXT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+```
+
+## tactile.session_tags
+1レコードが1つのタグと1つのセッションの紐づけ
+```SQL
+CREATE TABLE tactile.session_tags (
+    session_id UUID NOT NULL,
+    tag_id BIGINT NOT NULL,
+    PRIMARY KEY (session_id, tag_id),
+    CONSTRAINT fk_session_tags_session
+        FOREIGN KEY (session_id)
+        REFERENCES tactile.sessions (session_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_session_tags_tag
+        FOREIGN KEY (tag_id)
+        REFERENCES tactile.tags (id)
+        ON DELETE RESTRICT
 );
 ```
 
