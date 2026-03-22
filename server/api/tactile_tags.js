@@ -1,5 +1,7 @@
 const { createDbPool } = require("../db");
 const { resolveAuthenticatedUserId } = require("../auth_user");
+const { createLogger } = require("../logger");
+const path = require("path");
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -7,19 +9,23 @@ function readJsonBody(req) {
     req.on("data", (chunk) => {
       body += chunk.toString();
       if (body.length > 1024 * 1024) {
-        reject(new Error("payload_too_large"));
+        const err = new Error("payload_too_large");
+        err.rawBody = body;
+        reject(err);
         req.destroy();
       }
     });
     req.on("end", () => {
       if (!body) {
-        resolve({});
+        resolve({ payload: {}, rawBody: "" });
         return;
       }
       try {
-        resolve(JSON.parse(body));
+        resolve({ payload: JSON.parse(body), rawBody: body });
       } catch {
-        reject(new Error("invalid_json"));
+        const err = new Error("invalid_json");
+        err.rawBody = body;
+        reject(err);
       }
     });
     req.on("error", reject);
@@ -56,8 +62,37 @@ function normalizeSessionTagRow(row) {
 function createTactileTagsHandler({ sendJson }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
+  const LOG_DIR = path.join(__dirname, "..", "..", "logs");
+  const TAG_SAVE_LOG = path.join(LOG_DIR, "tactile_tag_saves.csv");
+  const tagSaveLogger = createLogger(TAG_SAVE_LOG);
   let initialized = false;
   let initPromise = null;
+
+  function writeTagSaveLog({ apiPath, userId, requestRawBody, responseStatus, responsePayload }) {
+    tagSaveLogger.appendLog(
+      "INFO",
+      JSON.stringify({
+        apiPath,
+        userId: userId == null ? null : Number(userId),
+        requestRawBody: requestRawBody || "",
+        responseStatus,
+        responsePayload,
+      })
+    );
+  }
+
+  function sendLoggedJson(res, statusCode, payload, logContext) {
+    if (logContext) {
+      writeTagSaveLog({
+        apiPath: logContext.apiPath,
+        userId: logContext.userId,
+        requestRawBody: logContext.requestRawBody,
+        responseStatus: statusCode,
+        responsePayload: payload,
+      });
+    }
+    sendJson(res, statusCode, payload);
+  }
 
   async function ensureSchema() {
     if (!pool) {
@@ -114,15 +149,19 @@ function createTactileTagsHandler({ sendJson }) {
     }
   }
 
-  async function requireUserId(req, res) {
+  async function requireUserId(req, res, { suppressResponse = false } = {}) {
     if (!pool) {
-      sendJson(res, 503, { error: "database_unavailable" });
+      if (!suppressResponse) {
+        sendJson(res, 503, { error: "database_unavailable" });
+      }
       return null;
     }
     await ensureSchema();
     const userId = await resolveAuthenticatedUserId(req, pool);
     if (!userId) {
-      sendJson(res, 401, { error: "unauthorized" });
+      if (!suppressResponse) {
+        sendJson(res, 401, { error: "unauthorized" });
+      }
       return null;
     }
     return userId;
@@ -151,19 +190,31 @@ function createTactileTagsHandler({ sendJson }) {
   }
 
   async function createTactileTag(req, res) {
-    const userId = await requireUserId(req, res);
-    if (!userId) {
-      return;
-    }
-    let body;
+    const logContext = {
+      apiPath: "/api/tactile-tags",
+      userId: null,
+      requestRawBody: "",
+    };
+    let bodyResult;
     try {
-      body = await readJsonBody(req);
+      bodyResult = await readJsonBody(req);
     } catch (err) {
-      sendJson(res, 400, {
+      logContext.requestRawBody = err.rawBody || "";
+      sendLoggedJson(res, 400, {
         error: err.message === "payload_too_large" ? "payload_too_large" : "invalid_json",
-      });
+      }, logContext);
       return;
     }
+
+    logContext.requestRawBody = bodyResult.rawBody || "";
+    const body = bodyResult.payload || {};
+
+    const userId = await requireUserId(req, res, { suppressResponse: true });
+    if (!userId) {
+      sendLoggedJson(res, 401, { error: "unauthorized" }, logContext);
+      return;
+    }
+    logContext.userId = userId;
 
     const code = typeof body.code === "string" ? body.code.trim() : "";
     const labelJa = typeof body.labelJa === "string" ? body.labelJa.trim() : "";
@@ -171,15 +222,15 @@ function createTactileTagsHandler({ sendJson }) {
     const isActive = body.isActive == null ? true : Boolean(body.isActive);
 
     if (!code) {
-      sendJson(res, 400, { error: "invalid_code" });
+      sendLoggedJson(res, 400, { error: "invalid_code" }, logContext);
       return;
     }
     if (!labelJa) {
-      sendJson(res, 400, { error: "invalid_label_ja" });
+      sendLoggedJson(res, 400, { error: "invalid_label_ja" }, logContext);
       return;
     }
     if (!Number.isInteger(sortOrder)) {
-      sendJson(res, 400, { error: "invalid_sort_order" });
+      sendLoggedJson(res, 400, { error: "invalid_sort_order" }, logContext);
       return;
     }
 
@@ -192,12 +243,12 @@ function createTactileTagsHandler({ sendJson }) {
         [code]
       );
       if (existingRows.length > 0) {
-        sendJson(res, 200, {
+        sendLoggedJson(res, 200, {
           success: true,
           created: false,
           requestedBy: userId,
           tag: normalizeTagRow(existingRows[0]),
-        });
+        }, logContext);
         return;
       }
 
@@ -212,15 +263,15 @@ function createTactileTagsHandler({ sendJson }) {
         [code, labelJa, sortOrder, isActive]
       );
 
-      sendJson(res, 201, {
+      sendLoggedJson(res, 201, {
         success: true,
         created: true,
         requestedBy: userId,
         tag: normalizeTagRow(rows[0]),
-      });
+      }, logContext);
     } catch (err) {
       console.error("[tactile_tags] create_tag_failed:", err.message);
-      sendJson(res, 500, { error: "tactile_tag_create_failed" });
+      sendLoggedJson(res, 500, { error: "tactile_tag_create_failed" }, logContext);
     }
   }
 
@@ -261,20 +312,31 @@ function createTactileTagsHandler({ sendJson }) {
   }
 
   async function createSessionTag(req, res) {
-    const userId = await requireUserId(req, res);
-    if (!userId) {
+    const logContext = {
+      apiPath: "/api/session-tags",
+      userId: null,
+      requestRawBody: "",
+    };
+    let bodyResult;
+    try {
+      bodyResult = await readJsonBody(req);
+    } catch (err) {
+      logContext.requestRawBody = err.rawBody || "";
+      sendLoggedJson(res, 400, {
+        error: err.message === "payload_too_large" ? "payload_too_large" : "invalid_json",
+      }, logContext);
       return;
     }
 
-    let body;
-    try {
-      body = await readJsonBody(req);
-    } catch (err) {
-      sendJson(res, 400, {
-        error: err.message === "payload_too_large" ? "payload_too_large" : "invalid_json",
-      });
+    logContext.requestRawBody = bodyResult.rawBody || "";
+    const body = bodyResult.payload || {};
+
+    const userId = await requireUserId(req, res, { suppressResponse: true });
+    if (!userId) {
+      sendLoggedJson(res, 401, { error: "unauthorized" }, logContext);
       return;
     }
+    logContext.userId = userId;
 
     const sessionId = typeof body.sessionId === "string"
       ? body.sessionId.trim()
@@ -283,11 +345,11 @@ function createTactileTagsHandler({ sendJson }) {
     const tagCode = typeof body.tagCode === "string" ? body.tagCode.trim() : "";
 
     if (!sessionId) {
-      sendJson(res, 400, { error: "missing_session_id" });
+      sendLoggedJson(res, 400, { error: "missing_session_id" }, logContext);
       return;
     }
     if (!Number.isInteger(tagId) && !tagCode) {
-      sendJson(res, 400, { error: "missing_tag_id_or_tag_code" });
+      sendLoggedJson(res, 400, { error: "missing_tag_id_or_tag_code" }, logContext);
       return;
     }
 
@@ -300,7 +362,7 @@ function createTactileTagsHandler({ sendJson }) {
         [sessionId, userId]
       );
       if (sessionRows.length < 1) {
-        sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+        sendLoggedJson(res, 404, { error: "session_not_found_or_forbidden" }, logContext);
         return;
       }
 
@@ -316,7 +378,7 @@ function createTactileTagsHandler({ sendJson }) {
       const tagLookupParam = Number.isInteger(tagId) ? tagId : tagCode;
       const [tagRows] = await pool.query(tagLookupSql, [tagLookupParam]);
       if (tagRows.length < 1) {
-        sendJson(res, 404, { error: "tag_not_found" });
+        sendLoggedJson(res, 404, { error: "tag_not_found" }, logContext);
         return;
       }
 
@@ -330,11 +392,11 @@ function createTactileTagsHandler({ sendJson }) {
         [sessionId, targetTag.id]
       );
       if (existingRows.length > 0) {
-        sendJson(res, 200, {
+        sendLoggedJson(res, 200, {
           success: true,
           created: false,
           sessionTag: normalizeSessionTagRow(existingRows[0]),
-        });
+        }, logContext);
         return;
       }
 
@@ -350,20 +412,28 @@ function createTactileTagsHandler({ sendJson }) {
         [sessionId, targetTag.id]
       );
 
-      sendJson(res, 201, {
+      sendLoggedJson(res, 201, {
         success: true,
         created: true,
         sessionTag: normalizeSessionTagRow(rows[0]),
-      });
+      }, logContext);
     } catch (err) {
       console.error("[tactile_tags] create_session_tag_failed:", err.message);
-      sendJson(res, 500, { error: "session_tag_create_failed" });
+      sendLoggedJson(res, 500, { error: "session_tag_create_failed" }, logContext);
     }
   }
 
   return async function handleTactileTags(req, res) {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (!pool) {
+      if (req.method === "POST" && (url.pathname === "/api/tactile-tags" || url.pathname === "/api/session-tags")) {
+        sendLoggedJson(res, 503, { error: "database_unavailable" }, {
+          apiPath: url.pathname,
+          userId: null,
+          requestRawBody: "",
+        });
+        return;
+      }
       sendJson(res, 503, { error: "database_unavailable" });
       return;
     }

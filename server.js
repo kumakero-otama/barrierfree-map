@@ -341,6 +341,16 @@ function handleRequest(req, res) {
     handleCount(req, res);
     return;
   }
+  if (
+    req.url &&
+    (
+      req.url.startsWith("/api/tactile-tags") ||
+      req.url.startsWith("/api/session-tags")
+    )
+  ) {
+    handleTactileTags(req, res);
+    return;
+  }
   if (req.url && req.url.startsWith("/api/session")) {
     handleSession(req, res);
     return;
@@ -371,16 +381,6 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/pro-status")) {
     handleProStatus(req, res);
-    return;
-  }
-  if (
-    req.url &&
-    (
-      req.url.startsWith("/api/tactile-tags") ||
-      req.url.startsWith("/api/session-tags")
-    )
-  ) {
-    handleTactileTags(req, res);
     return;
   }
   if (
