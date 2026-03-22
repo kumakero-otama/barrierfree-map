@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Barrierfree Map API
-  version: 1.18.7
+  version: 1.19.0
   description: |
     barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
     一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
@@ -22,6 +22,7 @@ tags:
   - name: RoadInfo
   - name: PostTags
   - name: Auth
+  - name: ProStatus
 
 paths:
   /api/config:
@@ -635,6 +636,81 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /api/pro-status:
+    get:
+      tags: [ProStatus]
+      summary: 現在ログイン中のユーザーの PRO 状態を取得
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProStatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: user_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '503':
+          description: db_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    put:
+      tags: [ProStatus]
+      summary: 現在ログイン中のユーザーの PRO 状態を更新
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isPro]
+              properties:
+                isPro:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ProStatusResponse'
+                  - type: object
+                    properties:
+                      ok: { type: boolean, example: true }
+        '400':
+          description: invalid_json or invalid_is_pro
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: user_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '503':
+          description: db_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /auth/google:
     post:
       tags: [Auth]
@@ -959,6 +1035,12 @@ components:
         totalTactileLength: { type: number }
         totalRoadPosts: { type: integer }
         totalHearts: { type: integer }
+
+    ProStatusResponse:
+      type: object
+      properties:
+        userId: { type: integer }
+        isPro: { type: boolean }
 
     AuthSuccessResponse:
       type: object

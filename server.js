@@ -12,6 +12,7 @@ const createOsmTactileWaysHandler = require("./server/api/osm_tactile");
 const createPostTagsHandler = require("./server/api/post_tags");
 const createRoadInfoHandler = require("./server/api/road_info");
 const createGoogleAuthHandler = require("./server/api/google_auth");
+const createProStatusHandler = require("./server/api/pro_status");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -314,6 +315,10 @@ const handleGoogleAuth = createGoogleAuthHandler({
   GOOGLE_CLIENT_ID,
 });
 
+const handleProStatus = createProStatusHandler({
+  sendJson,
+});
+
 function handleRequest(req, res) {
   const isCorsRequest = applyCorsHeaders(req, res);
   if (req.method === "OPTIONS" && isCorsRequest) {
@@ -357,6 +362,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/road-info")) {
     handleRoadInfo(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/pro-status")) {
+    handleProStatus(req, res);
     return;
   }
   if (

@@ -57,11 +57,111 @@ body {
 
 .profile-username {
   margin: 16px 0 12px;
-  text-align: center;
   font-size: 3rem;
   font-weight: 800;
   color: #3d5368;
   line-height: 1.15;
+}
+
+.profile-name-row {
+  margin: 16px 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pro-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffcf5a, #ff8f3f);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  box-shadow: 0 8px 20px rgba(255, 143, 63, 0.24);
+}
+
+.pro-toggle-card {
+  margin: 0 auto 24px;
+  max-width: 460px;
+  padding: 16px 18px;
+  border: 1px solid rgba(61, 83, 104, 0.18);
+  border-radius: 20px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+}
+
+.pro-toggle-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.pro-toggle-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1f2d3a;
+}
+
+.pro-toggle-description {
+  font-size: 0.95rem;
+  color: #5b6873;
+}
+
+.pro-toggle-switch {
+  position: relative;
+  width: 64px;
+  height: 36px;
+  flex: 0 0 auto;
+}
+
+.pro-toggle-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+.pro-toggle-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #c6d1da;
+  transition: background 0.2s ease;
+}
+
+.pro-toggle-slider::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(47, 63, 79, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.pro-toggle-switch input:checked + .pro-toggle-slider {
+  background: #ff9a4a;
+}
+
+.pro-toggle-switch input:checked + .pro-toggle-slider::after {
+  transform: translateX(28px);
+}
+
+.pro-toggle-switch input:disabled + .pro-toggle-slider {
+  opacity: 0.65;
 }
 
 .achievement-title {
@@ -109,6 +209,25 @@ body {
 
   .profile-username {
     font-size: 2rem;
+  }
+
+  .pro-badge {
+    min-width: 56px;
+    padding: 5px 12px;
+    font-size: 0.9rem;
+  }
+
+  .pro-toggle-card {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+
+  .pro-toggle-title {
+    font-size: 1rem;
+  }
+
+  .pro-toggle-description {
+    font-size: 0.85rem;
   }
 
   .achievement-title {

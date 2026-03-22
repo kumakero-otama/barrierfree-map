@@ -45,7 +45,21 @@
           </div>
         </div>
 
-        <h2 id="profile-username" class="profile-username">username</h2>
+        <div class="profile-name-row">
+          <h2 id="profile-username" class="profile-username">username</h2>
+          <span id="profile-pro-badge" class="pro-badge" hidden>PRO</span>
+        </div>
+
+        <label class="pro-toggle-card" for="profile-pro-toggle">
+          <span class="pro-toggle-copy">
+            <span class="pro-toggle-title">PROアカウント</span>
+            <span class="pro-toggle-description">プロフィールから PRO 表示を ON/OFF できます</span>
+          </span>
+          <span class="pro-toggle-switch">
+            <input id="profile-pro-toggle" type="checkbox" />
+            <span class="pro-toggle-slider" aria-hidden="true"></span>
+          </span>
+        </label>
 
         <h3 class="achievement-title">実績</h3>
         <ul class="achievement-list">

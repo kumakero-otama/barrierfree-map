@@ -93,6 +93,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           user_id BIGSERIAL PRIMARY KEY,
           username VARCHAR(50),
           icon_url TEXT,
+          is_pro BOOLEAN DEFAULT FALSE,
           total_tactile_length NUMERIC(10,3) DEFAULT 0,
           total_road_posts INTEGER DEFAULT 0,
           total_hearts INTEGER DEFAULT 0,
@@ -102,6 +103,11 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           last_login_at TIMESTAMP
         )
+      `);
+
+      await pool.query(`
+        ALTER TABLE login.users
+        ADD COLUMN IF NOT EXISTS is_pro BOOLEAN DEFAULT FALSE
       `);
 
       await pool.query(`
@@ -314,6 +320,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         user_id: memoryStore.nextUserId++,
         username: finalUsername,
         icon_url: finalIconUrl,
+        is_pro: false,
         email,
         email_verified: emailVerified,
         total_tactile_length: 0,
@@ -455,6 +462,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
             user_id: user.user_id,
             username: user.username,
             icon_url: user.icon_url,
+            is_pro: Boolean(user.is_pro),
             email: user.email || null,
             total_tactile_length: user.total_tactile_length || 0,
             total_road_posts: user.total_road_posts || 0,
@@ -470,6 +478,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       `SELECT s.user_id,
               u.username,
               u.icon_url,
+              u.is_pro,
               p.email,
               u.total_tactile_length,
               u.total_road_posts,
