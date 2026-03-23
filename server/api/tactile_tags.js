@@ -59,6 +59,23 @@ function normalizeSessionTagRow(row) {
   };
 }
 
+function buildSessionInfoPayload(rows, sessionId) {
+  if (!Array.isArray(rows) || rows.length < 1) {
+    return null;
+  }
+  const first = rows[0];
+  const tags = rows
+    .map((row) => (typeof row.tag_label_ja === "string" ? row.tag_label_ja.trim() : ""))
+    .filter(Boolean);
+  return {
+    sessionId,
+    username: first.username || null,
+    iconUrl: first.icon_url || null,
+    createdAt: first.created_at || null,
+    tags: [...new Set(tags)],
+  };
+}
+
 function createTactileTagsHandler({ sendJson }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
@@ -423,6 +440,45 @@ function createTactileTagsHandler({ sendJson }) {
     }
   }
 
+  async function getTactileSessionInfo(req, res, url) {
+    await ensureSchema();
+    const sessionId = (url.searchParams.get("sessionId") || url.searchParams.get("sessionUuid") || "").trim();
+    if (!sessionId) {
+      sendJson(res, 400, { error: "missing_session_id" });
+      return;
+    }
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT s.session_id,
+                u.username,
+                u.icon_url,
+                sp.created_at,
+                t.label_ja AS tag_label_ja
+         FROM tactile.sessions s
+         LEFT JOIN tactile.session_paths sp ON sp.session_id = s.session_id
+         LEFT JOIN login.users u ON u.user_id = s.user_id
+         LEFT JOIN tactile.session_tags st ON st.session_id = s.session_id
+         LEFT JOIN tactile.tags t ON t.id = st.tag_id
+         WHERE s.session_id = ?
+         ORDER BY t.sort_order ASC, t.id ASC`,
+        [sessionId]
+      );
+      const payload = buildSessionInfoPayload(rows, sessionId);
+      if (!payload) {
+        sendJson(res, 404, { error: "session_not_found" });
+        return;
+      }
+      sendJson(res, 200, {
+        success: true,
+        session: payload,
+      });
+    } catch (err) {
+      console.error("[tactile_tags] get_session_info_failed:", err.message);
+      sendJson(res, 500, { error: "session_info_unavailable" });
+    }
+  }
+
   return async function handleTactileTags(req, res) {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (!pool) {
@@ -459,6 +515,15 @@ function createTactileTagsHandler({ sendJson }) {
         }
         if (req.method === "POST") {
           await createSessionTag(req, res);
+          return;
+        }
+        sendJson(res, 405, { error: "method_not_allowed" });
+        return;
+      }
+
+      if (url.pathname === "/api/tactile-session-info") {
+        if (req.method === "GET") {
+          await getTactileSessionInfo(req, res, url);
           return;
         }
         sendJson(res, 405, { error: "method_not_allowed" });

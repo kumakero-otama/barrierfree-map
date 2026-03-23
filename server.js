@@ -344,6 +344,7 @@ function handleRequest(req, res) {
   if (
     req.url &&
     (
+      req.url.startsWith("/api/tactile-session-info") ||
       req.url.startsWith("/api/tactile-tags") ||
       req.url.startsWith("/api/session-tags")
     )
