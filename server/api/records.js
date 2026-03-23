@@ -47,9 +47,18 @@ function createRecordsHandler({ sendJson }) {
           s.user_id,
           source,
           sp.created_at,
-          ST_AsGeoJSON(sp.geom) AS geom_geojson
+          ST_AsGeoJSON(sp.geom) AS geom_geojson,
+          COALESCE(tag_info.tags, ARRAY[]::text[]) AS tags
         FROM tactile.session_paths sp
         LEFT JOIN tactile.sessions s ON s.session_id = sp.session_id
+        LEFT JOIN (
+          SELECT
+            st.session_id,
+            ARRAY_AGG(t.label_ja ORDER BY t.sort_order ASC, t.id ASC) AS tags
+          FROM tactile.session_tags st
+          JOIN tactile.tags t ON t.id = st.tag_id
+          GROUP BY st.session_id
+        ) AS tag_info ON tag_info.session_id = sp.session_id
       `;
       const params = [];
       const whereClauses = [];
