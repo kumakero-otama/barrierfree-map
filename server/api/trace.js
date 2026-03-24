@@ -8,11 +8,93 @@ const PEDESTRIAN_SIDEWALK_COSTING_OPTIONS = Object.freeze({
   sidewalk_factor: 0.1,
 });
 
-// matched_points から PostGISに保存できるLINESTRING WKTを組み立てる。
-function createLinestringWkt(points) {
-  const coords = points
-    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon))
-    .map((p) => `${p.lon} ${p.lat}`);
+// Valhallaのencoded polylineを [lat, lon] 配列へ戻す。
+function decodePolyline(str, precision = 6) {
+  if (typeof str !== "string" || str.length < 1) {
+    return [];
+  }
+
+  const coordinates = [];
+  const factor = 10 ** precision;
+  let index = 0;
+  let lat = 0;
+  let lon = 0;
+
+  while (index < str.length) {
+    let result = 0;
+    let shift = 0;
+    let byte = null;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < str.length + 1);
+
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+
+    result = 0;
+    shift = 0;
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < str.length + 1);
+
+    lon += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coordinates.push([lat / factor, lon / factor]);
+  }
+
+  return coordinates;
+}
+
+// traceレスポンスから保存用の座標列を取り出す。
+function extractPersistCoordinates(data) {
+  if (data && Array.isArray(data.edges) && data.edges.length > 0) {
+    let allCoords = [];
+    data.edges.forEach((edge) => {
+      if (!edge || !edge.shape) {
+        return;
+      }
+      const edgeCoords = decodePolyline(edge.shape, 6);
+      if (allCoords.length > 0 && edgeCoords.length > 0) {
+        const lastPoint = allCoords[allCoords.length - 1];
+        const firstPoint = edgeCoords[0];
+        if (lastPoint[0] === firstPoint[0] && lastPoint[1] === firstPoint[1]) {
+          allCoords = allCoords.concat(edgeCoords.slice(1));
+          return;
+        }
+      }
+      allCoords = allCoords.concat(edgeCoords);
+    });
+    if (allCoords.length > 1) {
+      return { coordinates: allCoords, sourceType: "edges.shape" };
+    }
+  }
+
+  if (data && data.shape) {
+    const decoded = decodePolyline(data.shape, 6);
+    if (decoded.length > 1) {
+      return { coordinates: decoded, sourceType: "shape" };
+    }
+  }
+
+  const matchedPoints = Array.isArray(data && data.matched_points) ? data.matched_points : [];
+  const fallbackCoords = matchedPoints
+    .map((p) => [Number(p && p.lat), Number(p && p.lon)])
+    .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+  if (fallbackCoords.length > 1) {
+    return { coordinates: fallbackCoords, sourceType: "matched_points" };
+  }
+
+  return { coordinates: [], sourceType: "none" };
+}
+
+// 座標列から PostGISに保存できるLINESTRING WKTを組み立てる。
+function createLinestringWkt(coordinates) {
+  const coords = coordinates
+    .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon))
+    .map(([lat, lon]) => `${lon} ${lat}`);
   if (coords.length < 2) {
     return null;
   }
@@ -25,11 +107,11 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
     return;
   }
 
-  const matchedPoints = Array.isArray(data.matched_points) ? data.matched_points : [];
   const edges = Array.isArray(data.edges) ? data.edges : [];
-  const wkt = createLinestringWkt(matchedPoints);
+  const { coordinates, sourceType } = extractPersistCoordinates(data);
+  const wkt = createLinestringWkt(coordinates);
   if (!wkt) {
-    console.warn(`${logPrefix} skip path save: not enough matched_points`);
+    console.warn(`${logPrefix} skip path save: not enough shape coordinates`);
     return;
   }
 
@@ -99,7 +181,10 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
     }
 
     await conn.commit();
-    console.log(`${logPrefix} saved session_paths + session_path_edges: edges=${validEdges.length}`);
+    console.log(
+      `${logPrefix} saved session_paths + session_path_edges: ` +
+      `edges=${validEdges.length}, vertices=${coordinates.length}, line_source=${sourceType}`
+    );
   } catch (err) {
     await conn.rollback();
     throw err;
