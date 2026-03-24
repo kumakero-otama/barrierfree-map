@@ -506,6 +506,7 @@ paths:
       summary: 道情報（一覧または詳細）
       description: |
         一覧取得モード（`pointId` 未指定）では `roadinfo.road_info_point.status = active` のポイントのみ返します。
+        詳細取得モード（`pointId` 指定）でも `roadinfo.road_info_point.status = deleted` のポイントは返しません。
       security:
         - bearerAuth: []
         - sessionCookie: []
@@ -564,6 +565,7 @@ paths:
         - 未登録コードは `roadinfo.road_info_tag` に新規作成
         - 解決されたタグは `roadinfo.road_info_point_tag` に紐付け（重複は無視）
         - 完了タグ（code: `complete` / `completed` / `done` / `resolved` / `inactive` または label_ja: `完了`）が含まれる場合、対象ポイントの `roadinfo.road_info_point.status` は `inactive` に更新されます
+        - `status = deleted` を指定した場合は、タグ解決・note追加・media追加を行わず、対象ポイントの `roadinfo.road_info_point.status` 更新だけを実行します
         また、投稿成功時に対象ポイントの `roadinfo.road_info_point.updated_at` を更新します。
       security:
         - bearerAuth: []
@@ -592,8 +594,8 @@ paths:
                   items: { type: string }
                 status:
                   type: string
-                  enum: [active, inactive, hidden]
-                  description: 任意。指定時は対象ポイントのstatusを更新。`hidden` は完了タグより優先される
+                  enum: [active, inactive, hidden, deleted]
+                  description: 任意。指定時は対象ポイントのstatusを更新。`hidden` と `deleted` は完了タグより優先される。`deleted` 指定時は note/media/tag の追加を行わない
                 images:
                   type: array
                   items:
@@ -614,13 +616,18 @@ paths:
                 properties:
                   success: { type: boolean, example: true }
                   pointId: { type: integer }
-                  noteId: { type: integer }
+                  noteId:
+                    type: integer
+                    nullable: true
+                    description: `status = deleted` 指定時は `null`
                   tagsCount: { type: integer }
                   createdTags:
                     type: array
                     description: この投稿で新規作成されたタグコード
                     items: { type: string }
-                  mediaCount: { type: integer }
+                  mediaCount:
+                    type: integer
+                    description: `status = deleted` 指定時は 0
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

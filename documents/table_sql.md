@@ -177,7 +177,9 @@ CREATE TABLE tactile.sessions (
   user_id BIGINT NOT NULL
     REFERENCES login.users(user_id),
   started_at TIMESTAMP NOT NULL,
-  ended_at TIMESTAMP
+  ended_at TIMESTAMP,
+  memo TEXT,
+  is_active BOOLEAN DEFAULT TRUE
 );
 ```
 

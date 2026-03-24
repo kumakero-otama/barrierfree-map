@@ -63,7 +63,7 @@ function normalizePointStatus(rawStatus) {
     return null;
   }
   const normalized = rawStatus.trim().toLowerCase();
-  if (normalized === "active" || normalized === "inactive" || normalized === "hidden") {
+  if (normalized === "active" || normalized === "inactive" || normalized === "hidden" || normalized === "deleted") {
     return normalized;
   }
   return null;
@@ -312,7 +312,7 @@ function createRoadInfoHandler({ sendJson }) {
                   status,
                   created_at
            FROM roadinfo.road_info_point
-           WHERE id = ?
+           WHERE id = ? AND status <> 'deleted'
            LIMIT 1`,
           [pointId]
         )
@@ -570,41 +570,53 @@ function createRoadInfoHandler({ sendJson }) {
 
         }
 
-        const { tagIds: resolvedTagIds, createdTags } = await resolveOrCreateTagIds(conn, tagCodes);
-        for (const tagId of resolvedTagIds) {
-          await conn.query(
-            `INSERT INTO roadinfo.road_info_point_tag (point_id, tag_id)
-             VALUES (?, ?)
-             ON CONFLICT (point_id, tag_id) DO NOTHING
-             RETURNING point_id`,
-            [pointId, tagId]
-          );
+        const deleteOnly = statusRequested === "deleted";
+        let resolvedTagIds = [];
+        let createdTags = [];
+        let completionByRequest = false;
+        let completionByDb = false;
+        if (!deleteOnly) {
+          const resolved = await resolveOrCreateTagIds(conn, tagCodes);
+          resolvedTagIds = resolved.tagIds;
+          createdTags = resolved.createdTags;
+          for (const tagId of resolvedTagIds) {
+            await conn.query(
+              `INSERT INTO roadinfo.road_info_point_tag (point_id, tag_id)
+               VALUES (?, ?)
+               ON CONFLICT (point_id, tag_id) DO NOTHING
+               RETURNING point_id`,
+              [pointId, tagId]
+            );
+          }
+          completionByRequest = tagCodes.some(isCompletionTagCode);
+          completionByDb = await hasCompletionTag(conn, resolvedTagIds);
         }
-        const completionByRequest = tagCodes.some(isCompletionTagCode);
-        const completionByDb = await hasCompletionTag(conn, resolvedTagIds);
         let nextStatus = statusRequested;
-        if (statusRequested !== "hidden" && (completionByRequest || completionByDb)) {
+        if (statusRequested !== "hidden" && statusRequested !== "deleted" && (completionByRequest || completionByDb)) {
           nextStatus = "inactive";
         }
 
-        const [noteResult] = await conn.query(
-          `INSERT INTO roadinfo.road_info_note (point_id, body, created_by, is_deleted)
-           VALUES (?, ?, ?, false)`,
-          [pointId, detail, userId]
-        );
-        const noteId = noteResult.insertId;
-        if (!noteId) {
-          throw new Error("note_insert_failed");
-        }
-
-        for (let i = 0; i < images.length; i += 1) {
-          const saved = await saveImage(images[i], i + 1, maxImageBytes);
-          savedFiles.push(saved.absPath);
-          await conn.query(
-            `INSERT INTO roadinfo.road_info_media (note_id, media_type, url, created_by, is_deleted)
-             VALUES (?, 'image', ?, ?, false)`,
-            [noteId, saved.url, userId]
+        let noteId = null;
+        if (!deleteOnly) {
+          const [noteResult] = await conn.query(
+            `INSERT INTO roadinfo.road_info_note (point_id, body, created_by, is_deleted)
+             VALUES (?, ?, ?, false)`,
+            [pointId, detail, userId]
           );
+          noteId = noteResult.insertId;
+          if (!noteId) {
+            throw new Error("note_insert_failed");
+          }
+
+          for (let i = 0; i < images.length; i += 1) {
+            const saved = await saveImage(images[i], i + 1, maxImageBytes);
+            savedFiles.push(saved.absPath);
+            await conn.query(
+              `INSERT INTO roadinfo.road_info_media (note_id, media_type, url, created_by, is_deleted)
+               VALUES (?, 'image', ?, ?, false)`,
+              [noteId, saved.url, userId]
+            );
+          }
         }
 
         if (nextStatus) {
