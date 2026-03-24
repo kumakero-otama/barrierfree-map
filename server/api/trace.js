@@ -101,6 +101,29 @@ function createLinestringWkt(coordinates) {
   return `SRID=4326;LINESTRING(${coords.join(",")})`;
 }
 
+// is_active=true のセッションに紐づく経路長だけを再集計して km で保存する。
+async function refreshUserTactileLength(conn, userId) {
+  const safeUserId = Number(userId);
+  if (!Number.isFinite(safeUserId) || safeUserId <= 0) {
+    return;
+  }
+
+  await conn.query(
+    `UPDATE login.users
+     SET total_tactile_length = COALESCE((
+           SELECT (COALESCE(SUM(ST_Length(sp.geom)), 0) / 1000.0)::numeric(10,3)
+           FROM tactile.sessions s
+           JOIN tactile.session_paths sp
+             ON sp.session_id = s.session_id
+           WHERE s.user_id = ?
+             AND s.is_active = true
+         ), 0),
+         updated_at = NOW()
+     WHERE user_id = ?`,
+    [safeUserId, safeUserId]
+  );
+}
+
 // trace結果をセッション単位の経路テーブルへ反映する。
 async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
   if (!pool || !sessionId) {
@@ -122,12 +145,6 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-
-    const [existingPathRows] = await conn.query(
-      "SELECT session_id FROM tactile.session_paths WHERE session_id = ? LIMIT 1",
-      [sessionId]
-    );
-    const isNewSessionPath = !Array.isArray(existingPathRows) || existingPathRows.length < 1;
 
     // 本体のライン情報（session_paths）は upsert で更新する。
     await conn.query(
@@ -154,30 +171,16 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
       );
     }
 
-    if (isNewSessionPath) {
-      const [sessionRows] = await conn.query(
-        "SELECT user_id FROM tactile.sessions WHERE session_id = ? LIMIT 1",
-        [sessionId]
-      );
-      const ownerUserId = Array.isArray(sessionRows) && sessionRows.length > 0
-        ? Number(sessionRows[0].user_id)
-        : null;
+    const [sessionRows] = await conn.query(
+      "SELECT user_id FROM tactile.sessions WHERE session_id = ? LIMIT 1",
+      [sessionId]
+    );
+    const ownerUserId = Array.isArray(sessionRows) && sessionRows.length > 0
+      ? Number(sessionRows[0].user_id)
+      : null;
 
-      if (Number.isFinite(ownerUserId) && ownerUserId > 0) {
-        await conn.query(
-          `UPDATE login.users
-           SET total_tactile_length = COALESCE((
-                 SELECT (COALESCE(SUM(ST_Length(sp.geom)), 0) / 1000.0)::numeric(10,3)
-                 FROM tactile.sessions s
-                 JOIN tactile.session_paths sp
-                   ON sp.session_id = s.session_id
-                 WHERE s.user_id = ?
-               ), 0),
-               updated_at = NOW()
-           WHERE user_id = ?`,
-          [ownerUserId, ownerUserId]
-        );
-      }
+    if (Number.isFinite(ownerUserId) && ownerUserId > 0) {
+      await refreshUserTactileLength(conn, ownerUserId);
     }
 
     await conn.commit();

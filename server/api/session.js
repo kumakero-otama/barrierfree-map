@@ -20,6 +20,28 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     sessionLogger.appendLog("INFO", "DB接続成功");
   }
 
+  async function refreshUserTactileLength(conn, userId) {
+    const safeUserId = Number(userId);
+    if (!Number.isFinite(safeUserId) || safeUserId <= 0) {
+      return;
+    }
+
+    await conn.query(
+      `UPDATE login.users
+       SET total_tactile_length = COALESCE((
+             SELECT (COALESCE(SUM(ST_Length(sp.geom)), 0) / 1000.0)::numeric(10,3)
+             FROM tactile.sessions s
+             JOIN tactile.session_paths sp
+               ON sp.session_id = s.session_id
+             WHERE s.user_id = ?
+               AND s.is_active = true
+           ), 0),
+           updated_at = NOW()
+       WHERE user_id = ?`,
+      [safeUserId, safeUserId]
+    );
+  }
+
   // /api/session/{start|end|cancel|deactivate} を1つのハンドラで振り分ける。
   return async function handleSession(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -176,7 +198,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       try {
         await conn.beginTransaction();
         const [targetRows] = await conn.query(
-          "SELECT session_id FROM tactile.sessions WHERE session_id = ? AND user_id = ? LIMIT 1",
+          "SELECT session_id, user_id FROM tactile.sessions WHERE session_id = ? AND user_id = ? LIMIT 1",
           [sessionId, userId]
         );
         if (!Array.isArray(targetRows) || targetRows.length < 1) {
@@ -187,6 +209,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
         await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.gps_raw WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.sessions WHERE session_id = ?", [sessionId]);
+        await refreshUserTactileLength(conn, userId);
         await conn.commit();
       } catch (err) {
         await conn.rollback();
@@ -228,14 +251,27 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
 
       sessionLogger.appendLog("SESSION_DEACTIVATE", `${sessionId},user_id=${userId}`);
-      const [result] = await pool.query(
-        "UPDATE tactile.sessions SET is_active = false WHERE session_id = ? AND user_id = ?",
-        [sessionId, userId]
-      );
-      const updated = result.affectedRows || 0;
-      if (updated < 1) {
-        sendJson(res, 404, { error: "session_not_found_or_forbidden" });
-        return;
+      const conn = await pool.getConnection();
+      let updated = 0;
+      try {
+        await conn.beginTransaction();
+        const [result] = await conn.query(
+          "UPDATE tactile.sessions SET is_active = false WHERE session_id = ? AND user_id = ?",
+          [sessionId, userId]
+        );
+        updated = result.affectedRows || 0;
+        if (updated < 1) {
+          await conn.rollback();
+          sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+          return;
+        }
+        await refreshUserTactileLength(conn, userId);
+        await conn.commit();
+      } catch (err) {
+        await conn.rollback();
+        throw err;
+      } finally {
+        conn.release();
       }
 
       sendJson(res, 200, {
