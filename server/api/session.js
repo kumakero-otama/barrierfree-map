@@ -20,7 +20,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     sessionLogger.appendLog("INFO", "DB接続成功");
   }
 
-  // /api/session/{start|end|cancel} を1つのハンドラで振り分ける。
+  // /api/session/{start|end|cancel|deactivate} を1つのハンドラで振り分ける。
   return async function handleSession(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.pathname.split("/").pop();
@@ -54,6 +54,10 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
       if (action === "cancel") {
         await handleSessionCancel(req, data, res);
+        return;
+      }
+      if (action === "deactivate") {
+        await handleSessionDeactivate(req, data, res);
         return;
       }
 
@@ -199,6 +203,49 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
       sessionLogger.appendLog("ERROR", `SESSION_CANCEL_DB_ERROR[${sessionId}]: ${err.message}`);
       sendJson(res, 500, { error: "session_cancel_failed", message: err.message });
+    }
+  }
+
+  // セッションを論理無効化し、一覧表示などから除外できるようにする。
+  async function handleSessionDeactivate(req, data, res) {
+    const sessionId = data.sessionId || data.sessionUuid;
+
+    if (!sessionId) {
+      sendJson(res, 400, { error: "missing_session_id" });
+      return;
+    }
+
+    if (!pool) {
+      sendJson(res, 200, { success: true, sessionId, dbDisabled: true });
+      return;
+    }
+
+    try {
+      const userId = await resolveAuthenticatedUserId(req, pool);
+      if (!userId) {
+        sendJson(res, 401, { error: "unauthorized" });
+        return;
+      }
+
+      sessionLogger.appendLog("SESSION_DEACTIVATE", `${sessionId},user_id=${userId}`);
+      const [result] = await pool.query(
+        "UPDATE tactile.sessions SET is_active = false WHERE session_id = ? AND user_id = ?",
+        [sessionId, userId]
+      );
+      const updated = result.affectedRows || 0;
+      if (updated < 1) {
+        sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+        return;
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        sessionId,
+        updated,
+      });
+    } catch (err) {
+      sessionLogger.appendLog("ERROR", `SESSION_DEACTIVATE_DB_ERROR[${sessionId}]: ${err.message}`);
+      sendJson(res, 500, { error: "session_deactivate_failed", message: err.message });
     }
   }
 }

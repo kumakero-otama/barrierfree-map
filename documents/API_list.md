@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.22.0`
+API version: `1.22.2`
 
 ## 認証
 
@@ -19,6 +19,7 @@ API version: `1.22.0`
 | POST | `/api/session/start` | 必要 | セッション開始 |
 | POST | `/api/session/end` | 必要 | セッション終了 |
 | POST | `/api/session/cancel` | 必要 | セッション関連データを削除 |
+| POST | `/api/session/deactivate` | 必要 | セッションを論理無効化 |
 | GET | `/api/records` | 条件付き | 保存済み経路一覧を取得 |
 | POST | `/api/trace` | 不要 | Valhalla `trace_attributes` を呼び出し |
 | GET | `/api/osm-tactile-ways` | 不要 | Overpass経由で点字ブロック関連地物を取得 |
@@ -97,6 +98,18 @@ API version: `1.22.0`
   - 任意: `sessionId`, `sessionUuid`
 - 主なレスポンス:
   - `200`: `success`, `sessionId`, `canceled` など
+  - `400`, `401`, `404`, `500`
+
+#### `POST /api/session/deactivate`
+- 概要: セッションを論理無効化
+- 認証: 必要
+- リクエストBody:
+  - 任意: `sessionId`, `sessionUuid`
+- 補足:
+  - `tactile.sessions.is_active` を `false` に更新
+  - `session_paths` などの関連データは削除しない
+- 主なレスポンス:
+  - `200`: `success`, `sessionId`, `updated` など
   - `400`, `401`, `404`, `500`
 
 #### `GET /api/records`

@@ -265,6 +265,54 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/session/deactivate:
+    post:
+      tags: [Session]
+      summary: セッションを論理無効化
+      description: |
+        対象の `tactile.sessions.is_active` を `false` に更新します。
+        関連データは削除しません。
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId: { type: string }
+                sessionUuid: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      updated: { type: integer, example: 1 }
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      dbDisabled: { type: boolean, example: true }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: session_not_found_or_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/records:
     get:
       tags: [Records]

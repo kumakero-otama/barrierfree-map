@@ -63,6 +63,8 @@ function createRecordsHandler({ sendJson }) {
       const params = [];
       const whereClauses = [];
 
+      whereClauses.push("s.is_active = true");
+
       if (Number.isFinite(centerLat) && Number.isFinite(centerLng) && Number.isFinite(radiusKm) && radiusKm > 0) {
         whereClauses.push(`
           ST_DWithin(
