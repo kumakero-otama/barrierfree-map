@@ -204,6 +204,27 @@ async function resolveOrCreateTagIds(conn, rawTagCodes) {
   };
 }
 
+// ユーザーが作成した active / hidden ポイント数を再集計して保存する。
+async function refreshUserRoadPostCount(conn, userId) {
+  const safeUserId = Number(userId);
+  if (!Number.isFinite(safeUserId) || safeUserId <= 0) {
+    return;
+  }
+
+  await conn.query(
+    `UPDATE login.users
+     SET total_road_posts = COALESCE((
+           SELECT COUNT(*)
+           FROM roadinfo.road_info_point
+           WHERE created_by = ?
+             AND status IN ('active', 'hidden')
+         ), 0),
+         updated_at = NOW()
+     WHERE user_id = ?`,
+    [safeUserId, safeUserId]
+  );
+}
+
 // data URL形式の画像を検証し、バイナリへ変換する。
 function parseDataUrl(dataUrl, maxImageBytes) {
   if (typeof dataUrl !== "string") {
@@ -537,9 +558,10 @@ function createRoadInfoHandler({ sendJson }) {
         await conn.beginTransaction();
 
         let pointId = null;
+        let pointOwnerUserId = userId;
         if (hasExistingPointId) {
           const [pointRows] = await conn.query(
-            `SELECT id
+            `SELECT id, created_by
              FROM roadinfo.road_info_point
              WHERE id = ? AND status <> 'deleted'
              LIMIT 1`,
@@ -549,6 +571,7 @@ function createRoadInfoHandler({ sendJson }) {
             throw new Error("point_not_found");
           }
           pointId = pointIdFromBody;
+          pointOwnerUserId = Number(pointRows[0].created_by) || null;
         } else {
           const [pointResult] = await conn.query(
             `INSERT INTO roadinfo.road_info_point (geom, status, created_by)
@@ -559,15 +582,6 @@ function createRoadInfoHandler({ sendJson }) {
           if (!pointId) {
             throw new Error("point_insert_failed");
           }
-
-          await conn.query(
-            `UPDATE login.users
-             SET total_road_posts = COALESCE(total_road_posts, 0) + 1,
-                 updated_at = NOW()
-             WHERE user_id = ?`,
-            [userId]
-          );
-
         }
 
         const deleteOnly = statusRequested === "deleted";
@@ -634,6 +648,10 @@ function createRoadInfoHandler({ sendJson }) {
              WHERE id = ?`,
             [pointId]
           );
+        }
+
+        if (!hasExistingPointId || nextStatus === "deleted") {
+          await refreshUserRoadPostCount(conn, pointOwnerUserId);
         }
 
         await conn.commit();
