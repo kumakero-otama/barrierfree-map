@@ -72,6 +72,7 @@ function buildSessionInfoPayload(rows, sessionId) {
     username: first.username || null,
     iconUrl: first.icon_url || null,
     createdAt: first.created_at || null,
+    memo: first.memo || "",
     tags: [...new Set(tags)],
   };
 }
@@ -454,6 +455,7 @@ function createTactileTagsHandler({ sendJson }) {
                 u.username,
                 u.icon_url,
                 sp.created_at,
+                s.memo,
                 t.label_ja AS tag_label_ja
          FROM tactile.sessions s
          LEFT JOIN tactile.session_paths sp ON sp.session_id = s.session_id

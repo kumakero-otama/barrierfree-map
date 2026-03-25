@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.22.2`
+API version: `1.23.0`
 
 ## 認証
 
@@ -20,6 +20,7 @@ API version: `1.22.2`
 | POST | `/api/session/end` | 必要 | セッション終了 |
 | POST | `/api/session/cancel` | 必要 | セッション関連データを削除 |
 | POST | `/api/session/deactivate` | 必要 | セッションを論理無効化 |
+| POST | `/api/session/memo` | 必要 | セッションメモを更新 |
 | GET | `/api/records` | 条件付き | 保存済み経路一覧を取得 |
 | POST | `/api/trace` | 不要 | Valhalla `trace_attributes` を呼び出し |
 | GET | `/api/osm-tactile-ways` | 不要 | Overpass経由で点字ブロック関連地物を取得 |
@@ -110,6 +111,19 @@ API version: `1.22.2`
   - `session_paths` などの関連データは削除しない
 - 主なレスポンス:
   - `200`: `success`, `sessionId`, `updated` など
+  - `400`, `401`, `404`, `500`
+
+#### `POST /api/session/memo`
+- 概要: セッションメモを更新
+- 認証: 必要
+- リクエストBody:
+  - 任意: `sessionId`, `sessionUuid`
+  - 必須: `memo`
+- 補足:
+  - `tactile.sessions.memo` を送信文字列で上書きする
+  - 空文字を送るとメモを空にできる
+- 主なレスポンス:
+  - `200`: `success`, `sessionId`, `memo`, `updated` など
   - `400`, `401`, `404`, `500`
 
 #### `GET /api/records`
@@ -242,7 +256,7 @@ API version: `1.22.2`
   - `400`, `401`, `404`, `405`, `500`, `503`
 
 #### `GET /api/tactile-session-info`
-- 概要: `session_id` から記録ユーザー情報とタグ表示名を取得
+- 概要: `session_id` から記録ユーザー情報、メモ、タグ表示名を取得
 - 主なクエリ:
   - 必須相当: `sessionId` または `sessionUuid`
 - 主なレスポンス:

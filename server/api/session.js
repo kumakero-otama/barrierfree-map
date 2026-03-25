@@ -42,7 +42,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     );
   }
 
-  // /api/session/{start|end|cancel|deactivate} を1つのハンドラで振り分ける。
+  // /api/session/{start|end|cancel|deactivate|memo} を1つのハンドラで振り分ける。
   return async function handleSession(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.pathname.split("/").pop();
@@ -80,6 +80,10 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
       if (action === "deactivate") {
         await handleSessionDeactivate(req, data, res);
+        return;
+      }
+      if (action === "memo") {
+        await handleSessionMemo(req, data, res);
         return;
       }
 
@@ -282,6 +286,55 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     } catch (err) {
       sessionLogger.appendLog("ERROR", `SESSION_DEACTIVATE_DB_ERROR[${sessionId}]: ${err.message}`);
       sendJson(res, 500, { error: "session_deactivate_failed", message: err.message });
+    }
+  }
+
+  // セッションメモを上書き更新する。
+  async function handleSessionMemo(req, data, res) {
+    const sessionId = data.sessionId || data.sessionUuid;
+    const memo = typeof data.memo === "string" ? data.memo : null;
+
+    if (!sessionId) {
+      sendJson(res, 400, { error: "missing_session_id" });
+      return;
+    }
+    if (memo == null) {
+      sendJson(res, 400, { error: "missing_memo" });
+      return;
+    }
+
+    if (!pool) {
+      sendJson(res, 200, { success: true, sessionId, memo, dbDisabled: true });
+      return;
+    }
+
+    try {
+      const userId = await resolveAuthenticatedUserId(req, pool);
+      if (!userId) {
+        sendJson(res, 401, { error: "unauthorized" });
+        return;
+      }
+
+      sessionLogger.appendLog("SESSION_MEMO", `${sessionId},user_id=${userId}`);
+      const [result] = await pool.query(
+        "UPDATE tactile.sessions SET memo = ? WHERE session_id = ? AND user_id = ?",
+        [memo, sessionId, userId]
+      );
+      const updated = result.affectedRows || 0;
+      if (updated < 1) {
+        sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+        return;
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        sessionId,
+        memo,
+        updated,
+      });
+    } catch (err) {
+      sessionLogger.appendLog("ERROR", `SESSION_MEMO_DB_ERROR[${sessionId}]: ${err.message}`);
+      sendJson(res, 500, { error: "session_memo_failed", message: err.message });
     }
   }
 }

@@ -313,6 +313,62 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/session/memo:
+    post:
+      tags: [Session]
+      summary: セッションメモを更新
+      description: |
+        対象の `tactile.sessions.memo` を、送信した文字列で上書き更新します。
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memo]
+              properties:
+                sessionId: { type: string }
+                sessionUuid: { type: string }
+                memo:
+                  type: string
+                  description: 保存するメモ文字列。空文字も指定可能
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      memo: { type: string }
+                      updated: { type: integer, example: 1 }
+                  - type: object
+                    properties:
+                      success: { type: boolean, example: true }
+                      sessionId: { type: string }
+                      memo: { type: string }
+                      dbDisabled: { type: boolean, example: true }
+        '400':
+          description: invalid_json / missing_session_id / missing_memo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: session_not_found_or_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/records:
     get:
       tags: [Records]
@@ -961,6 +1017,8 @@ paths:
     get:
       tags: [Tactile]
       summary: session_id から記録ユーザー情報とタグ表示名を取得
+      description: |
+        `tactile.sessions.memo` もあわせて返します。
       parameters:
         - in: query
           name: sessionId
@@ -1356,6 +1414,7 @@ components:
         username: { type: string, nullable: true }
         iconUrl: { type: string, nullable: true }
         createdAt: { type: string, format: date-time, nullable: true }
+        memo: { type: string }
         tags:
           type: array
           items: { type: string }
