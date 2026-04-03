@@ -74,6 +74,25 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   let initialized = false;
   let initPromise = null;
 
+  function getRequestMeta(req) {
+    return {
+      method: req.method || "",
+      path: req.url || "",
+      host: (req.headers && req.headers.host) || "",
+      origin: (req.headers && req.headers.origin) || "",
+      userAgent: (req.headers && req.headers["user-agent"]) || "",
+    };
+  }
+
+  function logAuthEvent(label, req, details = {}) {
+    const meta = getRequestMeta(req);
+    const payload = {
+      ...meta,
+      ...details,
+    };
+    console.log(`[auth] ${label} ${JSON.stringify(payload)}`);
+  }
+
   async function ensureSchema() {
     if (!pool) {
       return;
@@ -600,11 +619,17 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   }
 
   async function handleGoogleLogin(req, res) {
+    logAuthEvent("login_request", req, {
+      hasGoogleClientId: Boolean(GOOGLE_CLIENT_ID && client),
+    });
+
     if (req.method !== "POST") {
+      logAuthEvent("login_rejected_method", req);
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
     }
     if (!GOOGLE_CLIENT_ID || !client) {
+      logAuthEvent("login_missing_google_client_id", req);
       sendJson(res, 500, { error: "google_client_id_not_configured" });
       return;
     }
@@ -613,12 +638,14 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     try {
       body = await readJsonBody(req);
     } catch {
+      logAuthEvent("login_invalid_json", req);
       sendJson(res, 400, { error: "invalid_json" });
       return;
     }
 
     const idToken = body.id_token;
     if (!idToken || typeof idToken !== "string") {
+      logAuthEvent("login_missing_id_token", req);
       sendJson(res, 400, { error: "missing_id_token" });
       return;
     }
@@ -627,6 +654,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     try {
       payload = await verifyGoogleToken(idToken);
     } catch (err) {
+      logAuthEvent("login_invalid_token", req, {
+        error: err.message,
+      });
       sendJson(res, 401, { error: "invalid_token", message: err.message });
       return;
     }
@@ -634,12 +664,23 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     try {
       const user = await findGoogleUserBySub(payload.sub);
       if (!user) {
+        logAuthEvent("login_account_not_found", req, {
+          googleSub: payload.sub,
+          email: payload.email || null,
+        });
         sendJson(res, 404, { error: "account_not_found" });
         return;
       }
       await updateLoginMeta({ userId: user.user_id, payload });
       const accessToken = createAccessToken(user.user_id);
       const sessionId = await createSession(user.user_id);
+
+      logAuthEvent("login_success", req, {
+        userId: user.user_id,
+        hasUsername: Boolean(user.username),
+        email: user.email || null,
+        sessionCreated: Boolean(sessionId),
+      });
 
       res.setHeader(
         "Set-Cookie",
@@ -657,16 +698,25 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         user: toAuthUserPayload(user),
       });
     } catch (err) {
+      logAuthEvent("login_failed", req, {
+        error: err.message,
+      });
       sendJson(res, 500, { error: "login_failed", message: err.message });
     }
   }
 
   async function handleGoogleSignup(req, res) {
+    logAuthEvent("signup_request", req, {
+      hasGoogleClientId: Boolean(GOOGLE_CLIENT_ID && client),
+    });
+
     if (req.method !== "POST") {
+      logAuthEvent("signup_rejected_method", req);
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
     }
     if (!GOOGLE_CLIENT_ID || !client) {
+      logAuthEvent("signup_missing_google_client_id", req);
       sendJson(res, 500, { error: "google_client_id_not_configured" });
       return;
     }
@@ -675,6 +725,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     try {
       body = await readJsonBody(req);
     } catch {
+      logAuthEvent("signup_invalid_json", req);
       sendJson(res, 400, { error: "invalid_json" });
       return;
     }
@@ -684,18 +735,24 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     const iconDataUrl = typeof body.icon_data_url === "string" ? body.icon_data_url : "";
 
     if (!idToken || typeof idToken !== "string") {
+      logAuthEvent("signup_missing_id_token", req);
       sendJson(res, 400, { error: "missing_id_token" });
       return;
     }
     if (!username) {
+      logAuthEvent("signup_missing_username", req);
       sendJson(res, 400, { error: "missing_username" });
       return;
     }
     if (username && username.length > 50) {
+      logAuthEvent("signup_username_too_long", req, {
+        usernameLength: username.length,
+      });
       sendJson(res, 400, { error: "username_too_long" });
       return;
     }
     if (!iconDataUrl) {
+      logAuthEvent("signup_missing_icon_image", req);
       sendJson(res, 400, { error: "missing_icon_image" });
       return;
     }
@@ -704,6 +761,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     try {
       payload = await verifyGoogleToken(idToken);
     } catch (err) {
+      logAuthEvent("signup_invalid_token", req, {
+        error: err.message,
+      });
       sendJson(res, 401, { error: "invalid_token", message: err.message });
       return;
     }
@@ -728,6 +788,10 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
             maxAge: SESSION_MAX_AGE_SECONDS,
           })
         );
+        logAuthEvent("signup_existing_user_updated", req, {
+          userId: existing.user_id,
+          email: existing.email || null,
+        });
         sendJson(res, 200, {
           ok: true,
           updated: true,
@@ -752,6 +816,12 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       const accessToken = createAccessToken(user.user_id);
       const sessionId = await createSession(user.user_id);
 
+      logAuthEvent("signup_success", req, {
+        userId: user.user_id,
+        email: user.email || null,
+        sessionCreated: Boolean(sessionId),
+      });
+
       res.setHeader(
         "Set-Cookie",
         createSessionCookie(sessionId, {
@@ -773,6 +843,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         },
       });
     } catch (err) {
+      logAuthEvent("signup_failed", req, {
+        error: err.message,
+      });
       if (err.message === "invalid_icon_image") {
         sendJson(res, 400, { error: "invalid_icon_image" });
         return;
@@ -786,12 +859,20 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   }
 
   async function handleMe(req, res) {
+    logAuthEvent("me_request", req, {
+      hasAuthorization: Boolean(extractBearerToken(req)),
+      hasCookie: Boolean((req.headers.cookie || "").includes(`${SESSION_COOKIE_NAME}=`)),
+    });
+
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
     }
     const bearerResolved = await resolveUserFromAccessToken(req);
     if (bearerResolved.authError) {
+      logAuthEvent("me_invalid_access_token", req, {
+        error: bearerResolved.authError,
+      });
       sendJson(res, 401, { authenticated: false, error: "invalid_access_token" });
       return;
     }
@@ -802,9 +883,13 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       sessionUser = await findSession(sessionId);
     }
     if (!sessionUser) {
+      logAuthEvent("me_unauthenticated", req);
       sendJson(res, 401, { authenticated: false });
       return;
     }
+    logAuthEvent("me_success", req, {
+      userId: sessionUser.user_id,
+    });
     sendJson(res, 200, {
       authenticated: true,
       user: toAuthUserPayload(sessionUser),
@@ -812,6 +897,11 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   }
 
   async function handleLogout(req, res) {
+    logAuthEvent("logout_request", req, {
+      hasAuthorization: Boolean(extractBearerToken(req)),
+      hasCookie: Boolean((req.headers.cookie || "").includes(`${SESSION_COOKIE_NAME}=`)),
+    });
+
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
@@ -821,6 +911,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       try {
         verifyAccessToken(bearerToken);
       } catch {
+        logAuthEvent("logout_invalid_access_token", req);
         sendJson(res, 401, { error: "invalid_access_token" });
         return;
       }
@@ -832,6 +923,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     } catch {
       // Continue and clear cookie even if DB delete fails.
     }
+    logAuthEvent("logout_success", req, {
+      hadSessionCookie: Boolean(sessionId),
+    });
     res.setHeader(
       "Set-Cookie",
       clearSessionCookie({
@@ -842,6 +936,11 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   }
 
   async function handleProfileUpdate(req, res) {
+    logAuthEvent("profile_update_request", req, {
+      hasAuthorization: Boolean(extractBearerToken(req)),
+      hasCookie: Boolean((req.headers.cookie || "").includes(`${SESSION_COOKIE_NAME}=`)),
+    });
+
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
@@ -849,6 +948,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
 
     const bearerResolved = await resolveUserFromAccessToken(req);
     if (bearerResolved.authError) {
+      logAuthEvent("profile_update_invalid_access_token", req, {
+        error: bearerResolved.authError,
+      });
       sendJson(res, 401, { error: "invalid_access_token" });
       return;
     }
@@ -859,6 +961,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       sessionUser = await findSession(sessionId);
     }
     if (!sessionUser) {
+      logAuthEvent("profile_update_unauthenticated", req);
       sendJson(res, 401, { authenticated: false });
       return;
     }
@@ -867,6 +970,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     try {
       body = await readJsonBody(req);
     } catch {
+      logAuthEvent("profile_update_invalid_json", req, {
+        userId: sessionUser.user_id,
+      });
       sendJson(res, 400, { error: "invalid_json" });
       return;
     }
@@ -875,10 +981,17 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     const iconDataUrl = typeof body.icon_data_url === "string" ? body.icon_data_url : "";
 
     if (!username) {
+      logAuthEvent("profile_update_missing_username", req, {
+        userId: sessionUser.user_id,
+      });
       sendJson(res, 400, { error: "missing_username" });
       return;
     }
     if (username.length > 50) {
+      logAuthEvent("profile_update_username_too_long", req, {
+        userId: sessionUser.user_id,
+        usernameLength: username.length,
+      });
       sendJson(res, 400, { error: "username_too_long" });
       return;
     }
@@ -895,9 +1008,16 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         iconUrl,
       });
       if (!updatedUser) {
+        logAuthEvent("profile_update_user_not_found", req, {
+          userId: sessionUser.user_id,
+        });
         sendJson(res, 404, { error: "user_not_found" });
         return;
       }
+      logAuthEvent("profile_update_success", req, {
+        userId: updatedUser.user_id,
+        hasIconUrl: Boolean(updatedUser.icon_url),
+      });
       sendJson(res, 200, {
         ok: true,
         user: {
@@ -908,6 +1028,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       });
     } catch (err) {
       if (err.message === "invalid_icon_image") {
+        logAuthEvent("profile_update_invalid_icon_image", req, {
+          userId: sessionUser.user_id,
+        });
         sendJson(res, 400, { error: "invalid_icon_image" });
         return;
       }
