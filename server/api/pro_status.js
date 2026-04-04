@@ -46,6 +46,7 @@ function createProStatusHandler({ sendJson }) {
           user_id BIGSERIAL PRIMARY KEY,
           username VARCHAR(50),
           icon_url TEXT,
+          is_guest BOOLEAN DEFAULT FALSE,
           is_pro BOOLEAN DEFAULT FALSE,
           total_tactile_length NUMERIC(10,3) DEFAULT 0,
           total_road_posts INTEGER DEFAULT 0,
@@ -64,6 +65,10 @@ function createProStatusHandler({ sendJson }) {
       await pool.query(`
         ALTER TABLE login.users
         ADD COLUMN IF NOT EXISTS icon_url TEXT
+      `);
+      await pool.query(`
+        ALTER TABLE login.users
+        ADD COLUMN IF NOT EXISTS is_guest BOOLEAN DEFAULT FALSE
       `);
       await pool.query(`
         ALTER TABLE login.users
@@ -121,7 +126,7 @@ function createProStatusHandler({ sendJson }) {
       return { error: "unauthorized" };
     }
     const [rows] = await pool.query(
-      `SELECT user_id, is_pro
+      `SELECT user_id, is_pro, is_guest
        FROM login.users
        WHERE user_id = ?
        LIMIT 1`,
@@ -165,6 +170,10 @@ function createProStatusHandler({ sendJson }) {
     }
     if (result.error === "user_not_found") {
       sendJson(res, 404, { error: "user_not_found" });
+      return;
+    }
+    if (result.user.is_guest) {
+      sendJson(res, 403, { error: "guest_pro_locked" });
       return;
     }
 

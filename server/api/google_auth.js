@@ -14,6 +14,7 @@ const SESSION_COOKIE_NAME = "session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const MAX_ICON_BYTES = 5 * 1024 * 1024; // 5MB
 const USER_ICON_DIR = path.join(__dirname, "..", "..", "uploads", "user_icons");
+const GUEST_USERNAME = "Guest";
 
 function parseCookies(rawCookieHeader) {
   const cookieHeader = rawCookieHeader || "";
@@ -112,6 +113,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           user_id BIGSERIAL PRIMARY KEY,
           username VARCHAR(50),
           icon_url TEXT,
+          is_guest BOOLEAN DEFAULT FALSE,
           is_pro BOOLEAN DEFAULT FALSE,
           total_tactile_length NUMERIC(10,3) DEFAULT 0,
           total_road_posts INTEGER DEFAULT 0,
@@ -122,6 +124,11 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           last_login_at TIMESTAMP
         )
+      `);
+
+      await pool.query(`
+        ALTER TABLE login.users
+        ADD COLUMN IF NOT EXISTS is_guest BOOLEAN DEFAULT FALSE
       `);
 
       await pool.query(`
@@ -282,7 +289,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     await ensureSchema();
     const [rows] = await pool.query(
       `SELECT u.user_id, u.username, u.icon_url, u.email_verified, p.email,
-              u.total_tactile_length, u.total_road_posts, u.total_hearts
+              u.total_tactile_length, u.total_road_posts, u.total_hearts, u.is_guest
        FROM login.users u
        LEFT JOIN login.user_auth_providers p
          ON p.user_id = u.user_id AND p.provider = 'google'
@@ -294,14 +301,16 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   }
 
   function toAuthUserPayload(user) {
+    const isGuest = Boolean(user && user.is_guest);
     return {
       userId: user.user_id,
       email: user.email || null,
-      username: user.username || null,
-      iconUrl: user.icon_url || null,
+      username: isGuest ? GUEST_USERNAME : (user.username || null),
+      iconUrl: isGuest ? null : (user.icon_url || null),
       totalTactileLength: Number(user.total_tactile_length || 0),
       totalRoadPosts: Number(user.total_road_posts || 0),
       totalHearts: Number(user.total_hearts || 0),
+      isGuest,
     };
   }
 
@@ -339,6 +348,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         user_id: memoryStore.nextUserId++,
         username: finalUsername,
         icon_url: finalIconUrl,
+        is_guest: false,
         is_pro: false,
         email,
         email_verified: emailVerified,
@@ -357,10 +367,10 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     const [createdRows] = await pool.query(
       `WITH new_user AS (
          INSERT INTO login.users (
-           username, icon_url, email_verified, created_at, updated_at, last_login_at
+           username, icon_url, is_guest, email_verified, created_at, updated_at, last_login_at
          )
-         VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-         RETURNING user_id, username, icon_url, email_verified
+         VALUES (?, ?, false, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         RETURNING user_id, username, icon_url, email_verified, is_guest
        ),
        new_provider AS (
          INSERT INTO login.user_auth_providers (
@@ -370,7 +380,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
          FROM new_user
          RETURNING user_id, email
        )
-       SELECT n.user_id, n.username, n.icon_url, n.email_verified, p.email
+       SELECT n.user_id, n.username, n.icon_url, n.email_verified, n.is_guest, p.email
        FROM new_user n
        JOIN new_provider p ON p.user_id = n.user_id`,
       [finalUsername, finalIconUrl, emailVerified, sub, email]
@@ -464,6 +474,46 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     return sessionId;
   }
 
+  async function createGuestUser() {
+    if (!pool) {
+      const user = {
+        user_id: memoryStore.nextUserId++,
+        username: GUEST_USERNAME,
+        icon_url: null,
+        is_guest: true,
+        is_pro: false,
+        email: null,
+        email_verified: false,
+        total_tactile_length: 0,
+        total_road_posts: 0,
+        total_hearts: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_login_at: new Date().toISOString(),
+      };
+      memoryStore.usersBySub.set(`guest-${user.user_id}`, user);
+      return user;
+    }
+
+    await ensureSchema();
+    const [rows] = await pool.query(
+      `INSERT INTO login.users (
+         username,
+         icon_url,
+         is_guest,
+         email_verified,
+         created_at,
+         updated_at,
+         last_login_at
+       )
+       VALUES (?, NULL, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       RETURNING user_id, username, icon_url, is_guest, email_verified,
+                 total_tactile_length, total_road_posts, total_hearts`,
+      [GUEST_USERNAME]
+    );
+    return rows[0] || null;
+  }
+
   async function findSession(sessionId) {
     if (!sessionId) {
       return null;
@@ -481,6 +531,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
             user_id: user.user_id,
             username: user.username,
             icon_url: user.icon_url,
+            is_guest: Boolean(user.is_guest),
             is_pro: Boolean(user.is_pro),
             email: user.email || null,
             total_tactile_length: user.total_tactile_length || 0,
@@ -497,6 +548,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       `SELECT s.user_id,
               u.username,
               u.icon_url,
+              u.is_guest,
               u.is_pro,
               p.email,
               u.total_tactile_length,
@@ -550,6 +602,9 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     if (!pool) {
       for (const user of memoryStore.usersBySub.values()) {
         if (user.user_id === userId) {
+          if (user.is_guest) {
+            return user;
+          }
           user.username = username;
           if (iconUrl) {
             user.icon_url = iconUrl;
@@ -562,6 +617,10 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     }
 
     await ensureSchema();
+    const existingUser = await findUserById(userId);
+    if (existingUser && existingUser.is_guest) {
+      return existingUser;
+    }
     let result;
     if (iconUrl) {
       [result] = await pool.query(
@@ -585,7 +644,8 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       return null;
     }
     const [rows] = await pool.query(
-      `SELECT user_id, username, icon_url
+      `SELECT user_id, username, icon_url, is_guest,
+              total_tactile_length, total_road_posts, total_hearts
        FROM login.users
        WHERE user_id = ?
        LIMIT 1`,
@@ -896,6 +956,71 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     });
   }
 
+  async function handleGuestLogin(req, res) {
+    logAuthEvent("guest_request", req, {
+      hasAuthorization: Boolean(extractBearerToken(req)),
+      hasCookie: Boolean((req.headers.cookie || "").includes(`${SESSION_COOKIE_NAME}=`)),
+    });
+
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return;
+    }
+
+    const bearerResolved = await resolveUserFromAccessToken(req);
+    if (bearerResolved.authError) {
+      logAuthEvent("guest_invalid_access_token", req, {
+        error: bearerResolved.authError,
+      });
+      sendJson(res, 401, { error: "invalid_access_token" });
+      return;
+    }
+
+    let sessionUser = bearerResolved.user;
+    if (!sessionUser) {
+      const cookies = parseCookies(req.headers.cookie || "");
+      const sessionId = cookies[SESSION_COOKIE_NAME];
+      sessionUser = await findSession(sessionId);
+    }
+
+    if (sessionUser && !sessionUser.is_guest) {
+      logAuthEvent("guest_rejected_authenticated_user", req, {
+        userId: sessionUser.user_id,
+      });
+      sendJson(res, 409, { error: "already_authenticated" });
+      return;
+    }
+
+    try {
+      const guestUser = sessionUser || await createGuestUser();
+      if (!guestUser) {
+        throw new Error("guest_user_create_failed");
+      }
+      const accessToken = createAccessToken(guestUser.user_id);
+      const sessionId = await createSession(guestUser.user_id);
+      res.setHeader(
+        "Set-Cookie",
+        createSessionCookie(sessionId, {
+          secure: isSecureRequest(req),
+        })
+      );
+      logAuthEvent("guest_success", req, {
+        userId: guestUser.user_id,
+      });
+      sendJson(res, 200, {
+        authenticated: true,
+        access_token: accessToken,
+        expires_in: getAccessTokenExpiresInSeconds(),
+        user: toAuthUserPayload(guestUser),
+      });
+    } catch (err) {
+      logAuthEvent("guest_failed", req, {
+        error: err.message,
+      });
+      sendJson(res, 500, { error: "guest_login_failed", message: err.message });
+    }
+  }
+
   async function handleLogout(req, res) {
     logAuthEvent("logout_request", req, {
       hasAuthorization: Boolean(extractBearerToken(req)),
@@ -963,6 +1088,13 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     if (!sessionUser) {
       logAuthEvent("profile_update_unauthenticated", req);
       sendJson(res, 401, { authenticated: false });
+      return;
+    }
+    if (sessionUser.is_guest) {
+      logAuthEvent("profile_update_guest_forbidden", req, {
+        userId: sessionUser.user_id,
+      });
+      sendJson(res, 403, { error: "guest_profile_locked" });
       return;
     }
 
@@ -1041,6 +1173,10 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
 
   return async function handleGoogleAuth(req, res) {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    if (url.pathname === "/auth/guest") {
+      await handleGuestLogin(req, res);
+      return;
+    }
     if (url.pathname === "/auth/google") {
       await handleGoogleLogin(req, res);
       return;

@@ -387,6 +387,7 @@ function handleRequest(req, res) {
   if (
     req.url &&
     (
+      req.url.startsWith("/auth/guest") ||
       req.url.startsWith("/auth/google") ||
       req.url.startsWith("/auth/me") ||
       req.url.startsWith("/auth/logout") ||

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Barrierfree Map API
-  version: 1.21.1
+  version: 1.24.0
   description: |
     barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
     一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
@@ -813,6 +813,11 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: guest_pro_locked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404':
           description: user_not_found
           content:
@@ -1099,6 +1104,41 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /auth/guest:
+    post:
+      tags: [Auth]
+      summary: Guest アカウントでログイン
+      description: |
+        通常ユーザーで未認証の場合は、内部的に Guest ユーザーを新規作成して
+        access token と session Cookie を発行します。
+        すでに Guest セッション中ならその Guest を再利用します。
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: session Cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '401':
+          description: invalid_access_token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '409':
+          description: already_authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /auth/google/signup:
     post:
       tags: [Auth]
@@ -1237,6 +1277,11 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: guest_profile_locked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404':
           description: user_not_found
           content:
@@ -1381,6 +1426,7 @@ components:
         totalTactileLength: { type: number }
         totalRoadPosts: { type: integer }
         totalHearts: { type: integer }
+        isGuest: { type: boolean, example: false }
 
     ProStatusResponse:
       type: object

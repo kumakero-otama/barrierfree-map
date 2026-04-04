@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.23.0`
+API version: `1.24.0`
 
 ## 認証
 
@@ -35,6 +35,7 @@ API version: `1.23.0`
 | GET | `/api/session-tags` | 必要 | 現在ログイン中ユーザーの `tactile.session_tags` 一覧を取得 |
 | POST | `/api/session-tags` | 必要 | `tactile.session_tags` に紐づけを追加 |
 | GET | `/api/tactile-session-info` | 不要 | `session_id` から記録ユーザー情報とタグ表示名を取得 |
+| POST | `/auth/guest` | 不要 | Guestアカウントでログイン |
 | POST | `/auth/google` | 不要 | Google IDトークンでログイン |
 | POST | `/auth/google/signup` | 不要 | Googleアカウントで新規登録またはプロフィール初期設定 |
 | GET | `/auth/me` | 必要 | ログインユーザー情報を取得 |
@@ -214,7 +215,7 @@ API version: `1.23.0`
   - 必須: `isPro`
 - 主なレスポンス:
   - `200`: `ok` を含む `ProStatusResponse`
-  - `400`, `401`, `404`, `405`, `503`
+  - `400`, `401`, `403` (`guest_pro_locked`), `404`, `405`, `503`
 
 #### `GET /api/tactile-tags`
 - 概要: `tactile.tags` 一覧を取得
@@ -265,6 +266,17 @@ API version: `1.23.0`
 
 ### Auth
 
+#### `POST /auth/guest`
+- 概要: Guestアカウントでログイン
+- 補足:
+  - 未認証状態なら内部的に Guest ユーザーを新規作成する
+  - すでに Guest セッション中なら同じ Guest を再利用する
+  - access token と `session` Cookie を返す
+  - 通常ユーザーでログイン済みの状態では使えず、`409 already_authenticated` を返す
+- 主なレスポンス:
+  - `200`: 認証成功、`Set-Cookie` を返す
+  - `401`, `405`, `409`, `500`
+
 #### `POST /auth/google`
 - 概要: Google IDトークンでログイン
 - リクエストBody:
@@ -284,6 +296,10 @@ API version: `1.23.0`
 #### `GET /auth/me`
 - 概要: ログインユーザー情報を取得
 - 認証: 必要
+- 補足:
+  - Guest でログイン中の場合、`user.isGuest = true` を返す
+  - Guest の `username` は `Guest`
+  - Guest の `iconUrl` は `null`
 - 主なレスポンス:
   - `200`: `authenticated: true`, `user`
   - `401`: `authenticated: false`
@@ -304,4 +320,4 @@ API version: `1.23.0`
   - 任意: `icon_data_url`
 - 主なレスポンス:
   - `200`: `ok`, `user`
-  - `400`, `401`, `404`, `405`, `500`
+  - `400`, `401`, `403` (`guest_profile_locked`), `404`, `405`, `500`

@@ -79,7 +79,8 @@ CREATE TABLE login.users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP,
-    is_pro BOOLEAN DEFAULT FALSE
+    is_pro BOOLEAN DEFAULT FALSE,
+    is_guest BOOLEAN DEFAULT FALSE
 );
 ```
 
