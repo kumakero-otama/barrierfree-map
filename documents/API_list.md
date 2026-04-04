@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.24.0`
+API version: `1.24.1`
 
 ## 認証
 

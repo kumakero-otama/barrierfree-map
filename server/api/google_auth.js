@@ -496,7 +496,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     }
 
     await ensureSchema();
-    const [rows] = await pool.query(
+    const [insertResult] = await pool.query(
       `INSERT INTO login.users (
          username,
          icon_url,
@@ -507,11 +507,14 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
          last_login_at
        )
        VALUES (?, NULL, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-       RETURNING user_id, username, icon_url, is_guest, email_verified,
-                 total_tactile_length, total_road_posts, total_hearts`,
+       RETURNING user_id AS id`,
       [GUEST_USERNAME]
     );
-    return rows[0] || null;
+    const guestUserId = Number(insertResult && insertResult.insertId);
+    if (!Number.isFinite(guestUserId) || guestUserId <= 0) {
+      return null;
+    }
+    return findUserById(guestUserId);
   }
 
   async function findSession(sessionId) {
