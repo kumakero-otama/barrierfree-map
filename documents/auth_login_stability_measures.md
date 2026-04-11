@@ -562,7 +562,7 @@ VPS 化で改善が見込める点:
 ```json
 {
   "client": {
-    "appVersion": "1.24.1",
+    "appVersion": "1.25.1",
     "userAgent": "Mozilla/5.0 ...",
     "platform": "Android",
     "language": "ja-JP",
