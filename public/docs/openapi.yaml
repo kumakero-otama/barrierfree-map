@@ -24,6 +24,7 @@ tags:
   - name: Auth
   - name: ProStatus
   - name: Tactile
+  - name: ClientLogs
 
 paths:
   /api/config:
@@ -1058,6 +1059,126 @@ paths:
           $ref: '#/components/responses/InternalError'
         '503':
           description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/client-logs/health:
+    get:
+      tags: [ClientLogs]
+      summary: フロント側ログ受信APIの疎通確認
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  serverRequestId: { type: string }
+                  timestamp: { type: string, format: date-time }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /api/client-logs:
+    post:
+      tags: [ClientLogs]
+      summary: フロント側で蓄積した通信ログをまとめて送信
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client, session, logs]
+              properties:
+                client:
+                  type: object
+                  properties:
+                    appVersion: { type: string }
+                    userAgent: { type: string }
+                    platform: { type: string }
+                session:
+                  type: object
+                  properties:
+                    requestId: { type: string }
+                logs:
+                  type: array
+                  items:
+                    type: object
+                    required: [logId, createdAt, event, category]
+                    properties:
+                      logId: { type: string }
+                      createdAt: { type: string, format: date-time }
+                      event: { type: string }
+                      category: { type: string }
+                      level:
+                        type: string
+                        enum: [debug, info, warn, error]
+                      path: { type: string }
+                      method: { type: string }
+                      status:
+                        type: integer
+                        nullable: true
+                      message: { type: string }
+                      meta:
+                        type: object
+                        additionalProperties: true
+      responses:
+        '200':
+          description: すべて受理または重複扱い
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  serverRequestId: { type: string }
+                  accepted:
+                    type: array
+                    items: { type: string }
+                  duplicate:
+                    type: array
+                    items: { type: string }
+                  rejected:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        logId: { type: string }
+                        reason: { type: string }
+        '207':
+          description: 一部受理、一部拒否
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  serverRequestId: { type: string }
+                  accepted:
+                    type: array
+                    items: { type: string }
+                  duplicate:
+                    type: array
+                    items: { type: string }
+                  rejected:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        logId: { type: string }
+                        reason: { type: string }
+        '400':
+          description: invalid_payload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          description: payload_too_large
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }

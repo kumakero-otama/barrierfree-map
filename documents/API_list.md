@@ -35,6 +35,8 @@ API version: `1.24.1`
 | GET | `/api/session-tags` | 必要 | 現在ログイン中ユーザーの `tactile.session_tags` 一覧を取得 |
 | POST | `/api/session-tags` | 必要 | `tactile.session_tags` に紐づけを追加 |
 | GET | `/api/tactile-session-info` | 不要 | `session_id` から記録ユーザー情報とタグ表示名を取得 |
+| GET | `/api/client-logs/health` | 不要 | フロント側ログ受信APIの疎通確認 |
+| POST | `/api/client-logs` | 不要 | フロント側で蓄積した通信ログをまとめて送信 |
 | POST | `/auth/guest` | 不要 | Guestアカウントでログイン |
 | POST | `/auth/google` | 不要 | Google IDトークンでログイン |
 | POST | `/auth/google/signup` | 不要 | Googleアカウントで新規登録またはプロフィール初期設定 |
@@ -258,11 +260,92 @@ API version: `1.24.1`
 
 #### `GET /api/tactile-session-info`
 - 概要: `session_id` から記録ユーザー情報、メモ、タグ表示名を取得
-- 主なクエリ:
-  - 必須相当: `sessionId` または `sessionUuid`
+
+### Client Logs
+
+#### `GET /api/client-logs/health`
+- 概要: フロント側ログ受信APIの疎通確認
 - 主なレスポンス:
-  - `200`: `success`, `session`
-  - `400`, `404`, `405`, `500`, `503`
+  - `200`: `ok`, `serverRequestId`, `timestamp`
+  - `405`: `method_not_allowed`
+
+#### `POST /api/client-logs`
+- 概要: フロント側で蓄積した通信ログをまとめて送信
+- 認証: 不要
+- リクエストBody:
+  - 必須: `client`, `session`, `logs[]`
+  - 任意: `client.appVersion`, `client.userAgent`, `session.requestId`
+- 実装上の上限:
+  - リクエスト全体: `256KB`
+  - `logs[]` 件数: `200` 件まで処理
+- リクエスト例:
+```json
+{
+  "client": {
+    "appVersion": "1.24.1",
+    "userAgent": "Mozilla/5.0",
+    "platform": "web"
+  },
+  "session": {
+    "requestId": "req_20260411_8f3c2a91"
+  },
+  "logs": [
+    {
+      "logId": "clog_20260411_0001",
+      "createdAt": "2026-04-11T09:15:32.120Z",
+      "event": "auth_google_post_start",
+      "category": "auth",
+      "level": "info",
+      "path": "/auth/google",
+      "method": "POST",
+      "status": null,
+      "message": "Sending Google login request",
+      "meta": {
+        "hasAuthorization": false,
+        "hasCookie": false
+      }
+    }
+  ]
+}
+```
+- 補足:
+  - 認証前後どちらの状態でも送れるように Authorization 必須にはしない
+  - `logs[]` の各要素は `logId`, `createdAt`, `event`, `category` などを持つ
+  - `access_token` や Cookie の実値は送らず、付与有無などのメタ情報のみ送る
+  - `logId` により重複受信を識別する
+  - 重複判定はサーバープロセス内メモリで保持され、最新 `10000` 件を上限に管理する
+  - 受信ログは `logs/client_logs.csv` に保存される
+- `logs[]` 項目定義:
+  - 必須: `logId` `string`
+  - 必須: `createdAt` `string` (`ISO 8601`)
+  - 必須: `event` `string`
+  - 必須: `category` `string`
+  - 任意: `level` `string` (`debug|info|warn|error`)
+  - 任意: `path` `string`
+  - 任意: `method` `string`
+  - 任意: `status` `number|null`
+  - 任意: `message` `string`
+  - 任意: `meta` `object`
+- `event` / `category` の推奨:
+  - `category`: `auth`, `api`, `network`, `storage`, `navigation`
+  - `event`: `auth_google_callback_start`, `auth_google_post_start`, `auth_google_post_success`, `auth_google_post_failed`, `auth_me_start`, `auth_me_401`, `auth_me_success`, `api_request_timeout`, `api_request_network_error`, `token_saved`, `token_save_failed`
+- 再送方針:
+  - `200`: 受理済みとして送信キューから削除
+  - `207`: `accepted` のみ削除し、`rejected` は理由を見て破棄または再送対象にする
+  - `400`: ペイロード不正として破棄し、同一内容の無限再送はしない
+  - `413`: バッチ分割して再送する
+  - `429`: バックオフして再送する
+  - `500`: 一時障害として再送する
+- ID 生成ルール:
+  - `requestId`: 1画面遷移または1認証試行につき1つ生成し、その一連の通信ログへ共通付与する
+  - `logId`: 各ログレコードごとに一意な値を生成する
+  - 形式例: `requestId = req_<timestamp>_<random>`, `logId = clog_<timestamp>_<seq>`
+- 主なレスポンス:
+  - `200`: `ok`, `accepted`, `duplicate`, `rejected`, `serverRequestId`
+  - `207`: 一部受理、一部拒否
+  - `400`: `invalid_payload`
+  - `413`: `payload_too_large`
+  - `405`: `method_not_allowed`
 
 ### Auth
 

@@ -15,8 +15,11 @@ function toCsv(fields) {
 }
 
 // 指定ファイルにCSVログを追記するロガーを作る。
-function createLogger(logFilePath) {
+function createLogger(logFilePath, options = {}) {
   let writeQueue = Promise.resolve();
+  const maxBytes = Number.isFinite(options.maxBytes) && options.maxBytes > 0
+    ? options.maxBytes
+    : DEFAULT_MAX_BYTES;
 
   // ログ出力先ディレクトリがなければ作成する。
   function ensureLogDir() {
@@ -36,7 +39,7 @@ function createLogger(logFilePath) {
       return;
     }
 
-    if ((stats.size + incomingBytes) <= DEFAULT_MAX_BYTES) {
+    if ((stats.size + incomingBytes) <= maxBytes) {
       return;
     }
 

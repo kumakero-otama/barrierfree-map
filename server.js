@@ -14,6 +14,7 @@ const createRoadInfoHandler = require("./server/api/road_info");
 const createGoogleAuthHandler = require("./server/api/google_auth");
 const createProStatusHandler = require("./server/api/pro_status");
 const createTactileTagsHandler = require("./server/api/tactile_tags");
+const createClientLogsHandler = require("./server/api/client_logs");
 const { createLogger } = require("./server/logger");
 
 const HTTP_PORT = 3000;
@@ -324,6 +325,11 @@ const handleTactileTags = createTactileTagsHandler({
   sendJson,
 });
 
+const handleClientLogs = createClientLogsHandler({
+  sendJson,
+  LOG_DIR,
+});
+
 function handleRequest(req, res) {
   const isCorsRequest = applyCorsHeaders(req, res);
   if (req.method === "OPTIONS" && isCorsRequest) {
@@ -344,11 +350,16 @@ function handleRequest(req, res) {
   if (
     req.url &&
     (
+      req.url.startsWith("/api/client-logs") ||
       req.url.startsWith("/api/tactile-session-info") ||
       req.url.startsWith("/api/tactile-tags") ||
       req.url.startsWith("/api/session-tags")
     )
   ) {
+    if (req.url.startsWith("/api/client-logs")) {
+      handleClientLogs(req, res);
+      return;
+    }
     handleTactileTags(req, res);
     return;
   }
