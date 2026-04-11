@@ -1067,6 +1067,8 @@ paths:
     get:
       tags: [ClientLogs]
       summary: フロント側ログ受信APIの疎通確認
+      description: |
+        クライアント側のログ送信機構がサーバーまで到達できるかを確認します。
       responses:
         '200':
           description: OK
@@ -1085,6 +1087,11 @@ paths:
     post:
       tags: [ClientLogs]
       summary: フロント側で蓄積した通信ログをまとめて送信
+      description: |
+        認証前後どちらの状態でも送信できるログ受信APIです。
+        受信ログは `logs/client_logs.csv` に保存され、`logId` の重複は
+        サーバープロセス内メモリで最新 10000 件を上限に判定します。
+        実装上の上限は、1リクエストあたり 256KB、`logs[]` は最大 200 件です。
       requestBody:
         required: true
         content:
@@ -1105,23 +1112,38 @@ paths:
                     requestId: { type: string }
                 logs:
                   type: array
+                  maxItems: 200
                   items:
                     type: object
                     required: [logId, createdAt, event, category]
                     properties:
-                      logId: { type: string }
-                      createdAt: { type: string, format: date-time }
-                      event: { type: string }
-                      category: { type: string }
+                      logId:
+                        type: string
+                        maxLength: 128
+                      createdAt:
+                        type: string
+                        format: date-time
+                      event:
+                        type: string
+                        maxLength: 128
+                      category:
+                        type: string
+                        maxLength: 64
                       level:
                         type: string
                         enum: [debug, info, warn, error]
-                      path: { type: string }
-                      method: { type: string }
+                      path:
+                        type: string
+                        maxLength: 256
+                      method:
+                        type: string
+                        maxLength: 16
                       status:
                         type: integer
                         nullable: true
-                      message: { type: string }
+                      message:
+                        type: string
+                        maxLength: 500
                       meta:
                         type: object
                         additionalProperties: true
@@ -1174,14 +1196,24 @@ paths:
           description: invalid_payload
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      serverRequestId: { type: string }
         '405':
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           description: payload_too_large
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      serverRequestId: { type: string }
 
   /auth/google:
     post:
