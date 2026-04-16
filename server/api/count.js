@@ -1,3 +1,4 @@
+// マッチング API の月次利用状況を外部から参照できるようにするハンドラを生成する。
 function createCountHandler({
   MAX_MATCH_CALLS_PER_MONTH,
   getCurrentMonth,

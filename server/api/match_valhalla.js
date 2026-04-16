@@ -10,11 +10,13 @@ const PEDESTRIAN_SIDEWALK_COSTING_OPTIONS = Object.freeze({
   sidewalk_factor: 0.1,
 });
 
+// 数値化できる入力だけを受け入れ、失敗時は null を返す。
 function toFiniteNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
 }
 
+// 2 点間の球面距離をメートル単位で計算し、近い候補を選ぶ材料にする。
 function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   const r = 6371000;
   const toRad = (deg) => (deg * Math.PI) / 180;
@@ -30,6 +32,7 @@ function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   return r * c;
 }
 
+// Valhalla の edge 候補から OSM way_id を取り出す。
 function extractEdgeWayId(edgeCandidate) {
   if (!edgeCandidate || typeof edgeCandidate !== "object") {
     return null;
@@ -45,6 +48,7 @@ function extractEdgeWayId(edgeCandidate) {
   return null;
 }
 
+// locate 結果から相関点座標を取り出し、後続処理しやすい形へ揃える。
 function getCorrelatedPoint(edgeCandidate) {
   if (!edgeCandidate || typeof edgeCandidate !== "object") {
     return null;
@@ -57,6 +61,7 @@ function getCorrelatedPoint(edgeCandidate) {
   return { lat: correlatedLat, lon: correlatedLon };
 }
 
+// sidewalk 関連タグの真偽を文字列ゆらぎ込みで判定する。
 function isTruthySidewalkTag(value) {
   if (typeof value === "boolean") {
     return value;
@@ -68,6 +73,7 @@ function isTruthySidewalkTag(value) {
   return normalized === "left" || normalized === "right" || normalized === "both" || normalized === "yes" || normalized === "true";
 }
 
+// 候補 edge が歩道系の道路かどうかをタグ・分類から推定する。
 function isSidewalkLikeEdge(edgeCandidate) {
   if (!edgeCandidate || typeof edgeCandidate !== "object") {
     return false;
@@ -92,6 +98,7 @@ function isSidewalkLikeEdge(edgeCandidate) {
     classification === "path";
 }
 
+// locate 候補の中から、近距離の歩道を優先しつつ最適な edge を 1 本選ぶ。
 function selectPreferredEdge(edges, rawLat, rawLng) {
   if (!Array.isArray(edges) || edges.length < 1) {
     return null;
@@ -127,6 +134,7 @@ function selectPreferredEdge(edges, rawLat, rawLng) {
   return { ...candidates[0], sidewalkPriorityApplied: false };
 }
 
+// Valhalla /locate を呼び、スナップ結果と必要な保存処理を扱うハンドラを生成する。
 function createMatchHandler({
   MIN_INTERVAL_MS,
   MAX_MATCH_CALLS_PER_MONTH,
@@ -142,7 +150,7 @@ function createMatchHandler({
   const VALHALLA_HOST = process.env.VALHALLA_HOST || "localhost";
   const VALHALLA_PORT = process.env.VALHALLA_PORT || "8002";
   
-  // DB接続とログ出力先を準備する。
+  // DB 接続とログ出力先を準備する。
   const dbResult = createDbPool();
   const pool = dbResult.pool;
   
@@ -170,13 +178,13 @@ function createMatchHandler({
     }
     const safeUserId = userId || "unknown";
     
-    // CSVログに記録
+    // DB 保存前でも、観測したスナップ点は CSV ログへ残して追跡できるようにする。
     sessionLogger.appendLog("SESSION_UPDATE", `${sessionUuid},${safeUserId}`);
     pointsLogger.appendLog("POINT", `${sessionUuid},${seq},${snappedLat},${snappedLng}`);
     console.log(`[updateSession] Logged to CSV: sessionUuid=${sessionUuid}, seq=${seq}`);
     
     try {
-      // セッションが存在するかチェック
+      // 旧スキーマ互換のため session_uuid で存在確認し、無ければ新規作成する。
       const [sessions] = await pool.query(
         "SELECT id FROM tactile.sessions WHERE session_uuid = ?",
         [sessionUuid]
@@ -198,7 +206,7 @@ function createMatchHandler({
           [sessionId, seq, snappedLat, snappedLng]
         );
       } else {
-        // 既存セッションの終了時刻を更新
+        // 既存セッションは ended_at だけ更新し、ポイント行は追記し続ける。
         const sessionId = sessions[0].id;
         await pool.query(
           "UPDATE tactile.sessions SET ended_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -232,7 +240,7 @@ function createMatchHandler({
     }
   }
 
-  // raw座標とsnapped座標を同一トランザクションで保存する。
+  // raw 座標と snapped 座標を同一トランザクションで保存する。
   async function persistRealtimePoints({ sessionUuid, rawLat, rawLng, snappedLat, snappedLng, edgeId, confidence, logPrefix }) {
     if (!pool) {
       return;
@@ -249,6 +257,7 @@ function createMatchHandler({
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      // 生 GPS とスナップ後 GPS を同時保存し、後でマッチング精度を検証できるようにする。
       const [rawResult] = await conn.query(
         "INSERT INTO tactile.gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
         [safeSessionUuid, rawLng, rawLat, null]
@@ -317,10 +326,10 @@ function createMatchHandler({
     }
     lastRequestByDevice.set(rateLimitKey, now);
 
-    // Valhalla locate に1点問い合わせして最寄り道路を取得する。
+    // Valhalla locate に 1 点問い合わせして最寄り道路を取得する。
     console.log(`${logPrefix} valhalla locate request: lat=${lat}, lng=${lng}`);
 
-    // Valhallaのリクエストボディ（locateエンドポイント用）
+    // Valhalla の locate エンドポイント用リクエストボディ。
     const valhallaRequest = {
       verbose: true,
       locations: [{ lat, lon: lng, radius: SIDEWALK_PRIORITY_RADIUS_METERS }],
@@ -360,8 +369,7 @@ function createMatchHandler({
           const data = JSON.parse(body);
           console.log(`${logPrefix} valhalla_response_body=${body}`);
           
-          // locateのレスポンスから座標を取得
-          // locateは配列を返し、edges[0]にスナップされた座標が含まれる
+          // locate は配列を返すので先頭要素を見て、候補 edge 群から 1 本選ぶ。
           if (Array.isArray(data) && data.length > 0 && data[0]) {
             const result = data[0];
             if (result.edges && Array.isArray(result.edges) && result.edges.length > 0) {
@@ -381,7 +389,7 @@ function createMatchHandler({
                 console.log(`${logPrefix} [DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
                 console.log(`${logPrefix} [DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
                 
-                // セッション更新（非同期だが待たない）
+                // 応答を遅らせないため、セッション更新は非同期で投げるだけにする。
                 if (sessionUuid && canceledSessionIds && canceledSessionIds.has(sessionUuid)) {
                   console.log(`${logPrefix} [DEBUG] Skipping save for canceled session=${sessionUuid}`);
                 } else if (sessionUuid && userId && Number.isFinite(seq)) {
@@ -394,6 +402,7 @@ function createMatchHandler({
                 }
 
                 if (shouldRecordRealtime && (!sessionUuid || !canceledSessionIds || !canceledSessionIds.has(sessionUuid))) {
+                  // record=1 のときだけ、生座標とスナップ後座標を対で保存する。
                   persistRealtimePoints({
                     sessionUuid,
                     rawLat: lat,

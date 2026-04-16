@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.25.1`
+API version: `1.26.0`
 
 ## 認証
 
@@ -282,7 +282,7 @@ API version: `1.25.1`
 ```json
 {
   "client": {
-    "appVersion": "1.25.1",
+    "appVersion": "1.26.0",
     "userAgent": "Mozilla/5.0",
     "platform": "web"
   },

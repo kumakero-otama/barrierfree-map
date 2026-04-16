@@ -1,6 +1,7 @@
 const { createDbPool } = require("../db");
 const { resolveAuthenticatedUserId } = require("../auth_user");
 
+// 小さな JSON リクエストボディを Promise ベースで読み取る。
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -22,12 +23,14 @@ function readJsonBody(req) {
   });
 }
 
+// Pro 状態の参照・更新を扱う API ハンドラを生成する。
 function createProStatusHandler({ sendJson }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
   let initialized = false;
   let initPromise = null;
 
+  // 既存環境に不足している users 列を起動時に補完できるよう、遅延でスキーマ確認する。
   async function ensureSchema() {
     if (!pool) {
       return;
@@ -116,6 +119,7 @@ function createProStatusHandler({ sendJson }) {
     }
   }
 
+  // 認証中ユーザーを取得し、Pro 切り替え対象として扱えるか判定する。
   async function findCurrentUser(req) {
     if (!pool) {
       return { error: "db_unavailable" };
@@ -138,6 +142,7 @@ function createProStatusHandler({ sendJson }) {
     return { user: rows[0] };
   }
 
+  // 現在ユーザーの Pro 状態だけを返す読み取りエンドポイント。
   async function handleGet(req, res) {
     const result = await findCurrentUser(req);
     if (result.error === "db_unavailable") {
@@ -158,6 +163,7 @@ function createProStatusHandler({ sendJson }) {
     });
   }
 
+  // 本人の Pro フラグを書き換える更新エンドポイント。Guest には変更を許可しない。
   async function handlePut(req, res) {
     const result = await findCurrentUser(req);
     if (result.error === "db_unavailable") {
@@ -207,6 +213,7 @@ function createProStatusHandler({ sendJson }) {
 
   return async function handleProStatus(req, res) {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    // このハンドラは単一路径専用なので、他パスは早期に 404 を返す。
     if (url.pathname !== "/api/pro-status") {
       sendJson(res, 404, { error: "not_found" });
       return;

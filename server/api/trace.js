@@ -124,7 +124,7 @@ async function refreshUserTactileLength(conn, userId) {
   );
 }
 
-// trace結果をセッション単位の経路テーブルへ反映する。
+// trace 結果から復元したラインと edge 列を、セッション単位の経路テーブルへ反映する。
 async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
   if (!pool || !sessionId) {
     return;
@@ -158,12 +158,13 @@ async function persistSessionPath(pool, sessionId, source, data, logPrefix) {
       [sessionId, wkt, source]
     );
 
-    // 紐づくエッジ列は一旦削除して再作成する。
+    // 紐づくエッジ列は一旦削除して、Valhalla が返した順序で再作成する。
     await conn.query(
       "DELETE FROM tactile.session_path_edges WHERE session_id = ?",
       [sessionId]
     );
 
+    // seq に通過順を保存しておくと、後で元 edge 列を再現しやすい。
     for (let i = 0; i < validEdges.length; i += 1) {
       await conn.query(
         "INSERT INTO tactile.session_path_edges (session_id, seq, edge_id) VALUES (?, ?, ?) RETURNING session_id",
@@ -235,6 +236,7 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
         costing: "pedestrian",
         shape_match: requestData.shape_match || "map_snap",
         trace_options: {
+          // 呼び出し元の trace_options は残しつつ、歩道優先用の探索半径だけは明示上書きする。
           ...(requestData.trace_options && typeof requestData.trace_options === "object" ? requestData.trace_options : {}),
           search_radius: SIDEWALK_PRIORITY_RADIUS_METERS,
         },
@@ -261,6 +263,7 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
         },
       };
 
+      // trace_attributes を直接呼び、応答をそのままクライアントへ返す。
       const valhallaReq = http.request(options, (apiRes) => {
         let responseBody = "";
         apiRes.on("data", (chunk) => {
@@ -273,10 +276,12 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
             console.log(`${logPrefix} Response: edges=${data.edges?.length || 0}, matched_points=${data.matched_points?.length || 0}`);
 
             if (sessionId && (!canceledSessionIds || !canceledSessionIds.has(sessionId))) {
+              // 応答を先に返したいので、DB 保存は非同期で後追い実行する。
               persistSessionPath(pool, sessionId, source, data, logPrefix).catch((err) => {
                 console.error(`${logPrefix} session_path_save_error:`, err.message);
               });
             } else if (sessionId) {
+              // ユーザーがキャンセル済みなら、過去リクエストの保存だけ抑止する。
               console.log(`${logPrefix} session_path_save_skipped: canceled session=${sessionId}`);
             }
 

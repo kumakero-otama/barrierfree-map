@@ -3,6 +3,7 @@ const { resolveAuthenticatedUserId } = require("../auth_user");
 const { createLogger } = require("../logger");
 const path = require("path");
 
+// タグ保存 API 用の JSON ボディを読み取り、生データも監査ログ向けに残す。
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -32,6 +33,7 @@ function readJsonBody(req) {
   });
 }
 
+// tactile.tags の行を API 応答向けの命名へ詰め替える。
 function normalizeTagRow(row) {
   if (!row) {
     return null;
@@ -45,6 +47,7 @@ function normalizeTagRow(row) {
   };
 }
 
+// tactile.session_tags の JOIN 結果を扱いやすい形へ正規化する。
 function normalizeSessionTagRow(row) {
   if (!row) {
     return null;
@@ -59,6 +62,7 @@ function normalizeSessionTagRow(row) {
   };
 }
 
+// セッション詳細 API 用に、タグ付きセッション情報を 1 つの payload へまとめる。
 function buildSessionInfoPayload(rows, sessionId) {
   if (!Array.isArray(rows) || rows.length < 1) {
     return null;
@@ -77,6 +81,7 @@ function buildSessionInfoPayload(rows, sessionId) {
   };
 }
 
+// 点字ブロック関連タグの一覧・保存・セッション紐付けを扱うハンドラを生成する。
 function createTactileTagsHandler({ sendJson }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
@@ -86,6 +91,7 @@ function createTactileTagsHandler({ sendJson }) {
   let initialized = false;
   let initPromise = null;
 
+  // 保存系 API の入出力を CSV に残し、後から何が送られたか追跡できるようにする。
   function writeTagSaveLog({ apiPath, userId, requestRawBody, responseStatus, responsePayload }) {
     tagSaveLogger.appendLog(
       "INFO",
@@ -99,6 +105,7 @@ function createTactileTagsHandler({ sendJson }) {
     );
   }
 
+  // レスポンス送信と保存監査ログ記録を常に同じ経路で行う。
   function sendLoggedJson(res, statusCode, payload, logContext) {
     if (logContext) {
       writeTagSaveLog({
@@ -112,6 +119,7 @@ function createTactileTagsHandler({ sendJson }) {
     sendJson(res, statusCode, payload);
   }
 
+  // 初回アクセス時に必要テーブルを遅延作成し、空環境でも API が動くようにする。
   async function ensureSchema() {
     if (!pool) {
       return;
@@ -167,6 +175,7 @@ function createTactileTagsHandler({ sendJson }) {
     }
   }
 
+  // 認証必須 API で共通利用する userId 解決処理。必要ならその場でエラー応答も返す。
   async function requireUserId(req, res, { suppressResponse = false } = {}) {
     if (!pool) {
       if (!suppressResponse) {
@@ -185,6 +194,7 @@ function createTactileTagsHandler({ sendJson }) {
     return userId;
   }
 
+  // 定義済み tactile.tags を一覧取得し、必要なら active のみに絞る。
   async function listTactileTags(req, res, url) {
     await ensureSchema();
     const activeOnly = url.searchParams.get("activeOnly");
@@ -207,6 +217,7 @@ function createTactileTagsHandler({ sendJson }) {
     });
   }
 
+  // 新しい tactile.tag を作成し、保存内容と応答結果を監査ログへ残す。
   async function createTactileTag(req, res) {
     const logContext = {
       apiPath: "/api/tactile-tags",

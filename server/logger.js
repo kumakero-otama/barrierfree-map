@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
+// ログファイルが肥大化しすぎないよう、既定の最大サイズを 1MB に抑える。
 const DEFAULT_MAX_BYTES = 1 * 1024 * 1024;
 
 // CSVの1行に安全に埋め込めるよう、各フィールドを引用符で包む。
@@ -31,6 +32,7 @@ function createLogger(logFilePath, options = {}) {
     }
   }
 
+  // 追記前に上限超過を見積もり、超える場合はファイル全体を空にして回転なしで継続する。
   async function truncateIfNeeded(incomingBytes) {
     let stats;
     try {

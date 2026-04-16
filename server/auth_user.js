@@ -1,5 +1,6 @@
 const { extractBearerToken, verifyAccessToken } = require("./auth_token");
 
+// Cookie ヘッダーを単純な連想配列へ変換し、セッション Cookie を取り出しやすくする。
 function parseCookies(rawCookieHeader) {
   const cookieHeader = rawCookieHeader || "";
   return cookieHeader
@@ -18,15 +19,18 @@ function parseCookies(rawCookieHeader) {
     }, {});
 }
 
+// Bearer トークン認証を優先し、無ければセッション Cookie を使って現在ユーザーを解決する。
 async function resolveAuthenticatedUserId(req, pool) {
   const bearerToken = extractBearerToken(req);
   if (bearerToken) {
     try {
       const verified = verifyAccessToken(bearerToken);
       if (verified && Number.isFinite(verified.userId) && verified.userId > 0) {
+        // DB が無効な構成でも、トークン自体が正しければ呼び出し元へ userId を返せるようにする。
         if (!pool) {
           return verified.userId;
         }
+        // 退会済み・無効化済みのユーザーを弾くため、実在確認を追加する。
         const [userRows] = await pool.query(
           `SELECT user_id
            FROM login.users
@@ -54,6 +58,7 @@ async function resolveAuthenticatedUserId(req, pool) {
     return null;
   }
 
+  // セッションテーブル側では有効期限切れもここで除外する。
   const [rows] = await pool.query(
     `SELECT user_id
      FROM login.user_sessions

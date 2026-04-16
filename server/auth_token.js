@@ -1,13 +1,17 @@
 const crypto = require("crypto");
 
+// アクセストークン署名に使う共有秘密鍵。未設定時は開発用の既定値を使う。
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "change-this-dev-access-token-secret";
+// アクセストークンの有効期限秒数。環境変数が不正な場合は 7 日を採用する。
 const ACCESS_TOKEN_EXPIRES_IN_SECONDS = Number.parseInt(process.env.ACCESS_TOKEN_EXPIRES_IN_SECONDS, 10) || (60 * 60 * 24 * 7);
 
+// Buffer または文字列を Base64URL 形式へ変換し、JWT の各セグメントに使える形へ整える。
 function base64urlEncode(input) {
   const buf = Buffer.isBuffer(input) ? input : Buffer.from(String(input), "utf8");
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+// Base64URL 形式の文字列を通常の UTF-8 文字列へ戻す。
 function base64urlDecode(input) {
   const normalized = String(input || "").replace(/-/g, "+").replace(/_/g, "/");
   const padLength = (4 - (normalized.length % 4)) % 4;
@@ -15,12 +19,14 @@ function base64urlDecode(input) {
   return Buffer.from(padded, "base64").toString("utf8");
 }
 
+// 「header.payload」文字列へ HMAC-SHA256 署名を付与し、検証用シグネチャを作る。
 function signTokenSegment(segment) {
   return base64urlEncode(
     crypto.createHmac("sha256", ACCESS_TOKEN_SECRET).update(segment).digest()
   );
 }
 
+// userId を subject にした簡易 JWT 風アクセストークンを生成する。
 function createAccessToken(userId, options = {}) {
   const safeUserId = Number(userId);
   if (!Number.isFinite(safeUserId) || safeUserId <= 0) {
@@ -42,6 +48,7 @@ function createAccessToken(userId, options = {}) {
   return `${segment}.${signature}`;
 }
 
+// 署名・有効期限・subject を検証し、認証済みユーザー情報として扱える最小情報を返す。
 function verifyAccessToken(token) {
   if (!token || typeof token !== "string") {
     throw new Error("missing_access_token");
@@ -92,6 +99,7 @@ function verifyAccessToken(token) {
   };
 }
 
+// Authorization ヘッダーから Bearer トークン本体だけを取り出す。
 function extractBearerToken(req) {
   const raw = req && req.headers ? req.headers.authorization : "";
   if (!raw || typeof raw !== "string") {
@@ -101,6 +109,7 @@ function extractBearerToken(req) {
   return match ? match[1].trim() : "";
 }
 
+// クライアントへトークン寿命を通知したい箇所向けに設定値を公開する。
 function getAccessTokenExpiresInSeconds() {
   return ACCESS_TOKEN_EXPIRES_IN_SECONDS;
 }
@@ -111,4 +120,3 @@ module.exports = {
   extractBearerToken,
   getAccessTokenExpiresInSeconds,
 };
-

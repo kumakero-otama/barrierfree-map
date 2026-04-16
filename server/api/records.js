@@ -1,6 +1,7 @@
 const { createDbPool } = require("../db");
 const { resolveAuthenticatedUserId } = require("../auth_user");
 
+// 保存済み経路一覧を返す API ハンドラを生成し、必要なら認証ユーザーで絞り込む。
 function createRecordsHandler({ sendJson }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
@@ -40,7 +41,7 @@ function createRecordsHandler({ sendJson }) {
         }
       }
 
-      // 基本は全経路を取得し、条件があれば範囲検索を追加する。
+      // 基本は全経路を取得し、検索条件があれば同じ SQL に WHERE を積み増していく。
       let query = `
         SELECT
           sp.session_id,
@@ -65,6 +66,7 @@ function createRecordsHandler({ sendJson }) {
 
       whereClauses.push("s.is_active = true");
 
+      // 中心点と半径が揃っている場合だけ、PostGIS の距離検索を有効にする。
       if (Number.isFinite(centerLat) && Number.isFinite(centerLng) && Number.isFinite(radiusKm) && radiusKm > 0) {
         whereClauses.push(`
           ST_DWithin(
@@ -76,6 +78,7 @@ function createRecordsHandler({ sendJson }) {
         params.push(centerLng, centerLat, radiusKm * 1000);
       }
       if (mineOnly) {
+        // mine=1 のときは認証済みユーザーの経路だけへ制限する。
         whereClauses.push("s.user_id = ?");
         params.push(currentUserId);
       }

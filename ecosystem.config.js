@@ -1,3 +1,4 @@
+// PM2 で API サーバーと補助プロセスをまとめて起動するための定義。
 module.exports = {
   apps: [
     {

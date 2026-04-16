@@ -1,5 +1,6 @@
 const { loadRoadInfoConfig } = require("../road_info_config");
 
+// クライアント起動時に参照する最小限の設定値を返す API ハンドラを生成する。
 function createConfigHandler({
   MIN_INTERVAL_MS,
   CLIENT_MIN_INTERVAL_MS,

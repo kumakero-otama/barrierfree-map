@@ -1,6 +1,6 @@
 const { createDbPool } = require("../db");
 
-// 小さなJSONボディを安全に受け取り、エラーを1箇所で扱う。
+// 小さな JSON ボディを安全に受け取り、エラー処理を 1 箇所に寄せる。
 function parseJsonBody(req, callback) {
   let done = false;
   const finish = (err, payload) => {
@@ -35,7 +35,7 @@ function parseJsonBody(req, callback) {
   });
 }
 
-// DB行をフロント向けのタグオブジェクトへ正規化する。
+// DB 行をフロント向けのタグオブジェクトへ正規化する。
 function normalizeTagRow(row) {
   if (!row || typeof row !== "object") {
     return null;
@@ -53,7 +53,7 @@ function normalizeTagRow(row) {
   };
 }
 
-// ラベル文字列から英数字ベースのコード候補を作る。
+// 日本語ラベルからも安定したタグコードを作れるよう、ASCII ベースへ正規化する。
 function buildBaseCode(label) {
   const normalized = label
     .normalize("NFKC")
@@ -75,7 +75,7 @@ async function codeExists(pool, code) {
   return rows.length > 0;
 }
 
-// 重複しないタグコードを作る（base, base_2 ... の順に探索）。
+// 重複しないタグコードを作る。基本形が埋まっていれば連番サフィックスを試す。
 async function buildUniqueCode(pool, label) {
   const base = buildBaseCode(label);
   if (!(await codeExists(pool, base))) {
@@ -107,7 +107,7 @@ async function fetchActiveTags(pool) {
   return rows.map(normalizeTagRow).filter(Boolean);
 }
 
-// ラベル完全一致で既存タグを1件探す。
+// ラベル完全一致で既存タグを 1 件探し、重複作成を防ぐ。
 async function findTagByLabel(pool, label) {
   const [rows] = await pool.query(
     `SELECT id, code, label_ja, sort_order
@@ -120,7 +120,7 @@ async function findTagByLabel(pool, label) {
   return normalizeTagRow(rows[0]);
 }
 
-// タグ追加をトランザクションで実行し、作成行を返す。
+// タグ追加をトランザクションで実行し、作成直後の行をそのまま返す。
 async function createTag(pool, label) {
   const conn = await pool.getConnection();
   try {
@@ -153,6 +153,7 @@ async function createTag(pool, label) {
   }
 }
 
+// 投稿タグの一覧取得と追加をまとめて扱う API ハンドラを生成する。
 function createPostTagsHandler({ sendJson }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
@@ -210,12 +211,14 @@ function createPostTagsHandler({ sendJson }) {
         try {
           const existing = await findTagByLabel(pool, label);
           if (existing) {
+            // 既存ラベルなら新規作成せず、一覧件数だけ最新化して返す。
             const tags = await fetchActiveTags(pool);
             sendJson(res, 200, { success: true, created: false, tag: existing, count: tags.length });
             return;
           }
 
           const created = await createTag(pool, label);
+          // 新規作成後も一覧件数を返し、クライアント側の再取得回数を減らす。
           const tags = await fetchActiveTags(pool);
           sendJson(res, 201, { success: true, created: true, tag: created, count: tags.length });
         } catch (err) {

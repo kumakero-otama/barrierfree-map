@@ -3,6 +3,7 @@ const { createLogger } = require("../logger");
 const { resolveAuthenticatedUserId } = require("../auth_user");
 const path = require("path");
 
+// セッション開始・終了・キャンセル・論理削除・メモ更新を集約した API を作る。
 function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
@@ -67,6 +68,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
 
       if (action === "start") {
+        // 開始処理は upsert なので、途中再送が来ても同じ入口で吸収できる。
         await handleSessionStart(req, data, res);
         return;
       }
@@ -156,6 +158,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
 
       const [result] = await pool.query(
+        // 所有者本人のセッションだけ終了時刻を更新する。
         "UPDATE tactile.sessions SET ended_at = ? WHERE session_id = ? AND user_id = ?",
         [endedAt, sessionId, userId]
       );
@@ -191,6 +194,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
         return;
       }
       if (canceledSessionIds) {
+        // 別 API からの後追い保存を止めるため、先にキャンセル済み集合へ登録する。
         canceledSessionIds.add(sessionId);
       }
       if (deletedSessionKeys) {
@@ -208,6 +212,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
         if (!Array.isArray(targetRows) || targetRows.length < 1) {
           throw new Error("session_not_found_or_forbidden");
         }
+        // 関連データを順に消し、最後に sessions 本体を削除して整合性を保つ。
         await conn.query("DELETE FROM tactile.session_path_edges WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.session_paths WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
@@ -259,6 +264,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       let updated = 0;
       try {
         await conn.beginTransaction();
+        // 論理削除として is_active を落とし、表示・集計対象から外す。
         const [result] = await conn.query(
           "UPDATE tactile.sessions SET is_active = false WHERE session_id = ? AND user_id = ?",
           [sessionId, userId]
@@ -316,6 +322,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       }
 
       sessionLogger.appendLog("SESSION_MEMO", `${sessionId},user_id=${userId}`);
+      // メモ更新は単一 UPDATE に限定し、所有者一致しない場合は 404 にする。
       const [result] = await pool.query(
         "UPDATE tactile.sessions SET memo = ? WHERE session_id = ? AND user_id = ?",
         [memo, sessionId, userId]

@@ -8,6 +8,7 @@ const CONFIG_PATH = path.join(__dirname, "..", "config.yaml");
 const LOG_DIR = path.join(__dirname, "..", "logs");
 const DB_LOG = path.join(LOG_DIR, "db_connection.csv");
 
+// DB 初期化の成否や設定読み込み結果を記録する専用ロガー。
 const dbLogger = createLogger(DB_LOG);
 
 // ルートのconfig.yamlからDB接続設定を読む。
@@ -67,18 +68,22 @@ class PgCompatConnection {
   }
 
   async beginTransaction() {
+    // mysql2 互換の beginTransaction API を pg クライアントへ橋渡しする。
     await this.client.query("BEGIN");
   }
 
   async commit() {
+    // トランザクション確定も既存コードの呼び方に合わせる。
     await this.client.query("COMMIT");
   }
 
   async rollback() {
+    // 失敗時は呼び出し元が明示的にロールバックできるようにする。
     await this.client.query("ROLLBACK");
   }
 
   release() {
+    // 接続リーク防止のため、取得したクライアントは必ず pool へ返却する。
     this.client.release();
   }
 }
@@ -125,7 +130,7 @@ function createDbPool() {
       ssl: dbConfig.ssl ? { rejectUnauthorized: false } : undefined,
     });
 
-    // 接続テスト
+    // 起動直後に軽い疎通確認を流し、設定不備を早期にログへ残す。
     pool.query("SELECT 1")
       .then(() => {
         dbLogger.appendLog("INFO", "DB接続テスト成功");

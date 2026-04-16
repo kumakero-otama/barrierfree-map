@@ -17,8 +17,10 @@ const createTactileTagsHandler = require("./server/api/tactile_tags");
 const createClientLogsHandler = require("./server/api/client_logs");
 const { createLogger } = require("./server/logger");
 
+// HTTP/HTTPS の待受ポート。TLS が無い環境でも HTTP 側は単独で起動できる。
 const HTTP_PORT = 3000;
 const HTTPS_PORT = 3001;
+// 外部サービスや TLS 関連は環境変数から受け取り、未設定でも起動自体は継続する。
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || "";
 const TLS_KEY_PATH = process.env.TLS_KEY_PATH || "";
 const TLS_CERT_PATH = process.env.TLS_CERT_PATH || "";
@@ -34,6 +36,7 @@ const UPLOADS_DIR = path.join(__dirname, "uploads");
 const LOG_DIR = path.join(__dirname, "logs");
 const SERVER_LOG = path.join(LOG_DIR, "server.csv");
 let monthlyCounts = {};
+// カンマ区切りの許可 Origin 一覧を正規化して保持する。
 const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -60,6 +63,7 @@ function formatMessage(args) {
 
 appendLog("INFO", "server_start");
 
+// 端末出力を維持したまま、同じ内容を CSV ログへも保存するために console を差し替える。
 const originalLog = console.log;
 const originalWarn = console.warn;
 const originalError = console.error;
@@ -121,8 +125,10 @@ function incrementMonthlyCount(month) {
 }
 
 loadCount();
+// 端末単位の直近アクセス時刻を保持し、マッチング API の簡易レート制限に使う。
 const lastRequestByDevice = new Map();
 
+// 最低限の静的配信で使う Content-Type 一覧。
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -136,6 +142,7 @@ const CONTENT_TYPES = {
   ".webmanifest": "application/manifest+json",
 };
 
+// 静的ファイル配信と旧 URL からのリダイレクトをまとめて処理する。
 function handleStatic(req, res) {
   const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   // 旧パスでアクセスされた場合は新しいページ構成へリダイレクトする。
@@ -160,6 +167,7 @@ function handleStatic(req, res) {
     ? "/auth/login.html"
     : (legacyPathMap[lowerPath] || requestUrl.pathname);
   if (requestUrl.pathname !== canonicalPath) {
+    // 旧 URL へ来たクライアントを正規パスへ寄せ、古いブックマーク互換を保つ。
     res.writeHead(302, { Location: canonicalPath });
     res.end();
     return;
@@ -181,6 +189,7 @@ function handleStatic(req, res) {
   });
 }
 
+// uploads 配下の配信専用ハンドラ。パス正規化でディレクトリトラバーサルを防ぐ。
 function handleUploads(req, res) {
   const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   // uploads外に出ないようパス正規化してディレクトリトラバーサルを防ぐ。
@@ -210,11 +219,13 @@ function handleUploads(req, res) {
   });
 }
 
+// JSON レスポンスのヘッダーと文字コードを統一する共通関数。
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
 }
 
+// CORS を許可する Origin を限定し、本番配信先とローカル開発環境だけ通す。
 function isCorsOriginAllowed(origin) {
   if (!origin || typeof origin !== "string") {
     return false;
@@ -234,6 +245,7 @@ function isCorsOriginAllowed(origin) {
   return false;
 }
 
+// CORS 対象リクエストへ必要なヘッダーを付け、preflight にも使えるようにする。
 function applyCorsHeaders(req, res) {
   const origin = req.headers.origin;
   if (!isCorsOriginAllowed(origin)) {
@@ -254,6 +266,7 @@ function applyCorsHeaders(req, res) {
   return true;
 }
 
+// セッション削除・キャンセル状態を API 間で共有し、後続の非同期保存を止める。
 const deletedSessionKeys = new Set();
 const canceledSessionIds = new Set();
 
@@ -330,9 +343,11 @@ const handleClientLogs = createClientLogsHandler({
   LOG_DIR,
 });
 
+// API を先に振り分け、該当しないものだけ静的ファイル配信へフォールバックする。
 function handleRequest(req, res) {
   const isCorsRequest = applyCorsHeaders(req, res);
   if (req.method === "OPTIONS" && isCorsRequest) {
+    // preflight 応答は本文不要なので 204 で即終了する。
     res.writeHead(204);
     res.end();
     return;
@@ -421,6 +436,7 @@ http.createServer(handleRequest).listen(HTTP_PORT, () => {
 
 if (TLS_KEY_PATH && TLS_CERT_PATH) {
   try {
+    // 鍵と証明書が両方ある場合のみ HTTPS サーバーを追加で立ち上げる。
     const key = fs.readFileSync(TLS_KEY_PATH);
     const cert = fs.readFileSync(TLS_CERT_PATH);
     https.createServer({ key, cert }, handleRequest).listen(HTTPS_PORT, () => {

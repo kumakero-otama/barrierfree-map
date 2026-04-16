@@ -2,6 +2,7 @@ const { createDbPool } = require("../db");
 const { createLogger } = require("../logger");
 const path = require("path");
 
+// 旧 Mapbox Matching API を使って現在地点を道路へスナップするハンドラを生成する。
 function createMatchHandler({
   https,
   MAPBOX_TOKEN,
@@ -42,7 +43,7 @@ function createMatchHandler({
     }
     const safeUserId = userId || "unknown";
     
-    // CSVログに記録
+    // DB 保存前でも、受け取ったスナップ結果自体は CSV へ残して追跡可能にする。
     sessionLogger.appendLog("SESSION_UPDATE", `${sessionUuid},${safeUserId}`);
     pointsLogger.appendLog("POINT", `${sessionUuid},${seq},${snappedLat},${snappedLng}`);
     console.log(`[updateSession] Logged to CSV: sessionUuid=${sessionUuid}, seq=${seq}`);
@@ -55,7 +56,7 @@ function createMatchHandler({
       );
       
       if (sessions.length === 0) {
-        // 新規セッション作成
+        // 旧スキーマでは session_uuid を見て、無ければ新規セッションを作る。
         const [result] = await pool.query(
           "INSERT INTO tactile.sessions (session_uuid, user_id, started_at, ended_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
           [sessionUuid, safeUserId]
@@ -70,7 +71,7 @@ function createMatchHandler({
           [sessionId, seq, snappedLat, snappedLng]
         );
       } else {
-        // 既存セッションの終了時刻を更新
+        // 既存セッションは ended_at だけ更新し、ポイント行は追記し続ける。
         const sessionId = sessions[0].id;
         await pool.query(
           "UPDATE tactile.sessions SET ended_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -136,6 +137,7 @@ function createMatchHandler({
     const rateLimitKey = deviceUuid || ip;
     const last = lastRequestByDevice.get(rateLimitKey) || 0;
     if (now - last < MIN_INTERVAL_MS) {
+      // 端末単位で最小間隔を守らせ、外部 API の呼び過ぎを避ける。
       sendJson(res, 429, { error: "rate_limited", retryAfterMs: MIN_INTERVAL_MS - (now - last) });
       return;
     }
@@ -192,7 +194,7 @@ function createMatchHandler({
             console.log(`[DEBUG] sessionUuid=${sessionUuid}, userId=${userId}, seq=${seq}, pool=${!!pool}`);
             console.log(`[DEBUG] condition check: sessionUuid=${!!sessionUuid}, userId=${!!userId}, isFiniteSeq=${Number.isFinite(seq)}`);
             
-            // セッション更新（非同期だが待たない）
+            // スナップ応答を遅らせないため、セッション更新は非同期で投げるだけにする。
             if (sessionUuid && canceledSessionIds && canceledSessionIds.has(sessionUuid)) {
               console.log(`[DEBUG] Session canceled, skip updateSession: ${sessionUuid}`);
             } else if (sessionUuid && userId && Number.isFinite(seq)) {

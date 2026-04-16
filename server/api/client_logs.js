@@ -8,6 +8,7 @@ const MAX_STORED_LOG_IDS = 10000;
 const CLIENT_LOG_MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_LEVELS = new Set(["debug", "info", "warn", "error"]);
 
+// サーバー側で受信要求を追跡できるよう、一意なリクエスト ID を組み立てる。
 function createServerRequestId() {
   const suffix = typeof randomUUID === "function"
     ? randomUUID().slice(0, 8)
@@ -15,6 +16,7 @@ function createServerRequestId() {
   return `srv_${Date.now()}_${suffix}`;
 }
 
+// 重複判定用に保持している logId が増えすぎたら、古い順に破棄してメモリ使用量を抑える。
 function pruneSeenLogIds(seenLogIds) {
   while (seenLogIds.size > MAX_STORED_LOG_IDS) {
     const oldestKey = seenLogIds.keys().next().value;
@@ -25,6 +27,7 @@ function pruneSeenLogIds(seenLogIds) {
   }
 }
 
+// 受信サイズ上限を守りながら JSON ボディを読み取り、不正入力は明確なエラーに寄せる。
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -72,6 +75,7 @@ function readJsonBody(req) {
   });
 }
 
+// 文字列項目をトリムし、必要以上に長いデータは切り詰めてログ破損を防ぐ。
 function trimString(value, maxLength) {
   if (typeof value !== "string") {
     return "";
@@ -83,11 +87,13 @@ function trimString(value, maxLength) {
   return trimmed.slice(0, maxLength);
 }
 
+// level は許可された値だけに絞り、それ以外は info へ丸める。
 function normalizeLevel(value) {
   const normalized = trimString(value, 16).toLowerCase();
   return ALLOWED_LEVELS.has(normalized) ? normalized : "info";
 }
 
+// 任意メタ情報は JSON 化しやすい単純値だけを残して正規化する。
 function normalizeMeta(meta) {
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
     return {};
@@ -114,6 +120,7 @@ function normalizeMeta(meta) {
   return normalized;
 }
 
+// クライアント情報はログ保存に必要な最小項目だけへ整理する。
 function normalizeClientInfo(client) {
   if (!client || typeof client !== "object" || Array.isArray(client)) {
     return {};
@@ -125,6 +132,7 @@ function normalizeClientInfo(client) {
   };
 }
 
+// セッション情報は現在 requestId のみを保持する。
 function normalizeSessionInfo(session) {
   if (!session || typeof session !== "object" || Array.isArray(session)) {
     return {};
@@ -134,6 +142,7 @@ function normalizeSessionInfo(session) {
   };
 }
 
+// 1 件ぶんのログエントリを必須項目付きの安全な形式へ検証・整形する。
 function validateLogEntry(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     return { error: "invalid_log_entry" };
@@ -173,6 +182,7 @@ function validateLogEntry(entry) {
   };
 }
 
+// クライアント送信ログを受け取り、CSV へ保存する API ハンドラを生成する。
 function createClientLogsHandler({ sendJson, LOG_DIR }) {
   const logFilePath = path.join(LOG_DIR, "client_logs.csv");
   const { appendLog } = createLogger(logFilePath, { maxBytes: CLIENT_LOG_MAX_BYTES });
@@ -251,6 +261,7 @@ function createClientLogsHandler({ sendJson, LOG_DIR }) {
 
       const normalized = result.normalized;
       if (seenLogIds.has(normalized.logId)) {
+        // 同じ logId は再送とみなし、保存はせず duplicate として返す。
         duplicate.push(normalized.logId);
         continue;
       }
@@ -278,6 +289,7 @@ function createClientLogsHandler({ sendJson, LOG_DIR }) {
     }
 
     if (accepted.length === 0 && duplicate.length === 0) {
+      // 有効なログが 1 件もなければ、全体として失敗扱いにする。
       sendJson(res, 400, {
         error: "invalid_payload",
         serverRequestId,

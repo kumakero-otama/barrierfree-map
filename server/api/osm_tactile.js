@@ -10,7 +10,7 @@ function escapeRegexValue(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// YAMLルールを読み込み、利用可能な形式だけに正規化する。
+// YAML ルールを読み込み、利用可能な形式だけに正規化する。
 function loadRules() {
   const raw = fs.readFileSync(RULES_PATH, "utf8");
   const parsed = yaml.parse(raw) || {};
@@ -48,7 +48,7 @@ function loadRules() {
   };
 }
 
-// ルールと中心点からOverpass QLクエリを組み立てる。
+// ルールと中心点から Overpass QL クエリを組み立てる。
 function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
   const selectors = rules.elementTypes
     .flatMap((elementType) =>
@@ -67,7 +67,7 @@ out geom;
 `;
 }
 
-// Overpass APIへPOSTしてJSONレスポンスを受け取る。
+// Overpass API へ POST して JSON レスポンスを受け取る。
 function fetchOverpass(overpassHost, query, callback) {
   const body = `data=${encodeURIComponent(query)}`;
   const options = {
@@ -105,7 +105,7 @@ function fetchOverpass(overpassHost, query, callback) {
   req.end();
 }
 
-// Overpassのelement配列を地図表示しやすいGeoJSONへ変換する。
+// Overpass の element 配列を地図表示しやすい GeoJSON へ変換する。
 function toFeatureCollection(overpassJson, rules) {
   const elements = Array.isArray(overpassJson && overpassJson.elements) ? overpassJson.elements : [];
   const features = [];
@@ -180,6 +180,7 @@ function toFeatureCollection(overpassJson, rules) {
   };
 }
 
+// 指定範囲の点字ブロック関連 OSM データを返す API ハンドラを生成する。
 function createOsmTactileWaysHandler({ sendJson }) {
   const OVERPASS_HOST = process.env.OVERPASS_HOST || "overpass-api.de";
   let rules;
@@ -211,6 +212,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const centerLng = Number(url.searchParams.get("centerLng"));
       const radiusKmRaw = Number(url.searchParams.get("radiusKm"));
       const radiusKm = Number.isFinite(radiusKmRaw) && radiusKmRaw > 0 ? radiusKmRaw : 10;
+      // 過大なクエリを避けるため、半径は最大 10km に丸める。
       const radiusMeters = Math.round(Math.min(radiusKm, 10) * 1000);
 
       if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
@@ -225,6 +227,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
           sendJson(res, 502, { error: "osm_upstream_error", message: err.message });
           return;
         }
+        // レスポンスは FeatureCollection ではなく features 配列中心で返し、既存フロント構造に合わせる。
         const featureCollection = toFeatureCollection(overpassJson, rules);
         sendJson(res, 200, {
           success: true,

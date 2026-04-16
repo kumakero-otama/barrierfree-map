@@ -1,13 +1,13 @@
 const fs = require("fs");
 const path = require("path");
 
-// package.jsonからバージョンを読み込む
+// package.json を単一の正本として扱い、派生ファイルのバージョン表記を同期する。
 const packageJson = require("../package.json");
 const VERSION = packageJson.version;
 
 console.log(`Updating version to ${VERSION}...`);
 
-// 1. public/version.js を更新
+// 1. 画面表示用の version.js を丸ごと生成し直す。
 const versionJsPath = path.join(__dirname, "..", "public", "version.js");
 const versionJsContent = `// アプリケーションバージョン
 const APP_VERSION = "${VERSION}";
@@ -31,7 +31,7 @@ if (document.readyState === "loading") {
 fs.writeFileSync(versionJsPath, versionJsContent, "utf8");
 console.log(`✓ Updated ${versionJsPath}`);
 
-// 2. public/sw.js を更新
+// 2. Service Worker 側のキャッシュ名にも同じバージョンを反映する。
 const swJsPath = path.join(__dirname, "..", "public", "sw.js");
 const swJsContent = `const CACHE_VERSION = "${VERSION}"; // このバージョンはpackage.jsonから自動生成されます
 const CACHE_NAME = \`barrierfree-map-v\${CACHE_VERSION}-\${Date.now()}\`;

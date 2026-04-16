@@ -6,9 +6,10 @@ const { resolveAuthenticatedUserId } = require("../auth_user");
 const { loadRoadInfoConfig } = require("../road_info_config");
 
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "uploads", "road_info_media");
+// これらのコードは「問題解決済み」とみなし、ポイント状態も inactive へ寄せる。
 const COMPLETION_TAG_CODES = new Set(["complete", "completed", "done", "resolved", "inactive"]);
 
-// JSONボディを受け取り、サイズ超過/JSON不正を共通処理する。
+// JSON ボディを受け取り、サイズ超過や JSON 不正を共通処理する。
 function parseJsonBody(req, callback) {
   let done = false;
   const finish = (err, payload) => {
@@ -147,7 +148,7 @@ async function buildUniqueCode(conn, label) {
   throw new Error("tag_code_generation_failed");
 }
 
-// 指定タグコードを解決し、未登録タグは作成してtag_id配列を返す。
+// 指定タグコードを解決し、未登録タグはその場で追加して tag_id 配列を返す。
 async function resolveOrCreateTagIds(conn, rawTagCodes) {
   const tagCodes = sanitizeTagIds(rawTagCodes);
   if (tagCodes.length < 1) {
@@ -204,7 +205,7 @@ async function resolveOrCreateTagIds(conn, rawTagCodes) {
   };
 }
 
-// ユーザーが作成した active / hidden ポイント数を再集計して保存する。
+// ユーザーが作成した active / hidden ポイント数を再集計して users テーブルへ反映する。
 async function refreshUserRoadPostCount(conn, userId) {
   const safeUserId = Number(userId);
   if (!Number.isFinite(safeUserId) || safeUserId <= 0) {
@@ -225,7 +226,7 @@ async function refreshUserRoadPostCount(conn, userId) {
   );
 }
 
-// data URL形式の画像を検証し、バイナリへ変換する。
+// data URL 形式の画像を検証し、保存可能なバイナリへ変換する。
 function parseDataUrl(dataUrl, maxImageBytes) {
   if (typeof dataUrl !== "string") {
     throw new Error("invalid_image_data");
@@ -248,7 +249,7 @@ function parseDataUrl(dataUrl, maxImageBytes) {
   return { mimeType, binary };
 }
 
-// MIMEまたはファイル名から保存拡張子を決める。
+// MIME または元ファイル名から保存拡張子を決める。
 function getExtension(name, mimeType) {
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/png") return "png";

@@ -16,6 +16,7 @@ const MAX_ICON_BYTES = 5 * 1024 * 1024; // 5MB
 const USER_ICON_DIR = path.join(__dirname, "..", "..", "uploads", "user_icons");
 const GUEST_USERNAME = "Guest";
 
+// Cookie ヘッダーを連想配列へ変換し、セッション Cookie を読みやすくする。
 function parseCookies(rawCookieHeader) {
   const cookieHeader = rawCookieHeader || "";
   return cookieHeader
@@ -34,6 +35,7 @@ function parseCookies(rawCookieHeader) {
     }, {});
 }
 
+// サーバー側セッション ID を安全な属性付き Cookie 文字列へ変換する。
 function createSessionCookie(sessionId, { secure = false, maxAge = SESSION_MAX_AGE_SECONDS } = {}) {
   const parts = [
     `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionId)}`,
@@ -48,6 +50,7 @@ function createSessionCookie(sessionId, { secure = false, maxAge = SESSION_MAX_A
   return parts.join("; ");
 }
 
+// ログアウト時に即失効する Cookie 文字列を組み立てる。
 function clearSessionCookie({ secure = false } = {}) {
   const parts = [
     `${SESSION_COOKIE_NAME}=`,
@@ -62,6 +65,7 @@ function clearSessionCookie({ secure = false } = {}) {
   return parts.join("; ");
 }
 
+// Google ログイン・ゲストログイン・プロフィール更新をまとめて扱うハンドラを生成する。
 function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   const dbResult = createDbPool();
   const pool = dbResult.pool;
@@ -75,6 +79,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
   let initialized = false;
   let initPromise = null;
 
+  // 認証イベント記録で共通利用する、HTTP リクエスト由来のメタ情報を抜き出す。
   function getRequestMeta(req) {
     return {
       method: req.method || "",
@@ -85,6 +90,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     };
   }
 
+  // 認証系の成功・失敗を構造化ログで残す。
   function logAuthEvent(label, req, details = {}) {
     const meta = getRequestMeta(req);
     const payload = {
@@ -94,6 +100,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     console.log(`[auth] ${label} ${JSON.stringify(payload)}`);
   }
 
+  // login 系スキーマと最低限の認証テーブルを遅延で初期化する。
   async function ensureSchema() {
     if (!pool) {
       return;
@@ -189,10 +196,12 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     }
   }
 
+  // HTTPS リクエストかどうかを見て Secure Cookie の付与可否を決める。
   function isSecureRequest(req) {
     return Boolean(req.socket && req.socket.encrypted);
   }
 
+  // data URL 形式のユーザーアイコンを検証し、保存可能なら buffer と拡張子へ分解する。
   function parseDataUrlImage(dataUrl) {
     if (!dataUrl || typeof dataUrl !== "string") {
       return null;
@@ -221,6 +230,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     return { buffer, ext };
   }
 
+  // ユーザーアイコンを uploads 配下へ保存し、公開 URL を返す。
   function saveUserIcon({ sub, iconDataUrl }) {
     if (!iconDataUrl) {
       return null;
@@ -236,6 +246,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     return `/uploads/user_icons/${filename}`;
   }
 
+  // 認証系 API の小さな JSON ボディを Promise ベースで読む。
   function readJsonBody(req) {
     return new Promise((resolve, reject) => {
       let body = "";
@@ -257,6 +268,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     });
   }
 
+  // Google の sub から既存ユーザーを引き当てる。
   async function findGoogleUserBySub(sub) {
     if (!pool) {
       return memoryStore.usersBySub.get(sub) || null;
