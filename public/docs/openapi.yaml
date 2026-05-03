@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Barrierfree Map API
-  version: 1.27.1
+  version: 1.27.2
   description: |
     barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
     一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
@@ -72,11 +72,22 @@ paths:
   /api/stats:
     get:
       tags: [Config]
-      summary: 総ユーザー数・総点字ブロック記録距離・総道情報件数を取得
+      summary: 指定日までの総ユーザー数・総点字ブロック記録距離・総道情報件数を取得
       description: |
-        現在有効なユーザー数、記録済み点字ブロック距離の総計、公開対象の道情報件数を返します。
-        総点字ブロック記録距離は `login.users.total_tactile_length` の km 合計をメートルへ換算して返します。
-        総道情報件数は `roadinfo.road_info_point.status IN ('active', 'hidden')` を対象に集計します。
+        指定日の終了時点までに作成・記録されたデータを集計します。
+        総ユーザー数は `login.users.is_active = true` かつ `created_at` が指定日以前の件数です。
+        総点字ブロック記録距離は `tactile.sessions.started_at` が指定日以前、かつ
+        `tactile.sessions.is_active = true` と `login.users.is_active = true` の記録をメートル単位で合計します。
+        総道情報件数は `roadinfo.road_info_point.status IN ('active', 'hidden')` かつ
+        `created_at` が指定日以前の件数です。
+      parameters:
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+            example: '2026-05-03'
+          description: 集計対象日。未指定時は今日
       responses:
         '200':
           description: OK
@@ -84,6 +95,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatsResponse'
+        '400':
+          description: invalid_date
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '405':
           $ref: '#/components/responses/MethodNotAllowed'
         '500':
@@ -1573,6 +1589,10 @@ components:
       type: object
       properties:
         success: { type: boolean, example: true }
+        targetDate:
+          type: string
+          format: date
+          example: '2026-05-03'
         totalUsers: { type: integer, example: 123 }
         totalTactileLengthMeters: { type: integer, example: 456789 }
         totalRoadInfoPosts: { type: integer, example: 321 }

@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.27.1`
+API version: `1.27.2`
 
 ## 認証
 
@@ -67,14 +67,18 @@ API version: `1.27.1`
   - `405`: `method_not_allowed`
 
 #### `GET /api/stats`
-- 概要: 現在の総ユーザー数、総点字ブロック記録距離、総道情報件数を取得
+- 概要: 指定日までの総ユーザー数、総点字ブロック記録距離、総道情報件数を取得
 - 認証: 不要
+- 主なクエリ:
+  - 任意: `date`（`YYYY-MM-DD`。未指定時は今日）
 - 補足:
-  - 総ユーザー数は `login.users.is_active = true` の件数
-  - 総点字ブロック記録距離は `login.users.total_tactile_length` の合計をメートル換算して返却
-  - 総道情報件数は `roadinfo.road_info_point.status IN ('active', 'hidden')` の件数
+  - 集計は指定日の終了時点までを対象にし、SQL上は `< date + 1 day` で判定
+  - 総ユーザー数は `login.users.is_active = true` かつ `created_at` が指定日以前の件数
+  - 総点字ブロック記録距離は `tactile.sessions.started_at` が指定日以前、かつ `tactile.sessions.is_active = true` と `login.users.is_active = true` の記録をメートル合計して返却
+  - 総道情報件数は `roadinfo.road_info_point.status IN ('active', 'hidden')` かつ `created_at` が指定日以前の件数
 - 主なレスポンス:
-  - `200`: `success`, `totalUsers`, `totalTactileLengthMeters`, `totalRoadInfoPosts`
+  - `200`: `success`, `targetDate`, `totalUsers`, `totalTactileLengthMeters`, `totalRoadInfoPosts`
+  - `400`: `invalid_date`
   - `405`, `500`, `503`
 
 #### `GET /api/match`
@@ -310,7 +314,7 @@ API version: `1.27.1`
 ```json
 {
   "client": {
-    "appVersion": "1.27.1",
+    "appVersion": "1.27.2",
     "userAgent": "Mozilla/5.0",
     "platform": "web"
   },
