@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const createMatchHandler = require("./server/api/match_valhalla");
 const createCountHandler = require("./server/api/count");
+const createStatsHandler = require("./server/api/stats");
 const createSessionHandler = require("./server/api/session");
 const createConfigHandler = require("./server/api/config");
 const createRecordsHandler = require("./server/api/records");
@@ -293,6 +294,10 @@ const handleCount = createCountHandler({
   sendJson,
 });
 
+const handleStats = createStatsHandler({
+  sendJson,
+});
+
 const handleSession = createSessionHandler({
   deletedSessionKeys,
   canceledSessionIds,
@@ -365,6 +370,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/count")) {
     handleCount(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/stats")) {
+    handleStats(req, res);
     return;
   }
   if (

@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.27.0`
+API version: `1.27.1`
 
 ## 認証
 
@@ -15,6 +15,7 @@ API version: `1.27.0`
 | --- | --- | --- | --- |
 | GET | `/api/config` | 不要 | クライアント初期化用設定を取得 |
 | GET | `/api/count` | 不要 | マップマッチング月次カウントを取得 |
+| GET | `/api/stats` | 不要 | 総ユーザー数・総点字ブロック記録距離・総道情報件数を取得 |
 | GET | `/api/match` | 不要 | 1点マップマッチング（Valhalla locate） |
 | POST | `/api/session/start` | 必要 | セッション開始 |
 | POST | `/api/session/end` | 必要 | セッション終了 |
@@ -64,6 +65,17 @@ API version: `1.27.0`
 - 主なレスポンス:
   - `200`: `count`, `max`, `month`, `allMonths`
   - `405`: `method_not_allowed`
+
+#### `GET /api/stats`
+- 概要: 現在の総ユーザー数、総点字ブロック記録距離、総道情報件数を取得
+- 認証: 不要
+- 補足:
+  - 総ユーザー数は `login.users.is_active = true` の件数
+  - 総点字ブロック記録距離は `login.users.total_tactile_length` の合計をメートル換算して返却
+  - 総道情報件数は `roadinfo.road_info_point.status IN ('active', 'hidden')` の件数
+- 主なレスポンス:
+  - `200`: `success`, `totalUsers`, `totalTactileLengthMeters`, `totalRoadInfoPosts`
+  - `405`, `500`, `503`
 
 #### `GET /api/match`
 - 概要: 1点マップマッチング（Valhalla locate）
@@ -298,7 +310,7 @@ API version: `1.27.0`
 ```json
 {
   "client": {
-    "appVersion": "1.27.0",
+    "appVersion": "1.27.1",
     "userAgent": "Mozilla/5.0",
     "platform": "web"
   },

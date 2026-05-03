@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Barrierfree Map API
-  version: 1.27.0
+  version: 1.27.1
   description: |
     barrierfree-map の実装（`server.js` と `server/api/*.js`）に基づく API 仕様。
     一部レスポンスは上流サービス（Valhalla / Overpass）の返却を透過的に返すため、
@@ -68,6 +68,31 @@ paths:
                       type: integer
         '405':
           $ref: '#/components/responses/MethodNotAllowed'
+
+  /api/stats:
+    get:
+      tags: [Config]
+      summary: 総ユーザー数・総点字ブロック記録距離・総道情報件数を取得
+      description: |
+        現在有効なユーザー数、記録済み点字ブロック距離の総計、公開対象の道情報件数を返します。
+        総点字ブロック記録距離は `login.users.total_tactile_length` の km 合計をメートルへ換算して返します。
+        総道情報件数は `roadinfo.road_info_point.status IN ('active', 'hidden')` を対象に集計します。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: database_unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /api/match:
     get:
@@ -1543,6 +1568,14 @@ components:
       properties:
         success: { type: boolean, example: true }
         sessionId: { type: string }
+
+    StatsResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        totalUsers: { type: integer, example: 123 }
+        totalTactileLengthMeters: { type: integer, example: 456789 }
+        totalRoadInfoPosts: { type: integer, example: 321 }
 
     PostTag:
       type: object
