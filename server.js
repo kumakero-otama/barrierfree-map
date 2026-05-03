@@ -15,6 +15,7 @@ const createGoogleAuthHandler = require("./server/api/google_auth");
 const createProStatusHandler = require("./server/api/pro_status");
 const createTactileTagsHandler = require("./server/api/tactile_tags");
 const createClientLogsHandler = require("./server/api/client_logs");
+const createTactileRankingHandler = require("./server/api/tactile_ranking");
 const { createLogger } = require("./server/logger");
 
 // HTTP/HTTPS の待受ポート。TLS が無い環境でも HTTP 側は単独で起動できる。
@@ -343,6 +344,10 @@ const handleClientLogs = createClientLogsHandler({
   LOG_DIR,
 });
 
+const handleTactileRanking = createTactileRankingHandler({
+  sendJson,
+});
+
 // API を先に振り分け、該当しないものだけ静的ファイル配信へフォールバックする。
 function handleRequest(req, res) {
   const isCorsRequest = applyCorsHeaders(req, res);
@@ -388,6 +393,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/records")) {
     handleRecords(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/tactile-ranking")) {
+    handleTactileRanking(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/api/trace")) {

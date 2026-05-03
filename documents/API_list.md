@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.26.0`
+API version: `1.27.0`
 
 ## 認証
 
@@ -22,6 +22,7 @@ API version: `1.26.0`
 | POST | `/api/session/deactivate` | 必要 | セッションを論理無効化 |
 | POST | `/api/session/memo` | 必要 | セッションメモを更新 |
 | GET | `/api/records` | 条件付き | 保存済み経路一覧を取得 |
+| GET | `/api/tactile-ranking` | 不要 | 指定期間の点字ブロック記録距離ランキングを取得 |
 | POST | `/api/trace` | 不要 | Valhalla `trace_attributes` を呼び出し |
 | GET | `/api/osm-tactile-ways` | 不要 | Overpass経由で点字ブロック関連地物を取得 |
 | GET | `/api/post-tags` | 不要 | 投稿タグ一覧を取得 |
@@ -137,6 +138,21 @@ API version: `1.26.0`
 - 主なレスポンス:
   - `200`: `success`, `count`, `paths[]`
   - `401`, `405`, `500`, `503`
+
+#### `GET /api/tactile-ranking`
+- 概要: 指定期間内の点字ブロック記録距離が多いユーザーランキングを取得
+- 認証: 不要
+- 主なクエリ:
+  - 任意: `days`（既定値 `7`、1 から `3650`）
+  - 任意: `limit`（既定値 `10`、1 から `100`）
+- 補足:
+  - 集計期間は `tactile.sessions.started_at >= CURRENT_TIMESTAMP - days`
+  - 距離は `tactile.session_paths.geom` の `ST_Length` をメートル単位で合計
+  - `tactile.sessions.is_active = true` と `login.users.is_active = true` のみ対象
+- 主なレスポンス:
+  - `200`: `success`, `periodDays`, `limit`, `count`, `ranking[]`
+  - `400`: `invalid_days`, `invalid_limit`
+  - `405`, `500`, `503`
 
 #### `POST /api/trace`
 - 概要: Valhalla `trace_attributes` を呼び出し
@@ -282,7 +298,7 @@ API version: `1.26.0`
 ```json
 {
   "client": {
-    "appVersion": "1.26.0",
+    "appVersion": "1.27.0",
     "userAgent": "Mozilla/5.0",
     "platform": "web"
   },
