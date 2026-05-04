@@ -77,6 +77,7 @@ function fetchOverpass(overpassHost, query, callback) {
     headers: {
       "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
       "Content-Length": Buffer.byteLength(body),
+      "User-Agent": "barrierfree-map/1.27.3 (https://github.com/kumakero-otama/barrierfree-map)",
     },
   };
 
