@@ -216,7 +216,13 @@ function handleUploads(req, res) {
       res.end("Not Found");
       return;
     }
-    res.writeHead(200, { "Content-Type": contentType });
+    // /uploads/ 配下のファイルはアップロード時にユニークなファイル名（タイムスタンプ等）が付くため、
+    // 同URLの内容は変わらない前提で長期キャッシュを許可する。
+    // ブラウザのHTTPキャッシュ・サービスワーカーキャッシュ双方が効きやすくなる。
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=31536000, immutable",
+    });
     res.end(data);
   });
 }
