@@ -74,7 +74,7 @@ pm2 start ecosystem.config.js
 ```
 
 `barrierfree-map`のプロジェクトルート（`ecosystem.config.js`がある場所）で実行します。
-`ecosystem.config.js`に書いた2つのサービス（`server.js`と`loophole`）を同時に起動します。
+`ecosystem.config.js`に書いたサービス（`server.js`）を起動します。外部公開は Tailscale Funnel を使用します（詳細は documents/loophole_to_tailscale_migration.md 参照）。
 
 ### 再起動後の復元
 
@@ -98,16 +98,15 @@ pm2 startup
 
 ```bash
 pm2 logs barrierfree-map-server
-pm2 logs barrierfree-map-loophole
 ```
 
-どのディレクトリからでも実行できます。2つのサービスのログを表示します。
+どのディレクトリからでも実行できます。サービスのログを表示します。
 
 ### 停止 / 再起動
 
 ```bash
-pm2 stop barrierfree-map-server barrierfree-map-loophole
-pm2 restart barrierfree-map-server barrierfree-map-loophole
+pm2 stop barrierfree-map-server
+pm2 restart barrierfree-map-server
 ```
 
 どのディレクトリからでも実行できます。指定したサービスを停止または再起動します。
