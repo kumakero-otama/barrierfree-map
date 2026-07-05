@@ -288,6 +288,44 @@
         <li><code>geometry</code>: 地図に置くための位置情報</li>
       </ul>
 
+      <h3>裏側で使っている外部API</h3>
+      <p>
+        このAPIの裏では、OpenStreetMap系の検索サービス <strong>Overpass API</strong> の
+        <code>POST /api/interpreter</code> を使っています。
+      </p>
+      <table>
+        <tr>
+          <th>相手先</th>
+          <td>既定では <code>overpass-api.de</code></td>
+        </tr>
+        <tr>
+          <th>パス</th>
+          <td><code>/api/interpreter</code></td>
+        </tr>
+        <tr>
+          <th>メソッド</th>
+          <td><code>POST</code></td>
+        </tr>
+        <tr>
+          <th>送る形式</th>
+          <td><code>application/x-www-form-urlencoded</code> で <code>data=...</code> を送る</td>
+        </tr>
+        <tr>
+          <th>中身</th>
+          <td>Overpass QL という検索用の文を送る</td>
+        </tr>
+      </table>
+      <p>実際には、だいたい次のような検索文を組み立てています。</p>
+      <pre><code>[out:json][timeout:25];
+(
+  way(around:1000,35.6812,139.7671)["tactile_paving"~"^(yes|both|contrasted)$"];
+  node(around:1000,35.6812,139.7671)["tactile_paving:pattern"~"^(bars|dots)$"];
+);
+out geom;</code></pre>
+      <p>
+        意味は、「この場所の近く 1000m にある、点字ブロック関係のタグを持った way や node を JSON で返して」です。
+      </p>
+
       <h3>具体例</h3>
       <pre><code>GET /api/osm-tactile-ways?centerLat=35.6812&amp;centerLng=139.7671&amp;radiusKm=1</code></pre>
       <p>意味は「東京駅の近く1kmで、点字ブロック関係のOpenStreetMapデータを探して」です。</p>
@@ -397,6 +435,50 @@
         </tr>
       </table>
       <p>簡単にいうと、「GPSの1点を送ると、道の上っぽい1点が返る」APIです。</p>
+
+      <h3>裏側で使っている外部API</h3>
+      <p>
+        このAPIの裏では、Valhalla の <code>POST /locate</code> を使っています。
+        これは「この点の近くにある道を調べて、いちばん近そうな場所を返して」というAPIです。
+      </p>
+      <table>
+        <tr>
+          <th>相手先</th>
+          <td>既定では <code>localhost:8002</code>。環境変数 <code>VALHALLA_HOST</code> と <code>VALHALLA_PORT</code> で変更可能</td>
+        </tr>
+        <tr>
+          <th>パス</th>
+          <td><code>/locate</code></td>
+        </tr>
+        <tr>
+          <th>メソッド</th>
+          <td><code>POST</code></td>
+        </tr>
+        <tr>
+          <th>送る形式</th>
+          <td><code>application/json</code></td>
+        </tr>
+      </table>
+      <p>送っているJSONはだいたい次の形です。</p>
+      <pre><code>{
+  "verbose": true,
+  "locations": [
+    { "lat": 35.6812, "lon": 139.7671, "radius": 10 }
+  ],
+  "costing": "pedestrian",
+  "costing_options": {
+    "pedestrian": {
+      "walkway_factor": 0.1,
+      "sidewalk_factor": 0.1
+    }
+  }
+}</code></pre>
+      <p>
+        ここで <code>pedestrian</code> は「歩く人向け」、
+        <code>radius: 10</code> は「10mくらいの近くで探して」、
+        <code>walkway_factor</code> と <code>sidewalk_factor</code> は「歩道をかなり優先して」という意味です。
+      </p>
+
       <pre><code>GET /api/match?lat=35.6812&amp;lng=139.7671</code></pre>
       <div class="note">
         <p>
@@ -469,6 +551,53 @@
       <p>
         さらに <code>sessionId</code> があれば、サーバー側で「このセッションの通った経路」として保存されます。
       </p>
+
+      <h3>裏側で使っている外部API</h3>
+      <p>
+        このAPIの裏では、Valhalla の <code>POST /trace_attributes</code> を使っています。
+        これは「点の列を見て、どの道を通ったかを推定して」というAPIです。
+      </p>
+      <table>
+        <tr>
+          <th>相手先</th>
+          <td>既定では <code>localhost:8002</code>。<code>VALHALLA_HOST</code> と <code>VALHALLA_PORT</code> で変更可能</td>
+        </tr>
+        <tr>
+          <th>パス</th>
+          <td><code>/trace_attributes</code></td>
+        </tr>
+        <tr>
+          <th>メソッド</th>
+          <td><code>POST</code></td>
+        </tr>
+        <tr>
+          <th>送る形式</th>
+          <td><code>application/json</code></td>
+        </tr>
+      </table>
+      <p>送っているJSONはだいたい次の形です。</p>
+      <pre><code>{
+  "shape": [
+    { "lat": 35.6812, "lon": 139.7671 },
+    { "lat": 35.6813, "lon": 139.7674 },
+    { "lat": 35.6815, "lon": 139.7679 }
+  ],
+  "costing": "pedestrian",
+  "shape_match": "map_snap",
+  "trace_options": {
+    "search_radius": 10
+  },
+  "costing_options": {
+    "pedestrian": {
+      "walkway_factor": 0.1,
+      "sidewalk_factor": 0.1
+    }
+  }
+}</code></pre>
+      <p>
+        つまり、「歩く人として考えて、10mくらいの近くから歩道を優先しつつ、
+        この点の列がどの道だったかを推定して」と頼んでいます。
+      </p>
       <div class="note">
         <p>
           エラー: <code>400 invalid_json</code> は送ったJSONの形がこわれているときです。
@@ -512,8 +641,9 @@
       <h2>まとめ</h2>
       <p>
         このプロジェクトでは、OpenStreetMapの情報を読むAPIと、ValhallaでGPSを道に合わせるAPIが組み合わさっています。
-        <code>/api/osm-tactile-ways</code> は「地図上の点字ブロック情報を見る」ため、
-        <code>/api/match</code> と <code>/api/trace</code> は「GPSのずれを直して歩いた道をそれらしくする」ためのAPIです。
+        <code>/api/osm-tactile-ways</code> は Overpass API の <code>/api/interpreter</code> を使い、
+        <code>/api/match</code> は Valhalla の <code>/locate</code>、
+        <code>/api/trace</code> は Valhalla の <code>/trace_attributes</code> を使っています。
       </p>
     </section>
   </div>
