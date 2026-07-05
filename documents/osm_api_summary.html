@@ -315,7 +315,7 @@
           <td>Overpass QL という検索用の文を送る</td>
         </tr>
       </table>
-      <p>実際には、だいたい次のような検索文を組み立てています。</p>
+      <p>これは <code>/api/osm-tactile-ways</code> を受け取ったサーバーが、<strong>サーバー → Overpass API</strong> と送る検索文の例です。</p>
       <pre><code>[out:json][timeout:25];
 (
   way(around:1000,35.6812,139.7671)["tactile_paving"~"^(yes|both|contrasted)$"];
@@ -327,8 +327,9 @@ out geom;</code></pre>
       </p>
 
       <h3>具体例</h3>
-      <pre><code>GET /api/osm-tactile-ways?centerLat=35.6812&amp;centerLng=139.7671&amp;radiusKm=1</code></pre>
+      <p><code>GET /api/osm-tactile-ways?centerLat=35.6812&amp;centerLng=139.7671&amp;radiusKm=1</code> は、<strong>フロントエンド → このプロジェクトのAPI</strong> に送るリクエスト例です。</p>
       <p>意味は「東京駅の近く1kmで、点字ブロック関係のOpenStreetMapデータを探して」です。</p>
+      <p>次のJSONは、そのあと <strong>このプロジェクトのAPI → フロントエンド</strong> に返るレスポンス例です。</p>
       <pre><code>{
   "success": true,
   "centerLat": 35.6812,
@@ -459,7 +460,7 @@ out geom;</code></pre>
           <td><code>application/json</code></td>
         </tr>
       </table>
-      <p>送っているJSONはだいたい次の形です。</p>
+      <p>次のJSONは、<strong>このプロジェクトのAPI (/api/match) → Valhalla (/locate)</strong> に送っているリクエスト例です。</p>
       <pre><code>{
   "verbose": true,
   "locations": [
@@ -479,7 +480,8 @@ out geom;</code></pre>
         <code>walkway_factor</code> と <code>sidewalk_factor</code> は「歩道をかなり優先して」という意味です。
       </p>
 
-      <pre><code>GET /api/match?lat=35.6812&amp;lng=139.7671</code></pre>
+      <p><code>GET /api/match?lat=35.6812&amp;lng=139.7671</code> は、<strong>フロントエンド → このプロジェクトのAPI</strong> に送るリクエスト例です。</p>
+      <p>このあと返ってくるのは、<strong>このプロジェクトのAPI → フロントエンド</strong> のレスポンスで、本文では <code>lat</code>, <code>lng</code>, <code>count</code>, <code>month</code> が返ると説明しています。</p>
       <div class="note">
         <p>
           エラーや特別な返し方: <code>400 invalid_coordinates</code> は座標がおかしいとき、
@@ -528,7 +530,7 @@ out geom;</code></pre>
         </tr>
       </table>
 
-      <p>入力イメージは次のようになります。</p>
+      <p>次のJSONは、<strong>フロントエンド → このプロジェクトのAPI (/api/trace)</strong> に送るリクエスト例です。</p>
       <pre><code>{
   "sessionId": "abc-123",
   "shape": [
@@ -575,7 +577,7 @@ out geom;</code></pre>
           <td><code>application/json</code></td>
         </tr>
       </table>
-      <p>送っているJSONはだいたい次の形です。</p>
+      <p>次のJSONは、<strong>このプロジェクトのAPI (/api/trace) → Valhalla (/trace_attributes)</strong> に送っているリクエスト例です。</p>
       <pre><code>{
   "shape": [
     { "lat": 35.6812, "lon": 139.7671 },
@@ -598,6 +600,7 @@ out geom;</code></pre>
         つまり、「歩く人として考えて、10mくらいの近くから歩道を優先しつつ、
         この点の列がどの道だったかを推定して」と頼んでいます。
       </p>
+      <p>Valhalla から返ってきたJSONは、そのままに近い形で <strong>このプロジェクトのAPI → フロントエンド</strong> へ返されます。</p>
       <div class="note">
         <p>
           エラー: <code>400 invalid_json</code> は送ったJSONの形がこわれているときです。
