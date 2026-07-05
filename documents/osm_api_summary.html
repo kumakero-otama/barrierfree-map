@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OpenStreetMap関連APIまとめ</title>
+  <title>OpenStreetMap・Valhalla関連APIまとめ</title>
   <style>
     :root {
       --bg: #f5f1e8;
@@ -69,6 +69,11 @@
       color: var(--accent);
     }
 
+    h3 {
+      font-size: 1rem;
+      margin-top: 20px;
+    }
+
     p {
       margin: 0 0 12px;
     }
@@ -104,6 +109,7 @@
     .mini h3 {
       font-size: 1rem;
       margin-bottom: 8px;
+      margin-top: 0;
     }
 
     ul {
@@ -162,46 +168,63 @@
 <body>
   <div class="wrap">
     <section class="hero">
-      <div class="pill">OpenStreetMap関連API</div>
-      <h1>このプロジェクトにある<br />OpenStreetMapのAPIは何をするのか</h1>
+      <div class="pill">OpenStreetMap / Valhalla / フィッティング関連API</div>
+      <h1>このプロジェクトにある<br />地図まわりのAPIまとめ</h1>
       <p class="lead">
-        調べた結果、OpenStreetMapに直接関係するAPIは
-        <code>GET /api/osm-tactile-ways</code> です。
-        これは、地図のある場所の近くにある「点字ブロック関係のOpenStreetMapデータ」を取り出すためのAPIです。
+        調べた結果、このプロジェクトには OpenStreetMap 関連APIだけでなく、
+        Valhalla を使ったマップマッチングや経路フィッティングのAPIもあります。
+        このページでは、それらを中学生にも分かるようにまとめます。
       </p>
     </section>
 
     <section class="card">
-      <h2>まず一言でいうと</h2>
+      <h2>今回見つかったAPI一覧</h2>
+      <ul>
+        <li><code>GET /api/osm-tactile-ways</code>: OpenStreetMapから点字ブロック関連データを探す</li>
+        <li><code>GET /api/match</code>: 1つのGPS点を近くの道にぴたっと合わせる</li>
+        <li><code>POST /api/trace</code>: たくさんのGPS点をまとめて道に合わせ、通った経路らしく整える</li>
+        <li><code>GET /api/count</code>: マップマッチングAPIが今月どれだけ使われたかを見る</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>OpenStreetMapって何?</h2>
       <p>
-        ユーザーが「この場所の近くに点字ブロックの情報はあるかな」と知りたいときに使うAPIです。
-        サーバーは OpenStreetMap そのものを直接読むのではなく、
-        <strong>Overpass API</strong> という検索サービスに問い合わせて、
+        OpenStreetMap は、みんなで作る地図データです。
+        道、歩道、建物、信号、点字ブロックのような情報まで、世界中の人が少しずつ登録しています。
+      </p>
+      <p>
+        このプロジェクトでは、その OpenStreetMap の情報を読み取るAPIと、
+        GPSのずれを地図に合わせて直すAPIの両方を使っています。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2><code>GET /api/osm-tactile-ways</code></h2>
+      <p>
+        これは、地図のある場所の近くにある「点字ブロック関係のOpenStreetMapデータ」を取り出すAPIです。
+        サーバーは OpenStreetMap を直接全部読むのではなく、<strong>Overpass API</strong> という検索サービスに問い合わせて、
         その結果をアプリで使いやすい形に直して返します。
       </p>
-    </section>
 
-    <section class="card">
-      <h2>何を入力するのか</h2>
+      <h3>何を入力するのか</h3>
       <table>
         <tr>
           <th><code>centerLat</code></th>
-          <td>必須。中心にしたい場所の緯度です。地球上での「たて位置」です。</td>
+          <td>必須。中心にしたい場所の緯度です。</td>
         </tr>
         <tr>
           <th><code>centerLng</code></th>
-          <td>必須。中心にしたい場所の経度です。地球上での「よこ位置」です。</td>
+          <td>必須。中心にしたい場所の経度です。</td>
         </tr>
         <tr>
           <th><code>radiusKm</code></th>
-          <td>省略可。どこまで広く探すかを km で指定します。指定しないと 10km です。大きすぎても最大 10km に丸められます。</td>
+          <td>省略可。どこまで広く探すかを km で指定します。指定しないと 10km で、最大でも 10km までです。</td>
         </tr>
       </table>
       <p>つまり、「どの場所を中心に」「どれくらいの広さで探すか」を渡します。</p>
-    </section>
 
-    <section class="card">
-      <h2>どんなデータを探すのか</h2>
+      <h3>どんなデータを探すのか</h3>
       <p>このAPIは、OpenStreetMapの中でも主に点字ブロックに関係するタグを探します。</p>
       <div class="grid">
         <div class="mini">
@@ -225,11 +248,8 @@
           <p>棒状の誘導ブロックか、点状の警告ブロックか。</p>
         </div>
       </div>
-    </section>
 
-    <section class="card">
-      <h2>どんな出力をするのか</h2>
-      <p>返ってくるのは JSON です。中身はだいたい次のような意味です。</p>
+      <h3>どんな出力をするのか</h3>
       <table>
         <tr>
           <th><code>success</code></th>
@@ -252,10 +272,8 @@
           <td>見つかった地物の一覧。地図に線や点として描きやすい形で入っています。</td>
         </tr>
       </table>
-    </section>
 
-    <section class="card">
-      <h2><code>features</code> の中身</h2>
+      <h3><code>features</code> の中身</h3>
       <p>1つ1つの地物は、主に次の2種類です。</p>
       <ul>
         <li><strong>LineString</strong>: 線です。歩道や道沿いの点字ブロックのように、長さのあるものを表します。</li>
@@ -269,14 +287,10 @@
         <li><code>matched_tag_value</code>: そのタグの値</li>
         <li><code>geometry</code>: 地図に置くための位置情報</li>
       </ul>
-    </section>
 
-    <section class="card">
-      <h2>具体例</h2>
-      <p>たとえば、次のように呼び出します。</p>
+      <h3>具体例</h3>
       <pre><code>GET /api/osm-tactile-ways?centerLat=35.6812&amp;centerLng=139.7671&amp;radiusKm=1</code></pre>
       <p>意味は「東京駅の近く1kmで、点字ブロック関係のOpenStreetMapデータを探して」です。</p>
-      <p>返り値のイメージは次のようになります。</p>
       <pre><code>{
   "success": true,
   "centerLat": 35.6812,
@@ -299,24 +313,207 @@
     }
   ]
 }</code></pre>
+
+      <div class="note">
+        <p>
+          エラーの例: <code>400 invalid_center</code> は緯度や経度がおかしいとき、
+          <code>502 osm_upstream_error</code> は外部の地図検索サービスで失敗したときです。
+        </p>
+      </div>
     </section>
 
     <section class="card">
-      <h2>エラーのときはどうなるか</h2>
+      <h2>Valhalla とフィッティングって何?</h2>
+      <p>
+        スマホのGPSは、ほんとうは歩道の上にいるのに、少しずれて車道や建物の上に見えることがあります。
+        そこで使うのが <strong>Valhalla</strong> です。
+        これは地図データを使って、「たぶん本当はこの道の上だろう」と位置を直してくれる仕組みです。
+      </p>
+      <p>
+        この「ずれたGPSを道に合わせること」を、このページでは <strong>フィッティング</strong> や <strong>マップマッチング</strong> と考えてください。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2><code>GET /api/match</code></h2>
+      <p>
+        これは <strong>1点だけ</strong> を直すAPIです。
+        今いる場所のGPS 1つを送ると、近くの歩道や道に合わせた位置を返します。
+      </p>
+
+      <h3>何を入力するのか</h3>
+      <table>
+        <tr>
+          <th><code>lat</code></th>
+          <td>必須。今の緯度です。</td>
+        </tr>
+        <tr>
+          <th><code>lng</code></th>
+          <td>必須。今の経度です。</td>
+        </tr>
+        <tr>
+          <th><code>prevLat</code>, <code>prevLng</code></th>
+          <td>任意。1つ前の位置です。今の実装では必須ではありません。</td>
+        </tr>
+        <tr>
+          <th><code>sessionId</code> / <code>sessionUuid</code></th>
+          <td>任意。どの記録セッションの点かを表します。</td>
+        </tr>
+        <tr>
+          <th><code>userId</code></th>
+          <td>任意。ユーザーIDです。セッション保存に使われます。</td>
+        </tr>
+        <tr>
+          <th><code>deviceUuid</code></th>
+          <td>任意。どの端末から来たかを見分けるために使われます。</td>
+        </tr>
+        <tr>
+          <th><code>seq</code></th>
+          <td>任意。何番目の点かを表します。</td>
+        </tr>
+        <tr>
+          <th><code>record=1</code></th>
+          <td>任意。元のGPS点と直した後の点を保存して、あとで精度確認しやすくします。</td>
+        </tr>
+      </table>
+
+      <h3>どんな出力をするのか</h3>
+      <table>
+        <tr>
+          <th><code>lat</code></th>
+          <td>道に合わせて直したあとの緯度。</td>
+        </tr>
+        <tr>
+          <th><code>lng</code></th>
+          <td>道に合わせて直したあとの経度。</td>
+        </tr>
+        <tr>
+          <th><code>count</code></th>
+          <td>今月このAPIが何回使われたか。</td>
+        </tr>
+        <tr>
+          <th><code>month</code></th>
+          <td>その回数がどの月のものか。たとえば <code>2026-07</code> のような形です。</td>
+        </tr>
+      </table>
+      <p>簡単にいうと、「GPSの1点を送ると、道の上っぽい1点が返る」APIです。</p>
+      <pre><code>GET /api/match?lat=35.6812&amp;lng=139.7671</code></pre>
+      <div class="note">
+        <p>
+          エラーや特別な返し方: <code>400 invalid_coordinates</code> は座標がおかしいとき、
+          <code>429 rate_limited</code> は短時間に送りすぎたとき、
+          <code>204</code> は上限到達や上流応答の処理失敗などで、中身なしで返るときです。
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><code>POST /api/trace</code></h2>
+      <p>
+        これは <strong>たくさんのGPS点をまとめて</strong> 直すAPIです。
+        歩いた点の列を送ると、「本当はこの道を通ったはず」という形に整えて返します。
+      </p>
+
+      <h3>何を入力するのか</h3>
+      <table>
+        <tr>
+          <th><code>shape</code></th>
+          <td>必須。GPS点の配列です。各点は <code>lat</code> と <code>lon</code> を持ちます。</td>
+        </tr>
+        <tr>
+          <th><code>userId</code></th>
+          <td>任意。誰の記録かを表します。</td>
+        </tr>
+        <tr>
+          <th><code>sessionId</code></th>
+          <td>任意。セッションにひもづけて、あとで経路保存にも使えます。</td>
+        </tr>
+        <tr>
+          <th><code>source</code></th>
+          <td>任意。デフォルトは <code>valhalla</code> です。</td>
+        </tr>
+        <tr>
+          <th><code>costing</code></th>
+          <td>任意。OpenAPIにはありますが、実装では歩行者向けの <code>pedestrian</code> が使われます。</td>
+        </tr>
+        <tr>
+          <th><code>shape_match</code></th>
+          <td>任意。デフォルトは <code>map_snap</code> です。GPS列を道に合わせるモードです。</td>
+        </tr>
+        <tr>
+          <th><code>filters</code></th>
+          <td>任意。Valhallaから受け取る情報をしぼる設定です。</td>
+        </tr>
+      </table>
+
+      <p>入力イメージは次のようになります。</p>
+      <pre><code>{
+  "sessionId": "abc-123",
+  "shape": [
+    { "lat": 35.6812, "lon": 139.7671 },
+    { "lat": 35.6813, "lon": 139.7674 },
+    { "lat": 35.6815, "lon": 139.7679 }
+  ]
+}</code></pre>
+
+      <h3>どんな出力をするのか</h3>
+      <p>
+        返り値は「Valhallaの結果そのまま」に近い JSON です。
+        そのため項目は多いですが、大事なものだけ言うと次の通りです。
+      </p>
       <ul>
-        <li><code>400 invalid_center</code>: 緯度や経度が数字として正しくないとき。</li>
-        <li><code>405 method_not_allowed</code>: GET 以外の方法で呼んだとき。</li>
-        <li><code>500</code>: サーバー内部の設定や処理で問題が起きたとき。</li>
-        <li><code>502 osm_upstream_error</code>: OpenStreetMap検索に使う外部サービス側で失敗したとき。</li>
+        <li><code>edges</code>: どの道の区間を通ったと考えたか</li>
+        <li><code>matched_points</code>: 入力したGPS点が、どこに合わせられたか</li>
+        <li><code>shape</code>: 道に合わせて整えられた線の情報</li>
       </ul>
+      <p>
+        さらに <code>sessionId</code> があれば、サーバー側で「このセッションの通った経路」として保存されます。
+      </p>
+      <div class="note">
+        <p>
+          エラー: <code>400 invalid_json</code> は送ったJSONの形がこわれているときです。
+          Valhallaへの通信や結果の解釈に失敗すると <code>500</code> 系になります。
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><code>GET /api/count</code></h2>
+      <p>
+        これは地図そのものを返すAPIではありませんが、
+        <code>/api/match</code> などのマップマッチングが今月どれだけ使われたかを見るためのAPIです。
+      </p>
+
+      <h3>入力</h3>
+      <p>特に必要ありません。</p>
+
+      <h3>出力</h3>
+      <table>
+        <tr>
+          <th><code>count</code></th>
+          <td>今月使われた回数。</td>
+        </tr>
+        <tr>
+          <th><code>max</code></th>
+          <td>今月の上限回数。</td>
+        </tr>
+        <tr>
+          <th><code>month</code></th>
+          <td>対象の月。</td>
+        </tr>
+        <tr>
+          <th><code>allMonths</code></th>
+          <td>月ごとの回数一覧。</td>
+        </tr>
+      </table>
     </section>
 
     <section class="card note">
-      <h2>ポイント</h2>
+      <h2>まとめ</h2>
       <p>
-        このAPIは「OpenStreetMapの全部」を返すものではありません。
-        <strong>点字ブロックに関係するものだけ</strong> を、
-        指定した場所の近くから拾って返す、かなり目的のはっきりしたAPIです。
+        このプロジェクトでは、OpenStreetMapの情報を読むAPIと、ValhallaでGPSを道に合わせるAPIが組み合わさっています。
+        <code>/api/osm-tactile-ways</code> は「地図上の点字ブロック情報を見る」ため、
+        <code>/api/match</code> と <code>/api/trace</code> は「GPSのずれを直して歩いた道をそれらしくする」ためのAPIです。
       </p>
     </section>
   </div>
