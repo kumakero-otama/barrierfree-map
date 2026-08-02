@@ -167,6 +167,51 @@ async function connect(config, database, user = config.user, password = config.p
 
   const dev = await connect(adminConfig, databaseName, roleName, password);
   try {
+    await dev.query("CREATE SCHEMA IF NOT EXISTS experiment AUTHORIZATION CURRENT_USER");
+    await dev.query(`
+      CREATE TABLE IF NOT EXISTS experiment.fitting_comparisons (
+        id BIGSERIAL PRIMARY KEY,
+        experiment_session_uuid TEXT,
+        user_id TEXT NOT NULL,
+        observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        raw_lat DOUBLE PRECISION NOT NULL,
+        raw_lng DOUBLE PRECISION NOT NULL,
+        valhalla_lat DOUBLE PRECISION,
+        valhalla_lng DOUBLE PRECISION,
+        valhalla_way_id BIGINT,
+        valhalla_distance_m DOUBLE PRECISION,
+        browser_lat DOUBLE PRECISION,
+        browser_lng DOUBLE PRECISION,
+        browser_way_id BIGINT,
+        browser_way_version INTEGER,
+        browser_distance_m DOUBLE PRECISION,
+        browser_priority TEXT,
+        result_distance_m DOUBLE PRECISION,
+        way_match BOOLEAN,
+        browser_connected BOOLEAN,
+        valhalla_duration_ms INTEGER,
+        browser_duration_ms INTEGER,
+        status TEXT NOT NULL,
+        error_message TEXT,
+        client_version TEXT,
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await dev.query("CREATE INDEX IF NOT EXISTS fitting_comparisons_created_idx ON experiment.fitting_comparisons (created_at DESC)");
+    await dev.query("CREATE INDEX IF NOT EXISTS fitting_comparisons_session_idx ON experiment.fitting_comparisons (experiment_session_uuid, created_at)");
+    await dev.query(`
+      CREATE OR REPLACE FUNCTION experiment.prevent_fitting_history_mutation()
+      RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        RAISE EXCEPTION 'fitting_comparisons is append-only';
+      END $$
+    `);
+    await dev.query(`
+      CREATE TRIGGER fitting_comparisons_append_only
+      BEFORE UPDATE OR DELETE ON experiment.fitting_comparisons
+      FOR EACH ROW EXECUTE FUNCTION experiment.prevent_fitting_history_mutation()
+    `);
     await dev.query("SELECT 1");
     const userTableCount = await dev.query(`
       SELECT COUNT(*)::int AS count

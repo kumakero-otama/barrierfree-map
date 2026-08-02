@@ -20,7 +20,8 @@ module.exports = {
         HTTP_PORT: "3100",
         HTTPS_PORT: "3101",
         DB_CONFIG_PATH: `${__dirname}/config.dev.yaml`,
-        EXPERIMENT_DB_CONFIG_PATH: `${__dirname}/config.experiment.dev.yaml`,
+        // UI10の通常データと比較履歴は、同じ隔離済み開発DB内の別スキーマへ保存する。
+        EXPERIMENT_DB_CONFIG_PATH: `${__dirname}/config.dev.yaml`,
         ACCESS_TOKEN_SECRET: securityConfig.accessTokenSecret || "",
         DEV_ADMIN_KEY: securityConfig.adminKey || "",
         CORS_ALLOWED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000,https://barrierfree-map.tail5de5e1.ts.net:10001,https://kumakero-otama.github.io",
