@@ -241,7 +241,7 @@ function createMatchHandler({
   }
 
   // raw 座標と snapped 座標を同一トランザクションで保存する。
-  async function persistRealtimePoints({ sessionUuid, rawLat, rawLng, snappedLat, snappedLng, edgeId, confidence, logPrefix }) {
+  async function persistRealtimePoints({ sessionUuid, rawLat, rawLng, accuracy, snappedLat, snappedLng, edgeId, confidence, logPrefix }) {
     if (!pool) {
       return;
     }
@@ -260,7 +260,7 @@ function createMatchHandler({
       // 生 GPS とスナップ後 GPS を同時保存し、後でマッチング精度を検証できるようにする。
       const [rawResult] = await conn.query(
         "INSERT INTO tactile.gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
-        [safeSessionUuid, rawLng, rawLat, null]
+        [safeSessionUuid, rawLng, rawLat, Number.isFinite(accuracy) ? accuracy : null]
       );
       await conn.query(
         "INSERT INTO tactile.gps_matched (session_id, ts, geom, edge_id, confidence) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?, ?)",
@@ -291,6 +291,7 @@ function createMatchHandler({
     const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
     const lat = parseFloat(url.searchParams.get("lat"));
     const lng = parseFloat(url.searchParams.get("lng"));
+    const accuracy = parseFloat(url.searchParams.get("accuracy"));
     const sessionUuid = url.searchParams.get("sessionId") || url.searchParams.get("sessionUuid");
     const userId = req.authUserId ? String(req.authUserId) : "";
     const deviceUuid = userId;
@@ -407,6 +408,7 @@ function createMatchHandler({
                     sessionUuid,
                     rawLat: lat,
                     rawLng: lng,
+                    accuracy,
                     snappedLat,
                     snappedLng,
                     edgeId: edgeWayId,
