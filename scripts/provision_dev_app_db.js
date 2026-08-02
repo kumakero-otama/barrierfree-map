@@ -167,6 +167,8 @@ async function connect(config, database, user = config.user, password = config.p
 
   const dev = await connect(adminConfig, databaseName, roleName, password);
   try {
+    const osmDraftMigrationPath = path.join(repoRoot, "migrations", "002_osm_change_drafts.sql");
+    await dev.query(fs.readFileSync(osmDraftMigrationPath, "utf8"));
     await dev.query("CREATE SCHEMA IF NOT EXISTS experiment AUTHORIZATION CURRENT_USER");
     await dev.query(`
       CREATE TABLE IF NOT EXISTS experiment.fitting_comparisons (

@@ -12,6 +12,7 @@ const createTraceHandler = require("./server/api/trace");
 const createOsmTactileWaysHandler = require("./server/api/osm_tactile");
 const createOsmWalkableNetworkHandler = require("./server/api/osm_walkable");
 const createFittingComparisonsHandler = require("./server/api/fitting_comparisons");
+const createOsmChangesHandler = require("./server/api/osm_changes");
 const createPostTagsHandler = require("./server/api/post_tags");
 const createRoadInfoHandler = require("./server/api/road_info");
 const createGoogleAuthHandler = require("./server/api/google_auth");
@@ -344,6 +345,10 @@ const handleFittingComparisons = createFittingComparisonsHandler({
   sendJson,
 });
 
+const handleOsmChanges = createOsmChangesHandler({
+  sendJson,
+});
+
 const handlePostTags = createPostTagsHandler({
   sendJson,
 });
@@ -452,6 +457,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/fitting-comparisons")) {
     handleFittingComparisons(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/osm/")) {
+    handleOsmChanges(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/api/post-tags")) {
