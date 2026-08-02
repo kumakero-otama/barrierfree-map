@@ -10,6 +10,7 @@ const createConfigHandler = require("./server/api/config");
 const createRecordsHandler = require("./server/api/records");
 const createTraceHandler = require("./server/api/trace");
 const createOsmTactileWaysHandler = require("./server/api/osm_tactile");
+const createOsmWalkableNetworkHandler = require("./server/api/osm_walkable");
 const createPostTagsHandler = require("./server/api/post_tags");
 const createRoadInfoHandler = require("./server/api/road_info");
 const createGoogleAuthHandler = require("./server/api/google_auth");
@@ -330,6 +331,10 @@ const handleOsmTactileWays = createOsmTactileWaysHandler({
   sendJson,
 });
 
+const handleOsmWalkableNetwork = createOsmWalkableNetworkHandler({
+  sendJson,
+});
+
 const handlePostTags = createPostTagsHandler({
   sendJson,
 });
@@ -421,6 +426,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/osm-tactile-ways")) {
     handleOsmTactileWays(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/osm-walkable-network")) {
+    handleOsmWalkableNetwork(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/api/post-tags")) {
