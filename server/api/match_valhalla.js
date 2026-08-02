@@ -419,7 +419,15 @@ function createMatchHandler({
                   console.log(`${logPrefix} [DEBUG] Realtime record skipped for canceled session=${sessionUuid}`);
                 }
                 
-                sendJson(res, 200, { lat: snappedLat, lng: snappedLng, count: newCount, month: currentMonth });
+                sendJson(res, 200, {
+                  lat: snappedLat,
+                  lng: snappedLng,
+                  wayId: edgeWayId,
+                  distanceMeters: selectedEdge.distanceMeters,
+                  sidewalkPriorityApplied: selectedEdge.sidewalkPriorityApplied,
+                  count: newCount,
+                  month: currentMonth,
+                });
                 return;
               }
             }

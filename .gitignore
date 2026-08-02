@@ -4,6 +4,7 @@ localhost-key.pem
 localhost-cert.pem
 config.yaml
 config.dev.yaml
+config.experiment.dev.yaml
 logs/
 node_modules/
 data/mapbox-count.json
