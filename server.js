@@ -275,6 +275,9 @@ function applyCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", allowHeaders);
   res.setHeader("Access-Control-Max-Age", "86400");
+  if (String(req.headers["access-control-request-private-network"] || "").toLowerCase() === "true") {
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
+  }
   return true;
 }
 
