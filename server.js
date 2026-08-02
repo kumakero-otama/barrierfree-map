@@ -19,6 +19,7 @@ const createProStatusHandler = require("./server/api/pro_status");
 const createTactileTagsHandler = require("./server/api/tactile_tags");
 const createClientLogsHandler = require("./server/api/client_logs");
 const createTactileRankingHandler = require("./server/api/tactile_ranking");
+const createDevApiGuard = require("./server/security/dev_api_guard");
 const { createLogger } = require("./server/logger");
 
 // HTTP/HTTPS の待受先。開発環境を本番と別ポート・localhost限定で起動できるようにする。
@@ -370,6 +371,12 @@ const handleTactileRanking = createTactileRankingHandler({
   sendJson,
 });
 
+const guardDevApi = createDevApiGuard({
+  sendJson,
+  logDir: LOG_DIR,
+  allowedOrigins: CORS_ALLOWED_ORIGINS,
+});
+
 // API を先に振り分け、該当しないものだけ静的ファイル配信へフォールバックする。
 function handleRequest(req, res) {
   const isCorsRequest = applyCorsHeaders(req, res);
@@ -377,6 +384,9 @@ function handleRequest(req, res) {
     // preflight 応答は本文不要なので 204 で即終了する。
     res.writeHead(204);
     res.end();
+    return;
+  }
+  if (!guardDevApi(req, res)) {
     return;
   }
 

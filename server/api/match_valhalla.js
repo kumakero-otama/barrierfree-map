@@ -292,8 +292,8 @@ function createMatchHandler({
     const lat = parseFloat(url.searchParams.get("lat"));
     const lng = parseFloat(url.searchParams.get("lng"));
     const sessionUuid = url.searchParams.get("sessionId") || url.searchParams.get("sessionUuid");
-    const userId = url.searchParams.get("userId");
-    const deviceUuid = url.searchParams.get("deviceUuid") || userId;
+    const userId = req.authUserId ? String(req.authUserId) : "";
+    const deviceUuid = userId;
     const shouldRecordRealtime = url.searchParams.get("record") === "1";
     const seq = parseInt(url.searchParams.get("seq"), 10);
 

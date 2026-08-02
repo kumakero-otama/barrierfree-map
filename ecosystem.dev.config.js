@@ -1,4 +1,11 @@
 // 本番と同じサーバー上で、安全に並行稼働させる開発API用PM2定義。
+const fs = require("fs");
+const path = require("path");
+const securityConfigPath = path.join(__dirname, "config.security.dev.json");
+const securityConfig = fs.existsSync(securityConfigPath)
+  ? JSON.parse(fs.readFileSync(securityConfigPath, "utf8"))
+  : {};
+
 module.exports = {
   apps: [
     {
@@ -14,6 +21,8 @@ module.exports = {
         HTTPS_PORT: "3101",
         DB_CONFIG_PATH: `${__dirname}/config.dev.yaml`,
         EXPERIMENT_DB_CONFIG_PATH: `${__dirname}/config.experiment.dev.yaml`,
+        ACCESS_TOKEN_SECRET: securityConfig.accessTokenSecret || "",
+        DEV_ADMIN_KEY: securityConfig.adminKey || "",
         CORS_ALLOWED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000,https://barrierfree-map.tail5de5e1.ts.net:10001,https://kumakero-otama.github.io",
       },
     },

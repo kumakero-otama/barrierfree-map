@@ -85,7 +85,11 @@ function createFittingComparisonsHandler({ sendJson }) {
       const body = await readJson(req);
       const rawLat = finiteOrNull(body.rawLat);
       const rawLng = finiteOrNull(body.rawLng);
-      const userId = String(body.userId || "").trim();
+      const userId = String(req.authUserId || "").trim();
+      if (body.userId != null && String(body.userId) !== userId) {
+        sendJson(res, 403, { error: "user_mismatch" });
+        return;
+      }
       if (!userId || rawLat === null || rawLng === null || rawLat < -90 || rawLat > 90 || rawLng < -180 || rawLng > 180) {
         sendJson(res, 400, { error: "invalid_comparison" });
         return;
