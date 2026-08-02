@@ -4,14 +4,16 @@ const yaml = require("yaml");
 const { Pool } = require("pg");
 const { createLogger } = require("./logger");
 
-const CONFIG_PATH = path.join(__dirname, "..", "config.yaml");
+const CONFIG_PATH = process.env.DB_CONFIG_PATH
+  ? path.resolve(process.env.DB_CONFIG_PATH)
+  : path.join(__dirname, "..", "config.yaml");
 const LOG_DIR = path.join(__dirname, "..", "logs");
 const DB_LOG = path.join(LOG_DIR, "db_connection.csv");
 
 // DB 初期化の成否や設定読み込み結果を記録する専用ロガー。
 const dbLogger = createLogger(DB_LOG);
 
-// ルートのconfig.yamlからDB接続設定を読む。
+// 本番は従来のconfig.yaml、開発はDB_CONFIG_PATHで分離した設定を読む。
 function loadConfig() {
   const raw = fs.readFileSync(CONFIG_PATH, "utf8");
   const parsed = yaml.parse(raw);

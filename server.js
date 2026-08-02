@@ -19,9 +19,10 @@ const createClientLogsHandler = require("./server/api/client_logs");
 const createTactileRankingHandler = require("./server/api/tactile_ranking");
 const { createLogger } = require("./server/logger");
 
-// HTTP/HTTPS の待受ポート。TLS が無い環境でも HTTP 側は単独で起動できる。
-const HTTP_PORT = 3000;
-const HTTPS_PORT = 3001;
+// HTTP/HTTPS の待受先。開発環境を本番と別ポート・localhost限定で起動できるようにする。
+const HTTP_HOST = process.env.HTTP_HOST || "0.0.0.0";
+const HTTP_PORT = parseInt(process.env.HTTP_PORT, 10) || 3000;
+const HTTPS_PORT = parseInt(process.env.HTTPS_PORT, 10) || 3001;
 // 外部サービスや TLS 関連は環境変数から受け取り、未設定でも起動自体は継続する。
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || "";
 const TLS_KEY_PATH = process.env.TLS_KEY_PATH || "";
@@ -454,8 +455,8 @@ function handleRequest(req, res) {
   handleStatic(req, res);
 }
 
-http.createServer(handleRequest).listen(HTTP_PORT, () => {
-  console.log(`http://localhost:${HTTP_PORT}`);
+http.createServer(handleRequest).listen(HTTP_PORT, HTTP_HOST, () => {
+  console.log(`http://${HTTP_HOST}:${HTTP_PORT}`);
 });
 
 if (TLS_KEY_PATH && TLS_CERT_PATH) {
@@ -463,8 +464,8 @@ if (TLS_KEY_PATH && TLS_CERT_PATH) {
     // 鍵と証明書が両方ある場合のみ HTTPS サーバーを追加で立ち上げる。
     const key = fs.readFileSync(TLS_KEY_PATH);
     const cert = fs.readFileSync(TLS_CERT_PATH);
-    https.createServer({ key, cert }, handleRequest).listen(HTTPS_PORT, () => {
-      console.log(`https://localhost:${HTTPS_PORT}`);
+    https.createServer({ key, cert }, handleRequest).listen(HTTPS_PORT, HTTP_HOST, () => {
+      console.log(`https://${HTTP_HOST}:${HTTPS_PORT}`);
     });
   } catch (err) {
     console.warn("https_start_failed", err.message);

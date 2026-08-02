@@ -1,0 +1,9 @@
+# Copy this file to config.dev.yaml only after a dedicated development
+# database has been created. Never place production credentials here.
+db:
+  host: 127.0.0.1
+  port: 5432
+  user: stepby_dev
+  password: replace_with_development_password
+  database: stepby_dev
+  ssl: false
