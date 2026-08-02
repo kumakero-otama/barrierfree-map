@@ -14,7 +14,7 @@ module.exports = {
         HTTPS_PORT: "3101",
         DB_CONFIG_PATH: `${__dirname}/config.dev.yaml`,
         EXPERIMENT_DB_CONFIG_PATH: `${__dirname}/config.experiment.dev.yaml`,
-        CORS_ALLOWED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000,https://barrierfree-map.tail5de5e1.ts.net:10001",
+        CORS_ALLOWED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000,https://barrierfree-map.tail5de5e1.ts.net:10001,https://kumakero-otama.github.io",
       },
     },
   ],
