@@ -79,7 +79,9 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins }) {
     }
 
     const contentLength = Number(req.headers["content-length"] || 0);
-    const maxBodyBytes = pathname.startsWith("/auth/profile") ? 6 * 1024 * 1024 : 128 * 1024;
+    const maxBodyBytes = pathname.startsWith("/auth/profile")
+      ? 6 * 1024 * 1024
+      : pathname === "/api/osm/split-plan" ? 1024 * 1024 : 128 * 1024;
     if (Number.isFinite(contentLength) && contentLength > maxBodyBytes) {
       log("BODY_REJECTED", req, { contentLength, maxBodyBytes });
       sendJson(res, 413, { error: "payload_too_large", requestId: req.securityRequestId });

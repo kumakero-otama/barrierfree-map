@@ -1,7 +1,8 @@
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
+const { createSplitPlan } = require("../osm/split_planner");
 
-const MAX_BODY_BYTES = 256 * 1024;
+const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
 const ELEMENT_TYPES = new Set(["node", "way", "relation"]);
 const ACTION_TYPES = new Set(["create", "modify", "delete"]);
@@ -117,7 +118,7 @@ function createOsmChangesHandler({ sendJson }) {
     try {
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       // HTTP body may start streaming immediately, so capture it before awaiting DB initialization.
-      const pendingBody = url.pathname === "/api/osm/plans" && req.method === "POST"
+      const pendingBody = ["/api/osm/plans", "/api/osm/split-plan"].includes(url.pathname) && req.method === "POST"
         ? readJson(req)
         : null;
       await ensureSchema();
@@ -132,6 +133,28 @@ function createOsmChangesHandler({ sendJson }) {
           osmWritesEnabled: false,
           reason: "OSM write execution is intentionally not implemented and is locked off",
         });
+        return;
+      }
+
+      if (url.pathname === "/api/osm/split-plan" && req.method === "POST") {
+        const body = await pendingBody;
+        const splitPlan = createSplitPlan({ segments: body.segments }, { tactileValue: "yes" });
+        const planId = crypto.randomUUID();
+        const summary = String(body.summary || "UI10 tactile paving split dry-run").trim().slice(0, 500);
+        const clientContext = {
+          ...(body.clientContext && typeof body.clientContext === "object" ? body.clientContext : {}),
+          previewOnly: true,
+          osmWriteRequested: false,
+          planner: "split_planner_v1",
+          splitSummary: splitPlan.summary,
+        };
+        await pool.query(
+          `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
+           VALUES(?,?,?,?,?,?::jsonb,?::jsonb) RETURNING plan_id`,
+          [planId, "merge", req.authUserId, null, summary, JSON.stringify(splitPlan.operations), JSON.stringify(clientContext)]
+        );
+        await appendAudit(planId, "split_plan_created", req, { ...splitPlan.summary, osmSent: false });
+        sendJson(res, 201, { success: true, planId, status: "draft", osmSent: false, splitPlan });
         return;
       }
 
@@ -227,7 +250,14 @@ function createOsmChangesHandler({ sendJson }) {
 
       sendJson(res, 404, { error: "not_found" });
     } catch (error) {
-      const status = error.message === "invalid_json" ? 400 : error.message === "body_too_large" ? 413 : 500;
+      const clientErrors = new Set([
+        "invalid_segments", "duplicate_way_in_route", "invalid_way_identity", "invalid_way_geometry",
+        "invalid_boundary", "invalid_node_boundary", "invalid_projection_boundary",
+        "invalid_boundary_fraction", "invalid_boundary_lng", "invalid_boundary_lat", "zero_length_tactile_segment",
+      ]);
+      const status = error.message === "invalid_json" || clientErrors.has(error.message)
+        ? 400
+        : error.message === "body_too_large" ? 413 : 500;
       console.error("[osm_changes] request failed:", error.message);
       sendJson(res, status, { error: status === 500 ? "osm_change_api_failed" : error.message });
     }
