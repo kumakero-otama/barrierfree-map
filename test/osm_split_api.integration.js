@@ -14,6 +14,10 @@ async function run() {
     Authorization: `Bearer ${guest.body.access_token}`,
     "Content-Type": "application/json",
   };
+  const status = await request("/api/osm/status", { headers });
+  assert.strictEqual(status.status, 200);
+  assert.strictEqual(status.body.osmNetworkCodePresent, true);
+  assert.strictEqual(status.body.osmWritesEnabled, false);
   const created = await request("/api/osm/split-plan", {
     method: "POST",
     headers,
@@ -49,6 +53,10 @@ async function run() {
   const reverted = await request(`/api/osm/plans/${created.body.planId}/revert-plan`, { method: "POST", headers });
   assert.strictEqual(reverted.status, 201);
   assert.strictEqual(reverted.body.osmSent, false);
+  assert.strictEqual(reverted.body.executable, false);
+  const blockedRevert = await request(`/api/osm/plans/${reverted.body.planId}/execute-revert`, { method: "POST", headers });
+  assert.strictEqual(blockedRevert.status, 423);
+  assert.strictEqual(blockedRevert.body.osmSent, false);
 
   console.log(JSON.stringify({
     result: "passed",

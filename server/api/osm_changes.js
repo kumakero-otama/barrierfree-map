@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
 const { createSplitPlan } = require("../osm/split_planner");
+const { executeWithClient, createConfiguredClient } = require("../osm/osm_executor");
+const { createExecutableRevert } = require("../osm/revert_planner");
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
@@ -29,6 +31,16 @@ function isAdminRequest(req) {
   const expected = Buffer.from(String(process.env.DEV_ADMIN_KEY || ""));
   const actual = Buffer.from(String(req.headers["x-stepby-admin-key"] || ""));
   return expected.length >= 32 && expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+function writesEnabled() {
+  return process.env.OSM_WRITES_ENABLED === "true";
+}
+
+function hasImmediateConfirmation(req, body, planId, action) {
+  const header = String(req.headers["x-stepby-osm-confirm"] || "");
+  const expected = `${action} ${planId}`;
+  return header === expected && body && body.confirmation === expected;
 }
 
 function validateElements(value) {
@@ -84,6 +96,16 @@ function createOsmChangesHandler({ sendJson }) {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS osmchange.execution_attempts (
+        attempt_id UUID PRIMARY KEY,
+        plan_id UUID NOT NULL,
+        action TEXT NOT NULL CHECK (action IN ('execute', 'execute-revert')),
+        actor_user_id BIGINT NOT NULL,
+        request_id TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
     await pool.query("CREATE INDEX IF NOT EXISTS osm_change_plans_created_idx ON osmchange.change_plans(created_at DESC)");
     await pool.query("CREATE INDEX IF NOT EXISTS osm_audit_plan_idx ON osmchange.audit_events(plan_id, event_id)");
     await pool.query(`
@@ -98,6 +120,9 @@ function createOsmChangesHandler({ sendJson }) {
       FOR EACH ROW EXECUTE FUNCTION osmchange.prevent_history_mutation()`);
     await pool.query("DROP TRIGGER IF EXISTS osm_audit_events_append_only ON osmchange.audit_events");
     await pool.query(`CREATE TRIGGER osm_audit_events_append_only BEFORE UPDATE OR DELETE ON osmchange.audit_events
+      FOR EACH ROW EXECUTE FUNCTION osmchange.prevent_history_mutation()`);
+    await pool.query("DROP TRIGGER IF EXISTS osm_execution_attempts_append_only ON osmchange.execution_attempts");
+    await pool.query(`CREATE TRIGGER osm_execution_attempts_append_only BEFORE UPDATE OR DELETE ON osmchange.execution_attempts
       FOR EACH ROW EXECUTE FUNCTION osmchange.prevent_history_mutation()`);
     initialized = true;
   }
@@ -118,7 +143,8 @@ function createOsmChangesHandler({ sendJson }) {
     try {
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       // HTTP body may start streaming immediately, so capture it before awaiting DB initialization.
-      const pendingBody = ["/api/osm/plans", "/api/osm/split-plan"].includes(url.pathname) && req.method === "POST"
+      const isExecutionRequest = req.method === "POST" && /\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname);
+      const pendingBody = (["/api/osm/plans", "/api/osm/split-plan"].includes(url.pathname) || isExecutionRequest) && req.method === "POST"
         ? readJson(req)
         : null;
       await ensureSchema();
@@ -129,9 +155,10 @@ function createOsmChangesHandler({ sendJson }) {
           success: true,
           environment: "development",
           proposalApiEnabled: true,
-          osmNetworkCodePresent: false,
-          osmWritesEnabled: false,
-          reason: "OSM write execution is intentionally not implemented and is locked off",
+          osmNetworkCodePresent: true,
+          osmWritesEnabled: writesEnabled(),
+          requiredSafeguards: ["server_feature_flag", "admin_key", "per_request_plan_confirmation", "append_only_audit"],
+          reason: writesEnabled() ? "OSM write code is enabled but still requires per-request safeguards" : "OSM write code is installed and locked by the server feature flag",
         });
         return;
       }
@@ -203,23 +230,92 @@ function createOsmChangesHandler({ sendJson }) {
           return;
         }
         if (req.method === "POST" && parts[4] === "revert-plan") {
-          const reverseElements = [...plan.elements].reverse().map((element) => ({
-            ...element,
-            action: element.action === "create" ? "delete" : element.action === "delete" ? "create" : "modify",
-            before: element.after,
-            after: element.before,
-          }));
+          const [successEvents] = await pool.query(
+            `SELECT details FROM osmchange.audit_events
+             WHERE plan_id=? AND event_type='execution_succeeded' ORDER BY event_id DESC LIMIT 1`, [planId]
+          );
+          const executionResult = successEvents[0] && successEvents[0].details && successEvents[0].details.executionResult;
+          const executable = Boolean(executionResult);
+          const reverseElements = executable
+            ? createExecutableRevert(plan.elements, executionResult)
+            : [...plan.elements].reverse().map((element) => ({
+              ...element,
+              action: element.action === "create" ? "delete" : "modify",
+              before: element.after,
+              after: element.before,
+            }));
           const revertPlanId = crypto.randomUUID();
           await pool.query(
             `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
-             VALUES(?,?,?,?,?,?::jsonb,'{}'::jsonb) RETURNING plan_id`,
-            [revertPlanId, "revert", req.authUserId, planId, `Revert: ${plan.summary}`.slice(0, 500), JSON.stringify(reverseElements)]
+             VALUES(?,?,?,?,?,?::jsonb,?::jsonb) RETURNING plan_id`,
+            [revertPlanId, "revert", req.authUserId, planId, `Revert: ${plan.summary}`.slice(0, 500), JSON.stringify(reverseElements),
+              JSON.stringify({ executable, sourceChangesetId: executionResult && executionResult.changesetId || null })]
           );
-          await appendAudit(revertPlanId, "revert_plan_created", req, { sourcePlanId: planId });
-          sendJson(res, 201, { success: true, planId: revertPlanId, sourcePlanId: planId, status: "draft", osmSent: false });
+          await appendAudit(revertPlanId, "revert_plan_created", req, { sourcePlanId: planId, executable });
+          sendJson(res, 201, { success: true, planId: revertPlanId, sourcePlanId: planId, status: "draft", executable, osmSent: false });
           return;
         }
-        if (req.method === "POST" && ["approve", "execute", "delete-elements", "execute-revert"].includes(parts[4])) {
+        if (req.method === "POST" && ["execute", "execute-revert"].includes(parts[4])) {
+          const action = parts[4];
+          const body = await pendingBody;
+          if (!writesEnabled()) {
+            await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "server_feature_flag_disabled" });
+            sendJson(res, 423, { error: "osm_write_locked", osmSent: false, message: "OSM_WRITES_ENABLED is not true" });
+            return;
+          }
+          if (!isAdminRequest(req)) {
+            await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "admin_required" });
+            sendJson(res, 403, { error: "admin_required", osmSent: false });
+            return;
+          }
+          if (!hasImmediateConfirmation(req, body, planId, action)) {
+            await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "immediate_confirmation_required" });
+            sendJson(res, 409, { error: "osm_confirmation_required", osmSent: false, expected: `${action} ${planId}` });
+            return;
+          }
+          if (action === "execute-revert" && (plan.operation_type !== "revert" || !plan.client_context || !plan.client_context.executable)) {
+            await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "revert_not_executable" });
+            sendJson(res, 409, { error: "revert_not_executable", osmSent: false });
+            return;
+          }
+          const attemptId = crypto.randomUUID();
+          await pool.query(
+            `INSERT INTO osmchange.execution_attempts(attempt_id,plan_id,action,actor_user_id,request_id)
+             VALUES(?,?,?,?,?) RETURNING attempt_id`,
+            [attemptId, planId, action, req.authUserId, req.securityRequestId || null]
+          );
+          await appendAudit(planId, "execution_authorized", req, { attemptId, requestedAction: action, elementCount: plan.elements.length });
+          try {
+            const executionResult = await executeWithClient({
+              client: createConfiguredClient(),
+              operations: plan.elements,
+              summary: plan.summary,
+              planId,
+              operationType: plan.operation_type,
+              onChangesetCreated: async (changesetId) => {
+                await appendAudit(planId, "changeset_created", req, { attemptId, requestedAction: action, changesetId });
+              },
+            });
+            await appendAudit(planId, "execution_succeeded", req, { attemptId, requestedAction: action, executionResult });
+            sendJson(res, 200, { success: true, planId, attemptId, osmSent: true, executionResult });
+          } catch (executionError) {
+            await appendAudit(planId, "execution_failed", req, {
+              attemptId, requestedAction: action, error: executionError.message,
+              osmStatus: executionError.status || null,
+              changesetId: executionError.changesetId || null,
+              conflict: executionError.message === "osm_version_conflict" ? {
+                elementType: executionError.elementType,
+                osmId: executionError.osmId,
+                expectedVersion: executionError.expectedVersion,
+                currentVersion: executionError.currentVersion,
+              } : null,
+            });
+            const responseStatus = executionError.message === "osm_version_conflict" ? 409 : 502;
+            sendJson(res, responseStatus, { error: executionError.message === "osm_version_conflict" ? "osm_version_conflict" : "osm_execution_failed", message: executionError.message, planId, attemptId, osmSent: false });
+          }
+          return;
+        }
+        if (req.method === "POST" && ["approve", "delete-elements"].includes(parts[4])) {
           await appendAudit(planId, "execution_blocked", req, {
             requestedAction: parts[4],
             adminPresented: isAdminRequest(req),
