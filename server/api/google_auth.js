@@ -3,6 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const { OAuth2Client } = require("google-auth-library");
 const { createDbPool } = require("../db");
+const TERMS_VERSION = "2026-08-03";
+const PRIVACY_VERSION = "2026-08-03";
 const {
   createAccessToken,
   verifyAccessToken,
@@ -179,6 +181,32 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           expires_at TIMESTAMP NOT NULL
         )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS login.user_consents (
+          consent_id BIGSERIAL PRIMARY KEY,
+          user_id BIGINT NOT NULL REFERENCES login.users(user_id) ON DELETE RESTRICT,
+          terms_version TEXT NOT NULL,
+          privacy_version TEXT NOT NULL,
+          accepted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          acceptance_source TEXT NOT NULL,
+          UNIQUE (user_id, terms_version, privacy_version)
+        )
+      `);
+
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION login.prevent_consent_mutation()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          RAISE EXCEPTION 'User consent history is append-only';
+        END $$
+      `);
+      await pool.query("DROP TRIGGER IF EXISTS user_consents_append_only ON login.user_consents");
+      await pool.query(`
+        CREATE TRIGGER user_consents_append_only
+        BEFORE UPDATE OR DELETE ON login.user_consents
+        FOR EACH ROW EXECUTE FUNCTION login.prevent_consent_mutation()
       `);
 
       await pool.query(`
@@ -370,6 +398,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         last_login_at: new Date().toISOString(),
+        consent: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, acceptedAt: new Date().toISOString() },
       };
       memoryStore.usersBySub.set(sub, user);
       return user;
@@ -391,14 +420,36 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
          SELECT user_id, 'google', ?, ?, NULL, CURRENT_TIMESTAMP
          FROM new_user
          RETURNING user_id, email
+       ),
+       new_consent AS (
+         INSERT INTO login.user_consents (
+           user_id, terms_version, privacy_version, accepted_at, acceptance_source
+         )
+         SELECT user_id, ?, ?, CURRENT_TIMESTAMP, 'google_signup'
+         FROM new_user
+         RETURNING user_id
        )
        SELECT n.user_id, n.username, n.icon_url, n.email_verified, n.is_guest, p.email
        FROM new_user n
-       JOIN new_provider p ON p.user_id = n.user_id`,
-      [finalUsername, finalIconUrl, emailVerified, sub, email]
+       JOIN new_provider p ON p.user_id = n.user_id
+       JOIN new_consent c ON c.user_id = n.user_id`,
+      [finalUsername, finalIconUrl, emailVerified, sub, email, TERMS_VERSION, PRIVACY_VERSION]
     );
 
     return createdRows[0];
+  }
+
+  async function recordSignupConsent(userId) {
+    if (!pool) return;
+    await ensureSchema();
+    await pool.query(
+      `INSERT INTO login.user_consents (
+         user_id, terms_version, privacy_version, accepted_at, acceptance_source
+       ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'google_signup')
+       ON CONFLICT (user_id, terms_version, privacy_version) DO NOTHING
+       RETURNING consent_id`,
+      [userId, TERMS_VERSION, PRIVACY_VERSION]
+    );
   }
 
   async function updateLoginMeta({ userId, payload }) {
@@ -508,21 +559,26 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     }
 
     await ensureSchema();
-    const [insertResult] = await pool.query(
-      `INSERT INTO login.users (
-         username,
-         icon_url,
-         is_guest,
-         email_verified,
-         created_at,
-         updated_at,
-         last_login_at
+    const [createdRows] = await pool.query(
+      `WITH new_user AS (
+         INSERT INTO login.users (
+           username, icon_url, is_guest, email_verified, created_at, updated_at, last_login_at
+         )
+         VALUES (?, NULL, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         RETURNING user_id
+       ),
+       new_consent AS (
+         INSERT INTO login.user_consents (
+           user_id, terms_version, privacy_version, accepted_at, acceptance_source
+         )
+         SELECT user_id, ?, ?, CURRENT_TIMESTAMP, 'guest_signup'
+         FROM new_user
+         RETURNING user_id
        )
-       VALUES (?, NULL, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-       RETURNING user_id AS id`,
-      [GUEST_USERNAME]
+       SELECT u.user_id AS id FROM new_user u JOIN new_consent c ON c.user_id=u.user_id`,
+      [GUEST_USERNAME, TERMS_VERSION, PRIVACY_VERSION]
     );
-    const guestUserId = Number(insertResult && insertResult.insertId);
+    const guestUserId = Number(createdRows[0] && createdRows[0].id);
     if (!Number.isFinite(guestUserId) || guestUserId <= 0) {
       return null;
     }
@@ -808,6 +864,8 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     const idToken = body.id_token;
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const iconDataUrl = typeof body.icon_data_url === "string" ? body.icon_data_url : "";
+    const consentAccepted = body.terms_accepted === true && body.privacy_accepted === true;
+    const consentVersionsValid = body.terms_version === TERMS_VERSION && body.privacy_version === PRIVACY_VERSION;
 
     if (!idToken || typeof idToken !== "string") {
       logAuthEvent("signup_missing_id_token", req);
@@ -829,6 +887,19 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
     if (!iconDataUrl) {
       logAuthEvent("signup_missing_icon_image", req);
       sendJson(res, 400, { error: "missing_icon_image" });
+      return;
+    }
+    if (!consentAccepted) {
+      logAuthEvent("signup_consent_required", req);
+      sendJson(res, 400, { error: "consent_required" });
+      return;
+    }
+    if (!consentVersionsValid) {
+      logAuthEvent("signup_invalid_consent_version", req, {
+        termsVersion: body.terms_version || null,
+        privacyVersion: body.privacy_version || null,
+      });
+      sendJson(res, 400, { error: "invalid_consent_version" });
       return;
     }
 
@@ -854,6 +925,7 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
           iconUrl,
           payload,
         });
+        await recordSignupConsent(existing.user_id);
         const accessToken = createAccessToken(existing.user_id);
         const sessionId = await createSession(existing.user_id);
         res.setHeader(
@@ -982,6 +1054,14 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       return;
     }
 
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return;
+    }
+
     const bearerResolved = await resolveUserFromAccessToken(req);
     if (bearerResolved.authError) {
       logAuthEvent("guest_invalid_access_token", req, {
@@ -1004,6 +1084,20 @@ function createGoogleAuthHandler({ sendJson, GOOGLE_CLIENT_ID }) {
       });
       sendJson(res, 409, { error: "already_authenticated" });
       return;
+    }
+
+    if (!sessionUser) {
+      const consentAccepted = body.terms_accepted === true && body.privacy_accepted === true;
+      if (!consentAccepted) {
+        logAuthEvent("guest_consent_required", req);
+        sendJson(res, 400, { error: "consent_required" });
+        return;
+      }
+      if (body.terms_version !== TERMS_VERSION || body.privacy_version !== PRIVACY_VERSION) {
+        logAuthEvent("guest_invalid_consent_version", req);
+        sendJson(res, 400, { error: "invalid_consent_version" });
+        return;
+      }
     }
 
     try {

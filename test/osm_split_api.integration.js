@@ -1,4 +1,5 @@
 const assert = require("assert");
+const { createDbPool } = require("../server/db");
 
 const BASE_URL = process.env.TEST_API_URL || "http://127.0.0.1:3100";
 
@@ -8,8 +9,32 @@ async function request(path, options = {}) {
 }
 
 async function run() {
-  const guest = await request("/auth/guest", { method: "POST" });
+  const guest = await request("/auth/guest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      terms_accepted: true,
+      privacy_accepted: true,
+      terms_version: "2026-08-03",
+      privacy_version: "2026-08-03",
+    }),
+  });
   assert.strictEqual(guest.status, 200);
+  const { pool, error } = createDbPool();
+  if (error) throw error;
+  const [consentRows] = await pool.query(
+    `SELECT terms_version, privacy_version, acceptance_source
+       FROM login.user_consents
+      WHERE user_id = ?
+      ORDER BY accepted_at DESC
+      LIMIT 1`,
+    [guest.body.user.userId]
+  );
+  assert.deepStrictEqual(consentRows[0], {
+    terms_version: "2026-08-03",
+    privacy_version: "2026-08-03",
+    acceptance_source: "guest_signup",
+  });
   const headers = {
     Authorization: `Bearer ${guest.body.access_token}`,
     "Content-Type": "application/json",
