@@ -72,7 +72,7 @@
   <rect x="75" y="1215" width="275" height="45" rx="12" class="external"/><text x="94" y="1243" class="body">Google Identity：StepByログイン</text>
   <rect x="375" y="1215" width="275" height="45" rx="12" class="external"/><text x="394" y="1243" class="body">GitHub：ソース / Pages配信</text>
   <rect x="675" y="1215" width="275" height="45" rx="12" class="external"/><text x="694" y="1243" class="body">Overpass API：周辺OSM読取</text>
-  <rect x="975" y="1215" width="350" height="45" rx="12" class="external"/><text x="994" y="1243" class="body">OSM OAuth：認証実装済・Client ID設定待ち</text>
+  <rect x="975" y="1215" width="350" height="45" rx="12" class="external"/><text x="994" y="1243" class="body">OSM開発OAuth：Client ID設定済・小窓認証</text>
   <rect x="1350" y="1215" width="175" height="45" rx="12" class="external"/><text x="1369" y="1243" class="body">地図タイル等</text>
   <path d="M850 838 C850 1140 800 1140 800 1215" class="lineExt"/><path d="M976 924 C1080 1135 1150 1135 1150 1215" class="lineExt dash"/>
 
