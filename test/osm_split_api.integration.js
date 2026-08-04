@@ -112,10 +112,40 @@ async function run() {
   assert.strictEqual(blocked.status, 423);
   assert.strictEqual(blocked.body.osmSent, false);
 
+  const prematureRevert = await request(`/api/osm/records/${encodeURIComponent(recordId)}/revert-plan`, { method: "POST", headers });
+  assert.strictEqual(prematureRevert.status, 409);
+  assert.strictEqual(prematureRevert.body.error, "record_not_merged");
+
+  const sourceElements = detail.body.plan.elements;
+  const temporaryIds = {};
+  let nextTemporaryId = -1;
+  let nextCreatedId = 10000;
+  const diffResult = sourceElements.map((element) => {
+    if (element.action === "create") {
+      temporaryIds[element.after.temporaryId] = nextTemporaryId;
+      const result = { elementType: element.elementType, oldId: nextTemporaryId, newId: nextCreatedId, newVersion: 1 };
+      nextTemporaryId -= 1;
+      nextCreatedId += 1;
+      return result;
+    }
+    return { elementType: element.elementType, oldId: element.osmId, newId: element.osmId, newVersion: element.version + 1 };
+  });
+  const fakeChangesetId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+  const fakeExecutionResult = { changesetId: fakeChangesetId, temporaryIds, diffResult };
+  await pool.query(
+    `INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,details)
+     VALUES(?,?,?,?::jsonb) RETURNING event_id`,
+    [created.body.planId, "execution_succeeded", guest.body.user.userId, JSON.stringify({ executionResult: fakeExecutionResult, syntheticTest: true })]
+  );
+  await pool.query(
+    `UPDATE osmchange.record_links SET merge_changeset_id=?,osm_status='merged',updated_at=NOW()
+     WHERE record_id=?`, [fakeChangesetId, recordId]
+  );
+
   const reverted = await request(`/api/osm/records/${encodeURIComponent(recordId)}/revert-plan`, { method: "POST", headers });
   assert.strictEqual(reverted.status, 201);
   assert.strictEqual(reverted.body.osmSent, false);
-  assert.strictEqual(reverted.body.executable, false);
+  assert.strictEqual(reverted.body.executable, true);
   assert.strictEqual(reverted.body.recordId, recordId);
   const linkedAfterRevert = await request(`/api/osm/records/${encodeURIComponent(recordId)}`, { headers });
   assert.strictEqual(linkedAfterRevert.body.record.osm_status, "revert_draft");

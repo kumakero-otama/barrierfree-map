@@ -253,6 +253,10 @@ function createOsmChangesHandler({ sendJson }) {
             sendJson(res, 409, { error: "revert_plan_already_exists", planId: link.revert_plan_id, osmSent: false });
             return;
           }
+          if (link.osm_status !== "merged" || !link.merge_changeset_id) {
+            sendJson(res, 409, { error: "record_not_merged", status: link.osm_status, osmSent: false });
+            return;
+          }
           const [plans] = await pool.query(
             `SELECT plan_id,summary,elements FROM osmchange.change_plans WHERE plan_id=? LIMIT 1`, [link.merge_plan_id]
           );
