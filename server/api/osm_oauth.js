@@ -141,7 +141,8 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     await pool.query(
       `INSERT INTO login.osm_connection_audit
        (user_id,event_type,osm_user_id,osm_display_name,details)
-       VALUES (?,?,?,?,?::jsonb)`,
+       VALUES (?,?,?,?,?::jsonb)
+       RETURNING audit_id`,
       [userId || null, eventType, osmUserId, osmDisplayName, JSON.stringify(safeDetails)]
     );
   }
@@ -223,7 +224,8 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     await pool.query(
       `INSERT INTO login.osm_oauth_states
        (state_hash,user_id,code_verifier_encrypted,return_url,flow_mode,expires_at)
-       VALUES (?,?,?,?,?,CURRENT_TIMESTAMP + INTERVAL '10 minutes')`,
+       VALUES (?,?,?,?,?,CURRENT_TIMESTAMP + INTERVAL '10 minutes')
+       RETURNING state_hash`,
       [base64Url(sha256(state)), userId, encrypt(verifier), returnUrl, flowMode]
     );
     await appendAudit(userId, "authorization_started", { scope: REQUIRED_SCOPE });
@@ -293,7 +295,8 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
            connected_at=CURRENT_TIMESTAMP,
            last_verified_at=CURRENT_TIMESTAMP,
            revoked_at=NULL,
-           updated_at=CURRENT_TIMESTAMP`,
+           updated_at=CURRENT_TIMESTAMP
+         RETURNING user_id`,
         [pending.user_id, osmUser.id, osmUser.display_name, encrypt(tokenPayload.access_token), tokenPayload.scope || REQUIRED_SCOPE]
       );
       await appendAudit(pending.user_id, "connected", { osmUserId: osmUser.id, osmDisplayName: osmUser.display_name, scope: tokenPayload.scope || REQUIRED_SCOPE });
