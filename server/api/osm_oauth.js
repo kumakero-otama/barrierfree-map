@@ -91,11 +91,13 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
           user_id BIGINT NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
           code_verifier_encrypted TEXT NOT NULL,
           return_url TEXT NOT NULL,
+          flow_mode TEXT NOT NULL DEFAULT 'redirect' CHECK (flow_mode IN ('redirect','popup')),
           created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
           expires_at TIMESTAMPTZ NOT NULL,
           used_at TIMESTAMPTZ
         )
       `);
+      await pool.query("ALTER TABLE login.osm_oauth_states ADD COLUMN IF NOT EXISTS flow_mode TEXT NOT NULL DEFAULT 'redirect'");
       await pool.query(`
         CREATE TABLE IF NOT EXISTS login.osm_connection_audit (
           audit_id BIGSERIAL PRIMARY KEY,
@@ -163,6 +165,22 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     res.end();
   }
 
+  function finishAuthorization(res, pending, result, message) {
+    if (!pending || pending.flow_mode !== "popup") {
+      return redirectWithResult(res, pending && pending.return_url, result, message);
+    }
+    const returnTarget = new URL(pending.return_url || frontendReturnUrl);
+    const targetOrigin = returnTarget.origin;
+    const payload = JSON.stringify({ type: "stepby-osm-oauth-result", result, message: message || "" })
+      .replace(/</g, "\\u003c");
+    const fallbackUrl = new URL(pending.return_url || frontendReturnUrl);
+    fallbackUrl.searchParams.set("osm", result);
+    if (message) fallbackUrl.searchParams.set("osm_message", message);
+    const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StepBy OSM連携</title></head><body><p>StepByへ戻ります。この画面は自動的に閉じます。</p><script>if(window.opener&&!window.opener.closed){window.opener.postMessage(${payload},${JSON.stringify(targetOrigin)});window.close();}setTimeout(function(){location.replace(${JSON.stringify(fallbackUrl.toString())});},800);<\/script></body></html>`;
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(html);
+  }
+
   async function handleStatus(req, res) {
     const userId = await authenticatedUserId(req);
     if (!userId) return sendJson(res, 401, { error: "authentication_required" });
@@ -198,14 +216,15 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     if (!configured) return sendJson(res, 503, { error: "osm_oauth_app_not_configured" });
     await ensureSchema();
     const returnUrl = safeReturnUrl(requestUrl.searchParams.get("return_url"), frontendReturnUrl);
+    const flowMode = requestUrl.searchParams.get("mode") === "popup" ? "popup" : "redirect";
     const state = base64Url(crypto.randomBytes(32));
     const verifier = base64Url(crypto.randomBytes(48));
     const challenge = base64Url(sha256(verifier));
     await pool.query(
       `INSERT INTO login.osm_oauth_states
-       (state_hash,user_id,code_verifier_encrypted,return_url,expires_at)
-       VALUES (?,?,?,?,CURRENT_TIMESTAMP + INTERVAL '10 minutes')`,
-      [base64Url(sha256(state)), userId, encrypt(verifier), returnUrl]
+       (state_hash,user_id,code_verifier_encrypted,return_url,flow_mode,expires_at)
+       VALUES (?,?,?,?,?,CURRENT_TIMESTAMP + INTERVAL '10 minutes')`,
+      [base64Url(sha256(state)), userId, encrypt(verifier), returnUrl, flowMode]
     );
     await appendAudit(userId, "authorization_started", { scope: REQUIRED_SCOPE });
     const target = new URL(authorizeUrl);
@@ -226,7 +245,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     const code = requestUrl.searchParams.get("code") || "";
     const stateHash = base64Url(sha256(state));
     const [rows] = await pool.query(
-      `SELECT state_hash,user_id,code_verifier_encrypted,return_url,expires_at,used_at
+      `SELECT state_hash,user_id,code_verifier_encrypted,return_url,flow_mode,expires_at,used_at
        FROM login.osm_oauth_states WHERE state_hash=? LIMIT 1`,
       [stateHash]
     );
@@ -237,7 +256,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     await pool.query("UPDATE login.osm_oauth_states SET used_at=CURRENT_TIMESTAMP WHERE state_hash=? AND used_at IS NULL", [stateHash]);
     if (requestUrl.searchParams.get("error") || !code) {
       await appendAudit(pending.user_id, "authorization_denied", { reason: requestUrl.searchParams.get("error") || "missing_code" });
-      return redirectWithResult(res, pending.return_url, "cancelled", "OSM連携はキャンセルされました。");
+      return finishAuthorization(res, pending, "cancelled", "OSM連携はキャンセルされました。");
     }
     try {
       const body = new URLSearchParams({
@@ -278,10 +297,10 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
         [pending.user_id, osmUser.id, osmUser.display_name, encrypt(tokenPayload.access_token), tokenPayload.scope || REQUIRED_SCOPE]
       );
       await appendAudit(pending.user_id, "connected", { osmUserId: osmUser.id, osmDisplayName: osmUser.display_name, scope: tokenPayload.scope || REQUIRED_SCOPE });
-      redirectWithResult(res, pending.return_url, "connected", "OSMアカウントを連携しました。");
+      finishAuthorization(res, pending, "connected", "OSMアカウントを連携しました。");
     } catch (error) {
       await appendAudit(pending.user_id, "authorization_failed", { reason: error.message || "unknown" });
-      redirectWithResult(res, pending.return_url, "error", "OSM連携を完了できませんでした。");
+      finishAuthorization(res, pending, "error", "OSM連携を完了できませんでした。");
     }
   }
 
