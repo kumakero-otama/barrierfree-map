@@ -10,7 +10,8 @@ function buildQuery(lat, lng, radiusMeters) {
 way(around:${radiusMeters},${lat},${lng})
   ["highway"]
   ["highway"!~"^(motorway|motorway_link|trunk|trunk_link|raceway|construction|proposed)$"]
-  ["access"!~"^(private|no)$"];
+  ["access"!~"^(private|no)$"]->.walkable;
+(.walkable; relation(bw.walkable););
 out meta geom;`;
 }
 
@@ -51,6 +52,21 @@ function fetchOverpass(host, query, callback) {
 
 function normalizeWays(payload) {
   const elements = Array.isArray(payload && payload.elements) ? payload.elements : [];
+  const relationsByWay = new Map();
+  elements.filter((element) => element && element.type === "relation").forEach((relation) => {
+    const normalized = {
+      id: Number(relation.id),
+      version: Number(relation.version),
+      tags: relation.tags && typeof relation.tags === "object" ? relation.tags : {},
+      members: Array.isArray(relation.members) ? relation.members.map((member) => ({
+        type: String(member.type || ""), ref: Number(member.ref), role: String(member.role || ""),
+      })) : [],
+    };
+    normalized.members.filter((member) => member.type === "way" && Number.isSafeInteger(member.ref)).forEach((member) => {
+      if (!relationsByWay.has(member.ref)) relationsByWay.set(member.ref, []);
+      relationsByWay.get(member.ref).push(normalized);
+    });
+  });
   return elements.flatMap((element) => {
     if (!element || element.type !== "way" || !Array.isArray(element.geometry)) return [];
     const coordinates = element.geometry
@@ -65,6 +81,7 @@ function normalizeWays(payload) {
       nodes: Array.isArray(element.nodes) ? element.nodes.map(Number).filter(Number.isFinite) : [],
       coordinates,
       tags,
+      relations: relationsByWay.get(Number(element.id)) || [],
       priority: ["footway", "pedestrian", "path", "steps", "corridor"].includes(highway)
         ? "pedestrian"
         : "road",

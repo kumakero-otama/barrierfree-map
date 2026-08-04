@@ -3,6 +3,7 @@ const { createDbPool } = require("../db");
 const { createSplitPlan } = require("../osm/split_planner");
 const { executeWithClient, createConfiguredClient } = require("../osm/osm_executor");
 const { createExecutableRevert } = require("../osm/revert_planner");
+const { ensureRecordLinkSchema } = require("../osm/record_links");
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
@@ -108,6 +109,7 @@ function createOsmChangesHandler({ sendJson }) {
     `);
     await pool.query("CREATE INDEX IF NOT EXISTS osm_change_plans_created_idx ON osmchange.change_plans(created_at DESC)");
     await pool.query("CREATE INDEX IF NOT EXISTS osm_audit_plan_idx ON osmchange.audit_events(plan_id, event_id)");
+    await ensureRecordLinkSchema(pool);
     await pool.query(`
       CREATE OR REPLACE FUNCTION osmchange.prevent_history_mutation()
       RETURNS trigger LANGUAGE plpgsql AS $$
@@ -133,6 +135,27 @@ function createOsmChangesHandler({ sendJson }) {
        VALUES(?,?,?,?,?::jsonb) RETURNING event_id`,
       [planId, eventType, req.authUserId || null, req.securityRequestId || null, JSON.stringify(details)]
     );
+  }
+
+  async function requireOwnedRecord(recordId, userId, executor = pool) {
+    if (typeof recordId !== "string" || !recordId.trim() || recordId.length > 128) throw new Error("invalid_record_id");
+    const [rows] = await executor.query(
+      "SELECT session_id FROM tactile.sessions WHERE session_id=? AND user_id=? LIMIT 1",
+      [recordId.trim(), userId]
+    );
+    if (!rows[0]) throw new Error("record_not_found_or_forbidden");
+    return recordId.trim();
+  }
+
+  function buildReverseElements(plan, executionResult) {
+    return executionResult
+      ? createExecutableRevert(plan.elements, executionResult)
+      : [...plan.elements].reverse().map((element) => ({
+        ...element,
+        action: element.action === "create" ? "delete" : "modify",
+        before: element.after,
+        after: element.before,
+      }));
   }
 
   return async function handleOsmChanges(req, res) {
@@ -165,6 +188,7 @@ function createOsmChangesHandler({ sendJson }) {
 
       if (url.pathname === "/api/osm/split-plan" && req.method === "POST") {
         const body = await pendingBody;
+        const recordId = await requireOwnedRecord(body.recordId, req.authUserId);
         const splitPlan = createSplitPlan({ segments: body.segments }, { tactileValue: "yes" });
         const planId = crypto.randomUUID();
         const summary = String(body.summary || "UI10 tactile paving split dry-run").trim().slice(0, 500);
@@ -172,17 +196,106 @@ function createOsmChangesHandler({ sendJson }) {
           ...(body.clientContext && typeof body.clientContext === "object" ? body.clientContext : {}),
           previewOnly: true,
           osmWriteRequested: false,
-          planner: "split_planner_v1",
+          planner: "split_planner_v2_relations",
+          recordId,
           splitSummary: splitPlan.summary,
         };
-        await pool.query(
-          `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
-           VALUES(?,?,?,?,?,?::jsonb,?::jsonb) RETURNING plan_id`,
-          [planId, "merge", req.authUserId, null, summary, JSON.stringify(splitPlan.operations), JSON.stringify(clientContext)]
-        );
-        await appendAudit(planId, "split_plan_created", req, { ...splitPlan.summary, osmSent: false });
-        sendJson(res, 201, { success: true, planId, status: "draft", osmSent: false, splitPlan });
+        const conn = await pool.getConnection();
+        try {
+          await conn.beginTransaction();
+          const [existing] = await conn.query("SELECT merge_plan_id FROM osmchange.record_links WHERE record_id=? LIMIT 1", [recordId]);
+          if (existing[0]) throw new Error("record_already_linked");
+          await conn.query(
+            `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
+             VALUES(?,?,?,?,?,?::jsonb,?::jsonb) RETURNING plan_id`,
+            [planId, "merge", req.authUserId, null, summary, JSON.stringify(splitPlan.operations), JSON.stringify(clientContext)]
+          );
+          await conn.query(
+            `INSERT INTO osmchange.record_links(record_id,created_by,merge_plan_id,osm_status)
+             VALUES(?,?,?,'draft') RETURNING record_id`, [recordId, req.authUserId, planId]
+          );
+          await conn.query(
+            `INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+             VALUES(?,?,?,?,?::jsonb) RETURNING event_id`,
+            [planId, "split_plan_created", req.authUserId, req.securityRequestId || null,
+              JSON.stringify({ ...splitPlan.summary, recordId, osmSent: false })]
+          );
+          await conn.commit();
+        } catch (transactionError) {
+          await conn.rollback();
+          throw transactionError;
+        } finally {
+          conn.release();
+        }
+        sendJson(res, 201, { success: true, recordId, planId, status: "draft", osmSent: false, splitPlan });
         return;
+      }
+
+      if (parts[0] === "api" && parts[1] === "osm" && parts[2] === "records" && parts[3]) {
+        const recordId = decodeURIComponent(parts[3]);
+        await requireOwnedRecord(recordId, req.authUserId);
+        const [links] = await pool.query(
+          `SELECT record_id,merge_plan_id,merge_changeset_id,revert_plan_id,revert_changeset_id,osm_status,created_at,updated_at
+             FROM osmchange.record_links WHERE record_id=? AND created_by=? LIMIT 1`,
+          [recordId, req.authUserId]
+        );
+        const link = links[0];
+        if (!link) {
+          sendJson(res, 404, { error: "osm_record_link_not_found" });
+          return;
+        }
+        if (req.method === "GET" && parts.length === 4) {
+          sendJson(res, 200, { success: true, record: link, osmSent: ["merged", "revert_draft", "reverted"].includes(link.osm_status) });
+          return;
+        }
+        if (req.method === "POST" && parts[4] === "revert-plan") {
+          if (link.revert_plan_id) {
+            sendJson(res, 409, { error: "revert_plan_already_exists", planId: link.revert_plan_id, osmSent: false });
+            return;
+          }
+          const [plans] = await pool.query(
+            `SELECT plan_id,summary,elements FROM osmchange.change_plans WHERE plan_id=? LIMIT 1`, [link.merge_plan_id]
+          );
+          const plan = plans[0];
+          if (!plan) throw new Error("linked_plan_not_found");
+          const [successEvents] = await pool.query(
+            `SELECT details FROM osmchange.audit_events
+             WHERE plan_id=? AND event_type='execution_succeeded' ORDER BY event_id DESC LIMIT 1`, [link.merge_plan_id]
+          );
+          const executionResult = successEvents[0] && successEvents[0].details && successEvents[0].details.executionResult;
+          const executable = Boolean(executionResult);
+          const reverseElements = buildReverseElements(plan, executionResult);
+          const revertPlanId = crypto.randomUUID();
+          const conn = await pool.getConnection();
+          try {
+            await conn.beginTransaction();
+            await conn.query(
+              `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
+               VALUES(?,?,?,?,?,?::jsonb,?::jsonb) RETURNING plan_id`,
+              [revertPlanId, "revert", req.authUserId, link.merge_plan_id, `Revert record ${recordId}: ${plan.summary}`.slice(0, 500),
+                JSON.stringify(reverseElements), JSON.stringify({ recordId, executable, sourceChangesetId: executionResult && executionResult.changesetId || null })]
+            );
+            await conn.query(
+              `UPDATE osmchange.record_links SET revert_plan_id=?,osm_status='revert_draft',updated_at=NOW()
+               WHERE record_id=? AND created_by=? AND revert_plan_id IS NULL`,
+              [revertPlanId, recordId, req.authUserId]
+            );
+            await conn.query(
+              `INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+               VALUES(?,?,?,?,?::jsonb) RETURNING event_id`,
+              [revertPlanId, "revert_plan_created", req.authUserId, req.securityRequestId || null,
+                JSON.stringify({ recordId, sourcePlanId: link.merge_plan_id, executable, osmSent: false })]
+            );
+            await conn.commit();
+          } catch (transactionError) {
+            await conn.rollback();
+            throw transactionError;
+          } finally {
+            conn.release();
+          }
+          sendJson(res, 201, { success: true, recordId, planId: revertPlanId, sourcePlanId: link.merge_plan_id, status: "revert_draft", executable, osmSent: false });
+          return;
+        }
       }
 
       if (url.pathname === "/api/osm/plans" && req.method === "POST") {
@@ -230,20 +343,25 @@ function createOsmChangesHandler({ sendJson }) {
           return;
         }
         if (req.method === "POST" && parts[4] === "revert-plan") {
+          const [linkedRecords] = await pool.query(
+            "SELECT record_id FROM osmchange.record_links WHERE merge_plan_id=? LIMIT 1", [planId]
+          );
+          if (linkedRecords[0]) {
+            sendJson(res, 409, {
+              error: "use_record_revert_endpoint",
+              recordId: linkedRecords[0].record_id,
+              endpoint: `/api/osm/records/${encodeURIComponent(linkedRecords[0].record_id)}/revert-plan`,
+              osmSent: false,
+            });
+            return;
+          }
           const [successEvents] = await pool.query(
             `SELECT details FROM osmchange.audit_events
              WHERE plan_id=? AND event_type='execution_succeeded' ORDER BY event_id DESC LIMIT 1`, [planId]
           );
           const executionResult = successEvents[0] && successEvents[0].details && successEvents[0].details.executionResult;
           const executable = Boolean(executionResult);
-          const reverseElements = executable
-            ? createExecutableRevert(plan.elements, executionResult)
-            : [...plan.elements].reverse().map((element) => ({
-              ...element,
-              action: element.action === "create" ? "delete" : "modify",
-              before: element.after,
-              after: element.before,
-            }));
+          const reverseElements = buildReverseElements(plan, executionResult);
           const revertPlanId = crypto.randomUUID();
           await pool.query(
             `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
@@ -297,6 +415,17 @@ function createOsmChangesHandler({ sendJson }) {
               },
             });
             await appendAudit(planId, "execution_succeeded", req, { attemptId, requestedAction: action, executionResult });
+            if (plan.operation_type === "revert") {
+              await pool.query(
+                `UPDATE osmchange.record_links SET revert_changeset_id=?,osm_status='reverted',updated_at=NOW()
+                 WHERE revert_plan_id=?`, [executionResult.changesetId, planId]
+              );
+            } else {
+              await pool.query(
+                `UPDATE osmchange.record_links SET merge_changeset_id=?,osm_status='merged',updated_at=NOW()
+                 WHERE merge_plan_id=?`, [executionResult.changesetId, planId]
+              );
+            }
             sendJson(res, 200, { success: true, planId, attemptId, osmSent: true, executionResult });
           } catch (executionError) {
             await appendAudit(planId, "execution_failed", req, {
@@ -310,6 +439,11 @@ function createOsmChangesHandler({ sendJson }) {
                 currentVersion: executionError.currentVersion,
               } : null,
             });
+            await pool.query(
+              `UPDATE osmchange.record_links SET osm_status=?,updated_at=NOW()
+               WHERE merge_plan_id=? OR revert_plan_id=?`,
+              [executionError.message === "osm_version_conflict" ? "conflict" : "failed", planId, planId]
+            );
             const responseStatus = executionError.message === "osm_version_conflict" ? 409 : 502;
             sendJson(res, responseStatus, { error: executionError.message === "osm_version_conflict" ? "osm_version_conflict" : "osm_execution_failed", message: executionError.message, planId, attemptId, osmSent: false });
           }
@@ -350,9 +484,11 @@ function createOsmChangesHandler({ sendJson }) {
         "invalid_segments", "duplicate_way_in_route", "invalid_way_identity", "invalid_way_geometry",
         "invalid_boundary", "invalid_node_boundary", "invalid_projection_boundary",
         "invalid_boundary_fraction", "invalid_boundary_lng", "invalid_boundary_lat", "zero_length_tactile_segment",
+        "invalid_relation", "inconsistent_relation", "invalid_record_id", "record_not_found_or_forbidden", "record_already_linked",
       ]);
-      const status = error.message === "invalid_json" || clientErrors.has(error.message)
-        ? 400
+      const status = error.message === "record_not_found_or_forbidden" ? 404
+        : error.message === "record_already_linked" ? 409
+        : error.message === "invalid_json" || clientErrors.has(error.message) ? 400
         : error.message === "body_too_large" ? 413 : 500;
       console.error("[osm_changes] request failed:", error.message);
       sendJson(res, status, { error: status === 500 ? "osm_change_api_failed" : error.message });

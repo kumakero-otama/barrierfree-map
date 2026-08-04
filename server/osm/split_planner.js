@@ -108,8 +108,10 @@ function planWay(segment, counters, options) {
     before: null,
     after: { temporaryId: boundary.nodeRef, lat: boundary.coordinate[1], lng: boundary.coordinate[0], tags: {} },
   }));
+  const relationRefs = [];
   sections.forEach((section, index) => {
     if (index === 0) {
+      relationRefs.push(wayId);
       operations.push({
         elementType: "way", action: "modify", osmId: wayId, version,
         before: { nodes, coordinates, tags: baseTags },
@@ -117,13 +119,62 @@ function planWay(segment, counters, options) {
       });
     } else {
       counters.way += 1;
+      const temporaryId = `new-way-${counters.way}`;
+      relationRefs.push(temporaryId);
       operations.push({
         elementType: "way", action: "create", osmId: null, version: null, before: null,
-        after: { temporaryId: `new-way-${counters.way}`, nodes: section.refs, coordinates: section.coordinates, tags: section.tags, tactileSection: section.tactile, splitFromWayId: wayId },
+        after: { temporaryId, nodes: section.refs, coordinates: section.coordinates, tags: section.tags, tactileSection: section.tactile, splitFromWayId: wayId },
       });
     }
   });
-  return { wayId, version, from, to, sections, operations };
+  return { wayId, version, from, to, sections, relationRefs, operations };
+}
+
+function normalizeRelations(segments) {
+  const relations = new Map();
+  segments.forEach((segment) => {
+    (Array.isArray(segment.relations) ? segment.relations : []).forEach((relation) => {
+      const id = Number(relation && relation.id);
+      const version = Number(relation && relation.version);
+      const members = Array.isArray(relation && relation.members) ? relation.members.map((member) => ({
+        type: String(member && member.type || ""),
+        ref: Number(member && member.ref),
+        role: String(member && member.role || ""),
+      })) : [];
+      if (!Number.isSafeInteger(id) || id <= 0 || !Number.isInteger(version) || version <= 0 ||
+          members.some((member) => !["node", "way", "relation"].includes(member.type) || !Number.isSafeInteger(member.ref) || member.ref <= 0)) {
+        throw new Error("invalid_relation");
+      }
+      const normalized = { id, version, members, tags: relation.tags && typeof relation.tags === "object" ? { ...relation.tags } : {} };
+      const existing = relations.get(id);
+      if (existing && JSON.stringify(existing) !== JSON.stringify(normalized)) throw new Error("inconsistent_relation");
+      relations.set(id, normalized);
+    });
+  });
+  return [...relations.values()];
+}
+
+function planRelationUpdates(relations, ways) {
+  const replacements = new Map(ways.filter((way) => way.relationRefs.length > 1).map((way) => [way.wayId, way.relationRefs]));
+  return relations.flatMap((relation) => {
+    let changed = false;
+    const members = relation.members.flatMap((member) => {
+      const refs = member.type === "way" ? replacements.get(member.ref) : null;
+      if (!refs) return [member];
+      changed = true;
+      const orderedRefs = member.role === "backward" ? [...refs].reverse() : refs;
+      return orderedRefs.map((ref) => ({ ...member, ref }));
+    });
+    if (!changed) return [];
+    return [{
+      elementType: "relation",
+      action: "modify",
+      osmId: relation.id,
+      version: relation.version,
+      before: { members: relation.members, tags: relation.tags },
+      after: { members, tags: relation.tags },
+    }];
+  });
 }
 
 function createSplitPlan(input, options = {}) {
@@ -140,20 +191,23 @@ function createSplitPlan(input, options = {}) {
   };
   const counters = { node: 0, way: 0 };
   const ways = segments.map((segment) => planWay(segment, counters, settings));
+  const relationOperations = planRelationUpdates(normalizeRelations(segments), ways);
+  const operations = [...ways.flatMap((way) => way.operations), ...relationOperations];
   return {
     kind: "osm_split_dry_run",
     osmSent: false,
     tags: { tactile_paving: settings.tactileValue },
     ways,
-    operations: ways.flatMap((way) => way.operations),
+    operations,
     summary: {
       sourceWays: ways.length,
       createdNodes: counters.node,
       createdWays: counters.way,
       modifiedWays: ways.length,
-      operationCount: ways.reduce((sum, way) => sum + way.operations.length, 0),
+      modifiedRelations: relationOperations.length,
+      operationCount: operations.length,
     },
   };
 }
 
-module.exports = { createSplitPlan, normalizeBoundary };
+module.exports = { createSplitPlan, normalizeBoundary, normalizeRelations, planRelationUpdates };

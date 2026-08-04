@@ -16,7 +16,7 @@ function way(overrides = {}) {
 
 function run() {
   const middle = createSplitPlan({ segments: [way()] });
-  assert.deepStrictEqual(middle.summary, { sourceWays: 1, createdNodes: 2, createdWays: 2, modifiedWays: 1, operationCount: 5 });
+  assert.deepStrictEqual(middle.summary, { sourceWays: 1, createdNodes: 2, createdWays: 2, modifiedWays: 1, modifiedRelations: 0, operationCount: 5 });
   assert.strictEqual(middle.ways[0].sections.length, 3);
   assert.deepStrictEqual(middle.ways[0].sections.map((s) => s.tactile), [false, true, false]);
   assert.strictEqual(middle.ways[0].sections[1].tags.tactile_paving, "yes");
@@ -51,6 +51,28 @@ function run() {
   assert.strictEqual(multi.summary.createdNodes, 2);
   assert.strictEqual(multi.ways[0].sections.filter((s) => s.tactile).length, 1);
   assert.strictEqual(multi.ways[1].sections.filter((s) => s.tactile).length, 1);
+
+  const relation = {
+    id: 900,
+    version: 4,
+    tags: { type: "route", route: "foot" },
+    members: [
+      { type: "way", ref: 99, role: "" },
+      { type: "way", ref: 100, role: "forward" },
+      { type: "way", ref: 101, role: "" },
+    ],
+  };
+  const withRelation = createSplitPlan({ segments: [way({ relations: [relation] })] });
+  assert.strictEqual(withRelation.summary.modifiedRelations, 1);
+  assert.strictEqual(withRelation.summary.operationCount, 6);
+  const relationOperation = withRelation.operations.find((operation) => operation.elementType === "relation");
+  assert.deepStrictEqual(relationOperation.after.members.map((member) => member.ref), [99, 100, "new-way-1", "new-way-2", 101]);
+  assert.deepStrictEqual(relationOperation.after.members.slice(1, 4).map((member) => member.role), ["forward", "forward", "forward"]);
+
+  const backwardRelation = { ...relation, id: 901, members: [{ type: "way", ref: 100, role: "backward" }] };
+  const backward = createSplitPlan({ segments: [way({ relations: [backwardRelation] })] });
+  const backwardOperation = backward.operations.find((operation) => operation.elementType === "relation");
+  assert.deepStrictEqual(backwardOperation.after.members.map((member) => member.ref), ["new-way-2", "new-way-1", 100]);
 
   assert.throws(() => createSplitPlan({ segments: [way(), way()] }), /duplicate_way_in_route/);
   assert.strictEqual(middle.osmSent, false);
