@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="StepByプロジェクトのロードマップ。OSM統合、クラウド移行、その他の仕様変更を整理しています。">
+  <title>StepBy プロジェクト・ロードマップ</title>
+  <style>
+    :root {
+      --ink: #17241e;
+      --muted: #647169;
+      --paper: #f4f2ea;
+      --surface: rgba(255,255,255,.82);
+      --line: rgba(23,36,30,.13);
+      --green: #176347;
+      --green-soft: #d9eadf;
+      --blue: #315f78;
+      --blue-soft: #dce9ef;
+      --gold: #88651b;
+      --gold-soft: #f3e8c9;
+      --shadow: 0 18px 55px rgba(34,50,42,.09);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 88% 2%, rgba(198,227,209,.8), transparent 28rem),
+        radial-gradient(circle at 3% 43%, rgba(244,220,171,.35), transparent 26rem),
+        var(--paper);
+      font-family: "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+      line-height: 1.7;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    .shell { width: min(1160px, calc(100% - 34px)); margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 28px 0;
+    }
+
+    .brand { display: flex; align-items: center; gap: 11px; font-size: .82rem; font-weight: 800; letter-spacing: .12em; }
+    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: #fff; background: var(--green); }
+    .updated { color: var(--muted); font-size: .76rem; }
+
+    .hero { padding: 56px 0 54px; }
+    .eyebrow { margin: 0 0 13px; color: var(--green); font-size: .76rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+    h1 { max-width: 900px; margin: 0; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(2.7rem, 7vw, 6.2rem); font-weight: 500; letter-spacing: -.05em; line-height: 1.04; }
+    .lead { max-width: 720px; margin: 25px 0 0; color: var(--muted); font-size: 1rem; }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .summary a {
+      min-height: 158px;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,.9);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .summary a:hover, .summary a:focus-visible { transform: translateY(-3px); box-shadow: 0 24px 65px rgba(34,50,42,.13); outline: none; }
+    .summary-number { display: block; margin-bottom: 16px; color: var(--muted); font-family: Georgia, serif; font-size: 1.15rem; }
+    .summary strong { display: block; margin-bottom: 6px; font-size: 1.14rem; }
+    .summary small { color: var(--muted); }
+
+    .sequence {
+      margin: 28px 0 64px;
+      padding: 28px;
+      border-radius: 24px;
+      color: white;
+      background: var(--green);
+      box-shadow: 0 24px 65px rgba(23,99,71,.18);
+    }
+    .sequence-label { margin: 0 0 18px; color: rgba(255,255,255,.7); font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .sequence ol { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+    .sequence li { position: relative; min-height: 100px; padding: 15px 15px 15px 48px; border: 1px solid rgba(255,255,255,.18); border-radius: 15px; background: rgba(255,255,255,.08); }
+    .sequence li::before { counter-increment: step; content: counter(step); position: absolute; left: 15px; top: 14px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--green); background: #fff; font-size: .7rem; font-weight: 900; }
+    .sequence strong { display: block; margin-bottom: 3px; font-size: .9rem; }
+    .sequence span { color: rgba(255,255,255,.72); font-size: .74rem; line-height: 1.5; }
+
+    .track { margin-bottom: 78px; scroll-margin-top: 20px; }
+    .track-head { display: grid; grid-template-columns: 88px 1fr; gap: 22px; align-items: start; margin-bottom: 24px; }
+    .track-number { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 23px; font-family: Georgia, serif; font-size: 2rem; }
+    .track-osm .track-number { color: var(--green); background: var(--green-soft); }
+    .track-cloud .track-number { color: var(--blue); background: var(--blue-soft); }
+    .track-other .track-number { color: var(--gold); background: var(--gold-soft); }
+    .track h2 { margin: 0 0 4px; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(1.7rem, 4vw, 2.5rem); font-weight: 600; letter-spacing: -.03em; }
+    .track-head p { margin: 0; color: var(--muted); }
+
+    .report-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin: -4px 0 22px 110px;
+      padding: 18px 21px;
+      border: 1px solid rgba(31, 107, 79, .18);
+      border-radius: 18px;
+      color: var(--green);
+      background: var(--green-soft);
+      font-size: .84rem;
+      font-weight: 750;
+      text-decoration: none;
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .report-link:hover, .report-link:focus-visible { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(31,107,79,.12); outline: none; }
+    .report-link span { color: var(--muted); font-size: .74rem; font-weight: 500; }
+    .report-link b { white-space: nowrap; }
+
+    .spec-block {
+      margin: 0 0 22px 110px;
+      padding: 25px;
+      border: 1px solid rgba(255,255,255,.9);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .spec-block h3 { margin: 0 0 5px; font-size: 1rem; }
+    .spec-intro { margin: 0 0 18px; color: var(--muted); font-size: .78rem; }
+    .spec-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .spec-item { padding: 15px; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.5); }
+    .spec-item b { display: block; margin-bottom: 4px; color: var(--green); font-size: .78rem; }
+    .spec-item span { display: block; color: var(--muted); font-size: .72rem; line-height: 1.55; }
+
+    .columns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    .panel { padding: 27px; border: 1px solid rgba(255,255,255,.9); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); }
+    .panel.wide { grid-column: 1 / -1; }
+    .panel h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: .92rem; }
+    .panel h3::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px var(--green-soft); }
+    .track-cloud .panel h3::before { background: var(--blue); box-shadow: 0 0 0 5px var(--blue-soft); }
+    .track-other .panel h3::before { background: var(--gold); box-shadow: 0 0 0 5px var(--gold-soft); }
+
+    .tasks { margin: 0; padding: 0; list-style: none; }
+    .tasks > li { display: grid; grid-template-columns: 25px 1fr; gap: 11px; padding: 12px 0; border-top: 1px solid var(--line); }
+    .tasks > li:last-child { border-bottom: 1px solid var(--line); }
+    .box { width: 21px; height: 21px; margin-top: 2px; border: 1.5px solid #9aa59e; border-radius: 7px; }
+    .done .box { position: relative; border-color: var(--green); background: var(--green); }
+    .done .box::after { content: "✓"; position: absolute; inset: -4px 0 0 4px; color: #fff; font-size: .85rem; font-weight: 900; }
+    .done .task-title { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(100,113,105,.45); }
+    .task-title { display: block; font-size: .9rem; font-weight: 650; line-height: 1.55; }
+    .note { display: block; margin-top: 3px; color: var(--muted); font-size: .75rem; line-height: 1.55; }
+    .subtasks { margin: 8px 0 0; padding-left: 1.2rem; color: var(--muted); font-size: .8rem; }
+    .subtasks li + li { margin-top: 5px; }
+    .pill { display: inline-block; margin: 5px 6px 0 0; padding: 3px 8px; border-radius: 999px; color: var(--green); background: var(--green-soft); font-size: .66rem; font-weight: 800; }
+    .pill.wait { color: #7a5b18; background: var(--gold-soft); }
+
+    .dependency { margin-top: 18px; padding: 15px 17px; border-left: 3px solid var(--gold); border-radius: 0 12px 12px 0; color: #65552f; background: rgba(243,232,201,.62); font-size: .8rem; }
+
+    .architecture { margin: 0 0 72px; padding: 26px; border: 1px solid rgba(255,255,255,.9); border-radius: 24px; background: var(--surface); box-shadow: var(--shadow); }
+    .architecture-head { display: flex; align-items: end; justify-content: space-between; gap: 22px; margin-bottom: 18px; }
+    .architecture h2 { margin: 0 0 5px; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 600; }
+    .architecture p { margin: 0; color: var(--muted); font-size: .78rem; }
+    .architecture-link { flex: 0 0 auto; padding: 9px 13px; border-radius: 999px; color: var(--blue); background: var(--blue-soft); font-size: .74rem; font-weight: 800; text-decoration: none; }
+    .architecture-frame { display: block; width: 100%; aspect-ratio: 1600 / 1320; border: 1px solid var(--line); border-radius: 17px; background: #f6f9ff; }
+    .architecture-rule { margin-top: 15px !important; padding: 12px 15px; border-left: 3px solid var(--blue); border-radius: 0 12px 12px 0; background: var(--blue-soft); }
+
+    .cloud-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 0 0 22px 110px; }
+    .cloud-option { padding: 23px; border: 1px solid rgba(255,255,255,.9); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+    .cloud-option small { display: block; margin-bottom: 9px; color: var(--blue); font-size: .66rem; font-weight: 850; letter-spacing: .1em; }
+    .cloud-option h3 { margin: 0 0 8px; font-size: 1rem; }
+    .cloud-option p { margin: 0; color: var(--muted); font-size: .75rem; }
+    .cloud-option ul { margin: 12px 0 0; padding-left: 1.15rem; color: var(--muted); font-size: .72rem; }
+    .cloud-option li + li { margin-top: 4px; }
+
+    footer { display: flex; justify-content: space-between; gap: 20px; padding: 8px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; }
+
+    @media (max-width: 820px) {
+      .summary, .columns { grid-template-columns: 1fr; }
+      .sequence ol { grid-template-columns: repeat(2, 1fr); }
+      .panel.wide { grid-column: auto; }
+    }
+    @media (max-width: 540px) {
+      .updated { display: none; }
+      .hero { padding-top: 40px; }
+      .sequence ol { grid-template-columns: 1fr; }
+      .track-head { grid-template-columns: 58px 1fr; gap: 14px; }
+      .track-number { width: 52px; height: 52px; border-radius: 17px; font-size: 1.45rem; }
+      .report-link { align-items: flex-start; flex-direction: column; gap: 5px; margin-left: 0; }
+      .spec-block { margin-left: 0; }
+      .spec-grid { grid-template-columns: 1fr; }
+      .cloud-options { grid-template-columns: 1fr; margin-left: 0; }
+      .architecture { padding: 16px; }
+      .architecture-head { align-items: flex-start; flex-direction: column; }
+      .panel { padding: 22px; }
+      footer { flex-direction: column; gap: 3px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">S</span>STEPBY ROADMAP</div>
+      <div class="updated">2026年8月4日 更新</div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Project overview</p>
+        <h1>次のStepByを、<br>3つの仕事に分ける。</h1>
+        <p class="lead">点字ブロックデータをOSMへつなぐこと、運用基盤をクラウドへ移すこと、そして日々の使いやすさを整えること。混ざっていた作業を3本の流れに整理しました。</p>
+      </section>
+
+      <nav class="summary" aria-label="3つの作業分野">
+        <a href="#osm"><span class="summary-number">01</span><strong>OSM直接統合・Valhalla廃止</strong><small>調査 → 方式決定 → 新規・既存データ移行</small></a>
+        <a href="#cloud"><span class="summary-number">02</span><strong>クラウドサーバー移行</strong><small>移行条件確定 → 選定・費用相談 → 実移行</small></a>
+        <a href="#other"><span class="summary-number">03</span><strong>その他の仕様・運用変更</strong><small>規約公開、UI1移行、協力者への連絡</small></a>
+      </nav>
+
+      <section class="sequence" aria-labelledby="sequence-title">
+        <p class="sequence-label" id="sequence-title">Recommended order / 推奨する全体順序</p>
+        <ol>
+          <li><strong>調査と要件確定</strong><span>Valhallaの役割、OSMへの書込み条件、非公開情報を確認</span></li>
+          <li><strong>仕様変更を実装</strong><span>新規データ統合、既存データ移行、UIなどを完成</span></li>
+          <li><strong>クラウドを決定</strong><span>必要性能と費用を確定し、松田先生へ相談</span></li>
+          <li><strong>移行・検証</strong><span>バックアップ後に移行し、動作と公開範囲を確認</span></li>
+        </ol>
+      </section>
+
+      <section class="architecture" id="architecture" aria-labelledby="architecture-title">
+        <div class="architecture-head">
+          <div><h2 id="architecture-title">現在のシステム構成</h2><p>公開版・開発版・ローカルサーバー・Tailscale・DB・外部サービスの接続関係です。</p></div>
+          <a class="architecture-link" href="/system-architecture.svg" target="_blank" rel="noopener">SVGを別画面で拡大表示 →</a>
+        </div>
+        <a href="/system-architecture.svg" target="_blank" rel="noopener"><img class="architecture-frame" src="/system-architecture.svg" alt="StepByとbarrierfree-mapの現在のシステム構成図"></a>
+        <p class="architecture-rule"><strong>更新ルール：</strong>フロント、API、ポート、PM2、Tailscale、DB、コンテナ、外部サービスまたは認証方式を変更した作業では、この構成図も同時に更新します。秘密情報は掲載しません。</p>
+      </section>
+
+      <section class="track track-osm" id="osm">
+        <div class="track-head">
+          <div class="track-number">01</div>
+          <div><h2>OSM直接統合・Valhalla使用中止</h2><p>最大の技術変更。調査を終えてから、新規データ、既存データの順に進めます。</p></div>
+        </div>
+
+        <a class="report-link" href="/valhalla-browser-fitting-report.html">
+          <span>完了した2件の調査結果と、現行サービスを止めない移行計画をまとめています。</span>
+          <b>調査レポートを開く →</b>
+        </a>
+
+        <section class="spec-block" aria-labelledby="decided-spec-title">
+          <h3 id="decided-spec-title">決定済み仕様</h3>
+          <p class="spec-intro">ここまでの検討で、次の内容を基本方針として確定しました。</p>
+          <div class="spec-grid">
+            <div class="spec-item"><b>ブラウザ側フィッティング</b><span>現在地から約1km以内の歩行可能なOSM Way・Nodeをプリロードし、Web Workerで処理する。</span></div>
+            <div class="spec-item"><b>リアルタイム選択条件</b><span>GPS点に最も近い歩道または道路を候補とし、歩道を最優先。前回選択したWayとの連続性も考慮する。</span></div>
+            <div class="spec-item"><b>確定時の経路</b><span>記録全体を再計算し、OSM上で接続された、矛盾のない一つの経路とWay ID列を確定する。</span></div>
+            <div class="spec-item"><b>Way途中の開始・終了</b><span>記録開始点・終了点を既存Way上へ投影し、必要なNodeを作ってWayを分割。対象区間だけへ点字ブロック情報を付与する。</span></div>
+            <div class="spec-item"><b>OSMタグ</b><span>独立歩道Wayには tactile_paving=yes。道路中心線の場合は sidewalk:left/right:tactile_paving=yes など、OSM上の表現に合わせる。</span></div>
+            <div class="spec-item"><b>StepBy由来の記録</b><span>変更セットへ created_by=StepBy、source=survey、説明用commentを付与。独自のオブジェクトタグはコミュニティ確認後に判断する。</span></div>
+            <div class="spec-item"><b>StepByサーバー保存</b><span>内部ユーザーID・記録日時・確認日時・変更セットID・Way ID/Version・開始終了Node ID・順序・タグ・形状照合情報を保存する。</span></div>
+            <div class="spec-item"><b>公開範囲と安全な移行</b><span>StepByユーザーIDはOSMへ公開しない。新旧同時計算、限定利用、自動フォールバックを経てValhallaを最後に停止する。</span></div>
+            <div class="spec-item"><b>OSM送信の禁止条件</b><span>プロジェクト管理者の明示的な許可があるまで、本番OSMへのマージ機能を有効化せず、実データを一切送信しない。</span></div>
+            <div class="spec-item"><b>マージ履歴と取消し</b><span>送信要求、確認者、対象、変更内容、結果、changeset ID、エラー、取消しまで全イベントを追記型で保存する。履歴は削除・上書きしない。取消しは元の編集を消すのではなく、反対変更を新しいchangesetとして送る方式にする。</span></div>
+            <div class="spec-item"><b>開発リポジトリ・ブランチ</b><span>新しいリポジトリは作らない。フロントはStepBy内のUI10・UI11等、バックエンドはbarrierfree-mapの常設devブランチで開発する。</span></div>
+            <div class="spec-item"><b>開発サーバーの分離</b><span>本番と別フォルダ・別プロセス・別ポート・別DBで稼働。最初はTailscale Serve、GitHub Pagesからの結合試験時はFunnelの10000番を利用する。</span></div>
+          </div>
+        </section>
+
+        <div class="columns">
+          <article class="panel">
+            <h3>先に確認すること</h3>
+            <ul class="tasks">
+              <li class="done"><span class="box"></span><div><span class="task-title">Valhallaが現在行っている処理を特定する</span><span class="note">完了。1点スナップと軌跡全体のマップマッチング・Way ID取得を確認。<a href="/valhalla-browser-fitting-report.html">調査結果を見る</a></span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">ブラウザ側でフィッティングを代替できるか検証する</span><span class="note">完了。条件付きで実現可能。無停止の段階移行案を作成。<a href="/valhalla-browser-fitting-report.html#migration">移行案を見る</a></span></div></li>
+              <li><span class="box"></span><div><span class="task-title">点字ブロックを含むWayをOSMへ直接マージできるか確認する</span><span class="note">実装面の確認は進展。Way分割案、changeset送信、Version競合停止、取消送信のコードを作成済み。残りはOSM認証方式、レビュー運用、コミュニティ確認。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">PostgreSQLへOSM IDだけを保存する方式を確認する</span><span class="note">座標やタグを複製せず、OSMを正として照合できる構成を検討。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">公開・非公開データを分離できるか確認する</span><span class="note">点字ブロックはOSMへ。PROモードの柵・塀などと日常情報は公開しない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">StepBy IDをOSMデータへ付与できるか確認する</span><span class="note">Wikidata項目の作成可否、OSMタグとしての適切性、コミュニティ方針を確認。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM公式アプリで地図情報を編集してみる</span><span class="note">完了済み。</span></div></li>
+            </ul>
+          </article>
+
+          <article class="panel">
+            <h3>方式決定後に実施すること</h3>
+            <ul class="tasks">
+              <li class="done"><span class="box"></span><div><span class="task-title">開発用ブランチと作業領域を準備する</span><span class="note">完了。フロント・バックエンド双方にdevブランチと別worktreeを作成し、GitHubへpush済み。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">開発バックエンドを別プロセスで起動する</span><span class="note">完了。本番3000番とは別に、localhost限定の3100番・別PM2プロセスで稼働。本番DB設定は渡していない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">開発データと外部接続先を分離する</span><span class="note">完了。本番DBと同じ構造の開発専用DBを新規作成し、UI10の読み書きを開発DBだけへ分離。OSM送信はサーバー機能フラグで無効、認証情報も未設定。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">開発APIのTailscale接続を設定する</span><span class="note">完了。10000番はFunnel経由で開発API（localhost:3100）を公開し、10001番はtailnet内限定ServeでUI10（localhost:3200）を配信。許可したOrigin、認証、レート制限などの防御を適用している。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Funnel公開前の開発API防御を実装する</span><span class="note">完了。署名付きログイントークン、本人ID固定、履歴一覧の管理者キー、IP・ユーザー単位の二重レート制限、本文サイズ上限、Origin制限、異常アクセスログ、秘密鍵のGit分離を実装。未認証・偽トークン・ID偽装・大量アクセス・過大データの拒否を試験済み。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">新API検証用フロントをUI10以降へ実装する</span><span class="note">完了。UI10、開発API URL、開発専用Service Worker・キャッシュ、DEV表示を本番UI0から分離。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM歩行ネットワークの取得・キャッシュを実装する</span><span class="note">実装中。約1km圏の歩行可能WayをOverpassから取得し、Way ID/Version・Node ID・タグ・形状を返す開発API、5分サーバキャッシュ、IndexedDB保存まで実装。タイル差分取得・圧縮は未実装。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">StepBy専用ブラウザフィッターを実装する</span><span class="note">実装中。60m以内の線分投影、歩道優先、同一Way・共有Node接続優先をUI10へ実装し単体確認済み。空間インデックス、方位評価、Web Worker化は未実装。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">確定時の経路全体最適化を実装する</span><span class="note">実装中。開始・終了のWay途中位置と、共有Nodeで連結されたWay ID列を生成できる段階。GPS点列全体の確率的再最適化は未実装。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Valhallaとのシャドー比較機能を実装する</span><span class="note">実装中。UI10で同一GPSを新旧同時計算し、GPS・Valhalla・ブラウザ版・結果差を地図へ色分け表示。Way ID、位置差、歩道判定、連続性、計算時間、保存履歴番号を比較パネルへ表示し、実験DBへ全件保存できる。経路全体の比較集計と合格基準判定は未実装。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM認証と変更確認画面を実装する</span><span class="note">実装中。UI10で分割予定区間・Way ID・タグを表示し、未送信案を保存できる。サーバー側の管理者確認も実装済み。通常はGoogle認証でStepByへログインし、初回のOSM連携時だけOSM側で登録・OAuth許可を行い、2回目以降は保存したOSM認可を利用する方針。OSM OAuth連携と最終送信確認UIは未実装。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Wayの途中分割処理を実装する</span><span class="note">実装中。開始・終了Node作成、既存Node利用、正逆方向、複数Way、対象区間だけの tactile_paving=yes、元タグ継承を実装・自動試験済み。Relation所属の維持と道路中心線用タグの分岐は未実装。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM変更セットの作成・送信APIを実装する</span><span class="note">完了。changeset作成、Node・Way一括送信、ID・Version取得、changeset終了を実装。Version競合時は送信前に停止する。現在は機能フラグ無効で必ず423となり、実OSMでは未試験。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">StepBy側のOSM対応データ構造を実装する</span><span class="note">実装中。変更案、変更前後、実行要求、確認者、成功・失敗、changeset ID、OSM ID・Version、取消しを追記型で保存し、UPDATE・DELETEをDBで禁止。記録セッションとの完全な紐付けと再照合情報は未実装。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSMマージ取消APIを実装する</span><span class="note">完了。送信結果のID・Versionから反対変更を作り、新しいchangesetとして送るAPIを実装。現在Versionが違えば409で停止し、全履歴を追記保存する。機能フラグ無効のため実送信は不可、実OSMでは未試験。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM再編集後の追跡・再照合を実装する</span><span class="note">後からWayが再分割・統合された場合、変更セット・Node・形状情報を使って対応先を更新する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM開発環境で編集テストを実施する</span><span class="note">Way分割、Relation、競合、キャンセル、再送、ID返却、権限エラーを確認。本番OSMへはテストデータを送らない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSMコミュニティへ方式を確認する</span><span class="note">タグ付け、StepBy由来の表現、支援型編集・大量編集の運用を事前相談する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">限定利用から段階的に切り替える</span><span class="note">開発者、協力者、一部利用者、標準利用の順に拡大。低信頼・データ不足・処理失敗時はValhallaへ自動退避。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">件数、品質、重複、マージ可否、公開対象を確認し、少量の試験から始める。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Valhallaを停止する</span><span class="note">ブラウザ版とOSM統合が合格基準を満たし、一定期間の安定稼働を確認してから停止。設定と復旧手段は保管する。</span></div></li>
+            </ul>
+            <div class="dependency"><strong>次に実施：</strong> Way分割時のRelation所属維持を実装する。対象Wayがバス路線・歩行ルート等のRelationに含まれる場合に、分割後のWayへ参照を正しい順序で引き継ぐ変更案を作り、すべて偽データの自動テストで確認する。OSMへの送信は行わない。</div>
+            <div class="dependency"><strong>重要な順序：</strong> Valhallaは先に止めず、端末側フィッティングとOSM保存が同等以上に動くことを確認した後で停止します。</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="track track-cloud" id="cloud">
+        <div class="track-head">
+          <div class="track-number">02</div>
+          <div><h2>クラウドサーバー移行</h2><p>ブラウザフィッティングへの移行を完了し、Valhallaを廃止した構成を前提に検討します。現時点では移行先・構成とも未定です。</p></div>
+        </div>
+
+        <div class="cloud-options" aria-label="クラウド移行の2つの候補">
+          <article class="cloud-option">
+            <small>OPTION A</small>
+            <h3>VPSをまるごと移行</h3>
+            <p>現在のサーバー構成を、新しいクラウドVPS上へまとめて移します。</p>
+            <ul><li>APIとデータベースを1台で運用</li><li>現在の構成に近く、移行手順が分かりやすい</li><li>OS・セキュリティ・バックアップを自分たちで管理</li></ul>
+          </article>
+          <article class="cloud-option">
+            <small>OPTION B</small>
+            <h3>DBとAPI実行環境を分ける</h3>
+            <p>マネージドデータベースと、APIを動かすクラウドサービスを個別に契約します。</p>
+            <ul><li>DBのバックアップや更新をサービス側へ任せやすい</li><li>APIだけ個別に増強・変更できる</li><li>複数サービスの料金、接続、障害対応を比較する必要がある</li></ul>
+          </article>
+        </div>
+
+        <div class="columns">
+          <article class="panel">
+            <h3>選定・相談</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">移行前に完了させる仕様変更の範囲を確定する</span><span class="note">「全て完了」の判定条件をチェックリストにする。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Valhalla廃止後のクラウド要件を決める</span><span class="note">API、PostgreSQL、画像、ログ、バックアップ、運用負荷、月額上限、OSM連携を整理。Valhalla用のCPU・メモリ・タイル容量は含めない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">2つの移行方式を比較する</span><ul class="subtasks"><li>案A：VPSへAPI・DBをまとめて移行</li><li>案B：マネージドDBとAPI実行サービスを個別契約</li><li>料金、管理負荷、バックアップ、拡張性、障害時の切り分けを比較</li></ul></div></li>
+              <li><span class="box"></span><div><span class="task-title">構成とサービスを決定する</span><span class="pill wait">移行先・構成未定</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">移行費用と継続費用を見積もる</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">松田先生へ費用負担を相談する</span><span class="note">「可能であればご支援いただきたい」という依頼文と、見積りを準備。</span></div></li>
+            </ul>
+          </article>
+
+          <article class="panel">
+            <h3>移行作業</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">移行手順と切戻し手順を作成する</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">データベースと設定をバックアップする</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">クラウド環境を構築し、アプリとデータを移行する</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">本番切替え前に総合テストする</span><span class="note">認証、記録、OSM連携、非公開情報、性能、バックアップ復元を確認。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">本番を切り替え、移行後を監視する</span></div></li>
+            </ul>
+            <div class="dependency"><strong>開始条件：</strong> 01のブラウザフィッティング・OSM統合が安定し、Valhallaを廃止できていること。03の必要な仕様変更が完成し、移行構成・サービス・費用の承認が取れていること。</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="track track-other" id="other">
+        <div class="track-head">
+          <div class="track-number">03</div>
+          <div><h2>その他の仕様・運用変更</h2><p>法務文書、UI移行、協力依頼、開発環境など、独立して進められる項目です。</p></div>
+        </div>
+
+        <div class="columns">
+          <article class="panel wide">
+            <h3>公開・UI・連絡</h3>
+            <ul class="tasks">
+              <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成・公開。Google認証とOSM認証の違い、OSM公開情報、非公開情報、保存項目を明記した。初回Google登録とゲスト登録は両文書へのチェックが必須で、APIも未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">UI1へ移行する</span><span class="note">対象範囲と完了条件を先に確定する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡する</span><span class="note">状況を伝え、無理のない範囲で協力可能か確認。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Mariaさんへデバッグを依頼するか決める</span><span class="note">忙しくなさそうで、本人が対応可能な場合のみ依頼。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">MacでTailscaleを利用できるようにする</span><span class="note">完了済み。</span></div></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer><span>StepBy Project Roadmap</span><span>未確定事項は調査結果に合わせて更新します。</span></footer>
+  </div>
+</body>
+</html>
