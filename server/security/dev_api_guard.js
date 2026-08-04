@@ -97,7 +97,7 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins }) {
       }
     });
 
-    const publicRoute = pathname === "/api/config" || pathname === "/auth/guest" || pathname === "/auth/google" || pathname === "/auth/google/signup";
+    const publicRoute = pathname === "/api/config" || pathname === "/auth/guest" || pathname === "/auth/google" || pathname === "/auth/google/signup" || pathname === "/auth/osm/callback";
     if (publicRoute) {
       const rate = consumeRateLimit(`public:${ip}:${pathname}`, pathname === "/api/config" ? 60 : 10);
       if (!rate.allowed) {

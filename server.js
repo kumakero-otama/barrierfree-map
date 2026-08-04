@@ -17,6 +17,7 @@ const createFittingDetailsHandler = require("./server/api/fitting_details");
 const createPostTagsHandler = require("./server/api/post_tags");
 const createRoadInfoHandler = require("./server/api/road_info");
 const createGoogleAuthHandler = require("./server/api/google_auth");
+const createOsmOAuthHandler = require("./server/api/osm_oauth");
 const createProStatusHandler = require("./server/api/pro_status");
 const createTactileTagsHandler = require("./server/api/tactile_tags");
 const createClientLogsHandler = require("./server/api/client_logs");
@@ -363,6 +364,7 @@ const handleGoogleAuth = createGoogleAuthHandler({
   sendJson,
   GOOGLE_CLIENT_ID,
 });
+const handleOsmOAuth = createOsmOAuthHandler({ sendJson });
 
 const handleProStatus = createProStatusHandler({
   sendJson,
@@ -427,6 +429,10 @@ function handleRequest(req, res) {
       return;
     }
     handleTactileTags(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/auth/osm/")) {
+    handleOsmOAuth(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/api/session")) {
