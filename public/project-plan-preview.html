@@ -371,7 +371,7 @@
           <article class="panel wide">
             <h3>公開・UI・連絡</h3>
             <ul class="tasks">
-              <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成・公開。Google認証とOSM認証の違い、OSM公開情報、非公開情報、保存項目を明記した。初回Google登録とゲスト登録は両文書へのチェックが必須で、APIも未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成し、Tailscale版とGitHub Pages版へ公開。見出し・段落・箇条書きを整形して表示する。Google認証ユーザーの同意欄はログイン画面ではなく、初回プロフィール登録画面の「画像を選ぶ」と「登録」の間に配置した。ゲスト登録時も確認を必須とし、APIは未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。devブランチ全体はmainへマージせず、GitHub Pages公開用にUI10だけをmainへ同期している。UI0とバックエンド本番系には未反映。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">UI1へ移行する</span><span class="note">対象範囲と完了条件を先に確定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡する</span><span class="note">状況を伝え、無理のない範囲で協力可能か確認。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへデバッグを依頼するか決める</span><span class="note">忙しくなさそうで、本人が対応可能な場合のみ依頼。</span></div></li>
