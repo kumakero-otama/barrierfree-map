@@ -295,10 +295,10 @@
               <li><span class="box"></span><div><span class="task-title">確定時の経路全体最適化を実装する</span><span class="note">実装中。開始・終了のWay途中位置と、共有Nodeで連結されたWay ID列を生成できる段階。GPS点列全体の確率的再最適化は未実装。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Valhallaとのシャドー比較機能を実装する</span><span class="note">実装中。UI10で同一GPSを新旧同時計算し、GPS・Valhalla・ブラウザ版・結果差を地図へ色分け表示。Way ID、位置差、歩道判定、連続性、計算時間、保存履歴番号を比較パネルへ表示し、実験DBへ全件保存できる。経路全体の比較集計と合格基準判定は未実装。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM認証と変更確認画面を実装する</span><span class="note">実装中。UI10で分割予定区間・Way ID・タグを表示し、未送信案を保存できる。サーバー側の管理者確認も実装済み。通常はGoogle認証でStepByへログインし、初回のOSM連携時だけOSM側で登録・OAuth許可を行い、2回目以降は保存したOSM認可を利用する方針。OSM OAuth連携と最終送信確認UIは未実装。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Wayの途中分割処理を実装する</span><span class="note">実装中。開始・終了Node作成、既存Node利用、正逆方向、複数Way、対象区間だけの tactile_paving=yes、元タグ継承を実装・自動試験済み。Relation所属の維持と道路中心線用タグの分岐は未実装。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Wayの途中分割処理を実装する</span><span class="note">実装中。開始・終了Node、正逆方向、複数Way、対象区間だけの tactile_paving=yes、元タグ継承に加え、Relationのmember順・forward/backward role・Relationタグの引き継ぎを偽データで自動試験済み。残りは道路中心線用タグの分岐。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM変更セットの作成・送信APIを実装する</span><span class="note">完了。changeset作成、Node・Way一括送信、ID・Version取得、changeset終了を実装。Version競合時は送信前に停止する。現在は機能フラグ無効で必ず423となり、実OSMでは未試験。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">StepBy側のOSM対応データ構造を実装する</span><span class="note">実装中。変更案、変更前後、実行要求、確認者、成功・失敗、changeset ID、OSM ID・Version、取消しを追記型で保存し、UPDATE・DELETEをDBで禁止。記録セッションとの完全な紐付けと再照合情報は未実装。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">OSMマージ取消APIを実装する</span><span class="note">完了。送信結果のID・Versionから反対変更を作り、新しいchangesetとして送るAPIを実装。現在Versionが違えば409で停止し、全履歴を追記保存する。機能フラグ無効のため実送信は不可、実OSMでは未試験。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">StepBy記録とOSM処理を1対1で紐付ける</span><span class="note">完了。1記録＝1変更案＝1送信changeset＝最大1取消changesetの単純な表を開発DBへ実装。2件目の変更案・取消案は拒否し、状態を draft / merged / revert_draft / reverted / failed / conflict で管理。詳細画面にも状態とIDを表示する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSMマージ取消APIを実装する</span><span class="note">完了。record_idから元の変更案と監査履歴を特定し、反対変更を新しい取消案として作成するAPIへ整理。送信済みの場合は現在Version確認後に新しいchangesetとして取消す設計。機能フラグ無効のため実送信は不可、実OSMでは未試験。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM再編集後の追跡・再照合を実装する</span><span class="note">後からWayが再分割・統合された場合、変更セット・Node・形状情報を使って対応先を更新する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM開発環境で編集テストを実施する</span><span class="note">Way分割、Relation、競合、キャンセル、再送、ID返却、権限エラーを確認。本番OSMへはテストデータを送らない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSMコミュニティへ方式を確認する</span><span class="note">タグ付け、StepBy由来の表現、支援型編集・大量編集の運用を事前相談する。</span></div></li>
@@ -307,7 +307,7 @@
               <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Valhallaを停止する</span><span class="note">ブラウザ版とOSM統合が合格基準を満たし、一定期間の安定稼働を確認してから停止。設定と復旧手段は保管する。</span></div></li>
             </ul>
-            <div class="dependency"><strong>次に実施：</strong> Way分割時のRelation所属維持を実装する。対象Wayがバス路線・歩行ルート等のRelationに含まれる場合に、分割後のWayへ参照を正しい順序で引き継ぐ変更案を作り、すべて偽データの自動テストで確認する。OSMへの送信は行わない。</div>
+            <div class="dependency"><strong>次に実施：</strong> 道路中心線Wayに対する点字ブロックタグの分岐を実装する。独立歩道は tactile_paving=yes、道路中心線は実際の歩道側に応じて sidewalk:left/right:tactile_paving=yes を選び、誤った道路全体へのタグ付けを防ぐ。OSMへの送信は行わない。</div>
             <div class="dependency"><strong>重要な順序：</strong> Valhallaは先に止めず、端末側フィッティングとOSM保存が同等以上に動くことを確認した後で停止します。</div>
           </article>
         </div>
