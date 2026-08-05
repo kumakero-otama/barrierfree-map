@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StepBy クラウド移行案比較</title>
+<style>
+:root{--ink:#16323a;--muted:#5d7076;--line:#d8e4e5;--green:#167861;--soft:#edf8f4;--warn:#9a5a00}*{box-sizing:border-box}body{margin:0;background:#f4f8f8;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;line-height:1.7}main{max-width:1180px;margin:auto;padding:28px 18px 64px}a{color:#087365}.back{display:inline-block;margin-bottom:18px}.hero,.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 8px 24px rgba(24,70,70,.06)}h1{margin:.1em 0}.lead{color:var(--muted)}.recommend{margin:20px 0;padding:18px;border-left:6px solid var(--green);background:var(--soft);border-radius:12px}.table-wrap{overflow:auto;margin:20px 0}table{width:100%;min-width:980px;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}th,td{padding:13px;vertical-align:top;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}th{background:#e9f4f1;text-align:left}tr:last-child td{border-bottom:0}th:last-child,td:last-child{border-right:0}.good{color:var(--green);font-weight:700}.caution{color:var(--warn);font-weight:700}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card h2{margin-top:0}.small{font-size:.9rem;color:var(--muted)}code{background:#edf2f3;padding:.1em .35em;border-radius:5px}.sources li{margin:.5em 0}@media(max-width:600px){main{padding:18px 10px}.hero,.card{padding:18px}}
+</style></head><body><main>
+<a class="back" href="project-plan-preview.html">← タスクリストへ戻る</a>
+<section class="hero"><h1>StepBy クラウド移行案比較</h1><p class="lead">前提：第一ステップでValhallaを廃止し、ブラウザフィッティング・OSM変更案・認証・監査を完成させた後に移行する。2026-08-05時点の公式無料枠を確認。</p>
+<div class="recommend"><strong>現時点の第一候補：</strong> まずはVPSへそのまま移す案が、コード変更と障害点が最少。無料運用を優先する実験案は「Cloud Run＋Neon＋GitHub Pages＋オブジェクトストレージ」。利用が増えたらDBだけ有料化しやすい。</div></section>
+
+<div class="table-wrap"><table><thead><tr><th>案</th><th>構成例</th><th>無料枠の可能性</th><th>現在のNode/PostgreSQLとの相性</th><th>主な変更</th><th>注意点</th><th>評価</th></tr></thead><tbody>
+<tr><td><strong>1. VPSへ丸ごと移行</strong></td><td>Ubuntu VPS<br>Node/PM2＋PostgreSQL＋画像</td><td>Google Compute Engineの対象米国リージョンでe2-micro 1台、標準ディスク30GB等のFree Tier。ただし性能・転送量は小さい。</td><td class="good">最良</td><td>OS、TLS、バックアップ、監視を移設。アプリ変更は最小。</td><td>保守・セキュリティ更新は自分で実施。1GB級RAMでは余裕が少ない。</td><td><strong>移行しやすさ1位</strong></td></tr>
+<tr><td><strong>1-B. Oracle無料VPS</strong></td><td>OCI Ampere A1 VM<br>Node/PM2＋PostgreSQL＋画像</td><td>Always Freeで合計2 OCPU・12GB RAM相当、Block Volume 200GBなど。現行一体構成を載せやすい。</td><td class="good">最良</td><td>ARM64互換を確認してサーバーを丸ごと移設。</td><td>リージョンによって空き容量不足があり、アイドルVMが回収される場合がある。無料枠にSLAなし。</td><td><strong>無料VPS第一候補</strong></td></tr>
+<tr><td><strong>2. Google中心</strong></td><td>GitHub PagesまたはFirebase Hosting<br>Cloud Run<br>Neon/Supabase PostgreSQL<br>Cloud Storage</td><td>Cloud Runは月200万リクエスト、180,000 vCPU秒、360,000 GiB秒が無料枠。Cloud Storage無料枠は対象米国リージョン等の条件あり。</td><td class="good">良い</td><td>Nodeをコンテナ化。ローカルファイル保存をCloud Storageへ変更。DB接続プール調整。</td><td>Cloud SQLには恒久的な小規模無料枠を期待しにくいため、無料優先なら外部Postgres併用。</td><td><strong>無料実験の第一候補</strong></td></tr>
+<tr><td><strong>3. AWS中心</strong></td><td>GitHub Pages/S3<br>Lambda＋API Gateway<br>RDS PostgreSQLまたは外部Postgres<br>S3</td><td>Lambdaは月100万リクエスト・400,000 GB秒の無料枠。DBやAPI Gatewayは契約時期・期間限定枠に注意。</td><td>中</td><td>HTTPサーバーをLambda向けへ分割。画像をS3へ。コールドスタートとDB接続対策。</td><td>サービス数と権限設定が多く、個人開発では運用が複雑。完全無料を維持しにくい。</td><td>拡張性重視</td></tr>
+<tr><td><strong>4. Cloudflare中心</strong></td><td>Pages<br>Workers<br>Neon PostgreSQL＋Hyperdrive、またはD1<br>R2</td><td>Workersは10万リクエスト/日、R2は10GB/月、Hyperdriveは10万DBクエリ/日。静的アセットは無料。</td><td>中〜低</td><td>Node APIをWorkersランタイム向けへ変更。ファイルをR2へ。Postgres継続ならHyperdrive。</td><td>Freeは1回10ms CPU制限。画像処理・大きい依存関係・従来Node APIは書換え量が多い。D1へ移すならSQL移行も必要。</td><td>軽量API向け</td></tr>
+<tr><td><strong>5. Supabase一体型</strong></td><td>GitHub Pages<br>Supabase Postgres/Auth/Storage/Edge Functions</td><td>無料でDB 500MB、Storage 1GB、Edge Functions 50万回など。1週間非アクティブで停止。</td><td class="good">DBは良い</td><td>PostgreSQL移行は容易。画像Storageと一部APIをEdge Functionsへ移す。既存Google認証との整理。</td><td>無料DBは小さく、非アクティブ停止・バックアップ制約あり。Node APIを全部そのままは動かせない。</td><td>管理画面重視</td></tr>
+<tr><td><strong>6. Render簡易PaaS</strong></td><td>Render Web Service<br>Render Postgres<br>Object Storageは別</td><td>無料Web Serviceあり。ただし無料Postgresは1GBで30日後に失効するため、本番DBには不適。</td><td class="good">良い</td><td>Nodeをほぼそのままデプロイ可能。</td><td>無料DBが30日限定でバックアップなし。本番は有料DBまたはNeon等が必要。</td><td>短期検証向け</td></tr>
+</tbody></table></div>
+
+<section class="cards"><article class="card"><h2>推奨A：安全優先</h2><p><strong>小規模VPS 1台</strong>へNode、PostgreSQL、画像を移す。現行構造を維持でき、第一ステップ完了後の移行事故が最も少ない。</p><p class="small">無料VPSは性能・リージョン・在庫に左右されるため、本番では月額上限を決めた低価格VPSも比較対象にする。</p></article>
+<article class="card"><h2>推奨B：無料枠優先</h2><p><strong>GitHub Pages＋Cloud Run＋Neon＋Cloud Storage</strong>。現在のNode/PostgreSQLを比較的維持しながら、アクセスが少ない時間はAPIを停止できる。</p><p class="small">現在の画像は本番で約142MBなので、無料ストレージ容量内から開始できる可能性が高い。</p></article>
+<article class="card"><h2>採用前に測るもの</h2><ul><li>月間APIリクエスト数</li><li>Cloud Run換算のCPU時間</li><li>DB容量と月間増加量</li><li>画像容量と転送量</li><li>同時接続数</li><li>バックアップ保持日数</li></ul></article></section>
+
+<section class="card sources"><h2>公式情報</h2><ul>
+<li><a href="https://cloud.google.com/run/pricing">Google Cloud Run pricing</a></li>
+<li><a href="https://docs.cloud.google.com/free/docs/free-cloud-features">Google Cloud Free Program</a></li>
+<li><a href="https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm">Oracle Cloud Always Free resources</a></li>
+<li><a href="https://firebase.google.com/pricing">Firebase pricing</a></li>
+<li><a href="https://aws.amazon.com/lambda/pricing/">AWS Lambda pricing</a></li>
+<li><a href="https://developers.cloudflare.com/workers/platform/pricing/">Cloudflare Workers / R2 / D1 / Hyperdrive pricing</a></li>
+<li><a href="https://neon.com/pricing">Neon pricing</a></li>
+<li><a href="https://supabase.com/pricing">Supabase pricing</a></li>
+<li><a href="https://render.com/docs/free">Render free services</a></li>
+</ul><p class="small">無料枠・価格・制限は変更されるため、実移行直前に再確認する。</p></section>
+</main></body></html>

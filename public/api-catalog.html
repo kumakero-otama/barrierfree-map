@@ -1,0 +1,51 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StepBy 開発API一覧</title>
+<style>:root{--ink:#17343b;--line:#d9e4e5;--green:#19745f;--red:#9b3d31}*{box-sizing:border-box}body{margin:0;background:#f4f8f8;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;line-height:1.65}main{max-width:1180px;margin:auto;padding:28px 16px 64px}a{color:#087365}.hero,.group{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}.endpoint{border:1px solid var(--line);border-radius:13px;padding:14px}.endpoint h3{margin:0 0 5px;font-size:1rem}code{background:#edf3f3;padding:.12em .35em;border-radius:5px;overflow-wrap:anywhere}.method{display:inline-block;min-width:48px;text-align:center;color:#fff;background:#397c72;border-radius:6px;margin-right:7px;font-size:.78rem}.locked{color:var(--red);font-weight:700}.done{color:var(--green);font-weight:700}.small{font-size:.9rem;color:#5d7076}.back{display:inline-block;margin-bottom:18px}@media(max-width:600px){main{padding:18px 10px}.hero,.group{padding:16px}}</style></head><body><main>
+<a class="back" href="project-plan-preview.html">← タスクリストへ戻る</a><section class="hero"><h1>StepBy 開発API一覧</h1><p>UI10が利用する開発APIの目的・認証・実装状態をまとめたもの。2026-08-05更新。</p><p><span class="done">通常APIは実装済み</span>。OSM送信・取消送信APIもコードは存在するが、管理者の明示許可がないためサーバー機能フラグで常時ロック中。</p></section>
+
+<section class="group"><h2>稼働・設定</h2><div class="grid">
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/health</code></h3><p>API、PostgreSQL、OSM OAuth設定、OSM書込ロックを一括確認。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/config</code></h3><p>記録間隔など公開可能なクライアント設定を返す。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/count</code></h3><p>マッチング利用数と上限を返す。</p></article></div></section>
+
+<section class="group"><h2>StepBy認証・プロフィール</h2><div class="grid">
+<article class="endpoint"><h3><span class="method">POST</span><code>/auth/google</code></h3><p>Google IDトークンを検証してStepByへログイン。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/auth/google/signup</code></h3><p>規約同意を検証して初回プロフィールを作成。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/auth/guest</code></h3><p>同意確認後に開発用ゲストアカウントを作成。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/auth/me</code></h3><p>現在の利用者、実績、アカウント種別を取得。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/auth/profile</code></h3><p>ユーザー名・アイコンを更新。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/auth/logout</code></h3><p>StepByセッションを終了。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/pro-status</code></h3><p>PRO権限の状態を取得。</p></article></div></section>
+
+<section class="group"><h2>OSM OAuth</h2><div class="grid">
+<article class="endpoint"><h3><span class="method">GET</span><code>/auth/osm/status</code></h3><p>OSMアカウント連携状態を取得。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/auth/osm/start</code></h3><p>PKCE状態を保存し、小窓用のOSM開発環境認証URLを発行。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/auth/osm/callback</code></h3><p>OSM認証コードを交換し、暗号化トークンと追記監査履歴を保存。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/auth/osm/disconnect</code></h3><p>保存トークンを破棄し、解除履歴を追加。</p></article></div></section>
+
+<section class="group"><h2>記録・地図情報</h2><div class="grid">
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/session/start</code></h3><p>GPS記録セッションを開始。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/session/end</code></h3><p>記録を確定し集計を保存。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/session/cancel</code></h3><p>未確定セッションを取消。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/records</code></h3><p>StepByで記録されたデータを取得。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/trace</code></h3><p>GPS生点とaccuracyを開発DBへ保存。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/fitting-details</code></h3><p>最新記録の生座標・フィット結果・Way・OSM案状態を取得。</p></article>
+<article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/fitting-comparisons</code></h3><p>Valhalla版とブラウザ版の比較履歴を保存・取得。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-tactile-ways</code></h3><p>周辺のOSM点字ブロックWayを読取。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-walkable-network</code></h3><p>約1km圏の歩行可能Way・Node・Relationを取得・キャッシュ。</p></article>
+<article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/tactile-tags</code>ほか</h3><p>点字ブロックタグ、セッションタグ、記録詳細タグを管理。</p></article>
+<article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/road-info</code></h3><p>OSMへ送らない道情報・画像を保存・取得。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/stats</code> / <code>/api/tactile-ranking</code></h3><p>合計値・ランキングを取得。</p></article></div></section>
+
+<section class="group"><h2>OSM変更案・履歴・取消し</h2><div class="grid">
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/status</code></h3><p>変更案APIと書込ロック状態を取得。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/split-plan</code></h3><p>Way分割・Relation引継ぎを含む未送信案を作成。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/plans</code></h3><p>一般の未送信変更案を作成。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/plans/:planId</code></h3><p>変更前後、要素、監査履歴を取得。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/records/:recordId</code></h3><p>記録と送信・取消changesetの1対1状態を取得。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/records/:recordId/revert-plan</code></h3><p>記録単位で反対変更案を作成。元履歴は削除しない。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/audit-events</code></h3><p>管理者用の追記型監査履歴。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/plans/:id/execute</code></h3><p class="locked">実装済み・423ロック。明示許可なしでは実行不可。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/plans/:id/execute-revert</code></h3><p class="locked">取消送信も新規OSM書込みとしてロック。</p></article></div></section>
+
+<section class="group"><h2>安全条件</h2><ul><li>APIは開発用署名トークン、Origin制限、レート制限、本文上限を適用。</li><li>開発APIは開発DBだけへ接続。</li><li>OSM送信・取消しは機能フラグ、管理者鍵、操作直前確認、監査保存がすべて揃わない限り停止。</li><li>OAuthトークン、Cookie、秘密鍵は監査履歴へ保存しない。</li></ul><p class="small">仕様の正式な機械可読定義はUI10のOpenAPI文書も更新対象とする。</p></section>
+</main></body></html>

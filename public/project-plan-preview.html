@@ -202,7 +202,7 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true">S</span>STEPBY ROADMAP</div>
-      <div class="updated">2026年8月4日 更新</div>
+      <div class="updated">2026年8月5日 更新</div>
     </header>
 
     <main>
@@ -228,12 +228,22 @@
         </ol>
       </section>
 
+      <a class="report-link" href="api-catalog.html">
+        <span>認証・記録・フィッティング・OSM変更案・監査・取消しを含む開発APIの一覧です。</span>
+        <b>API一覧を開く →</b>
+      </a>
+
+      <a class="report-link" href="cloud-migration-options.html">
+        <span>VPS、Google、AWS、Cloudflare、Supabase、Renderを無料枠と移行量で比較しています。</span>
+        <b>クラウド移行案の比較表を開く →</b>
+      </a>
+
       <section class="architecture" id="architecture" aria-labelledby="architecture-title">
         <div class="architecture-head">
           <div><h2 id="architecture-title">現在のシステム構成</h2><p>公開版・開発版・ローカルサーバー・Tailscale・DB・外部サービスの接続関係です。</p></div>
-          <a class="architecture-link" href="/system-architecture.svg" target="_blank" rel="noopener">SVGを別画面で拡大表示 →</a>
+          <a class="architecture-link" href="system-architecture.svg" target="_blank" rel="noopener">SVGを別画面で拡大表示 →</a>
         </div>
-        <a href="/system-architecture.svg" target="_blank" rel="noopener"><img class="architecture-frame" src="/system-architecture.svg" alt="StepByとbarrierfree-mapの現在のシステム構成図"></a>
+        <a href="system-architecture.svg" target="_blank" rel="noopener"><img class="architecture-frame" src="system-architecture.svg" alt="StepByとbarrierfree-mapの現在のシステム構成図"></a>
         <p class="architecture-rule"><strong>更新ルール：</strong>フロント、API、ポート、PM2、Tailscale、DB、コンテナ、外部サービスまたは認証方式を変更した作業では、この構成図も同時に更新します。秘密情報は掲載しません。</p>
       </section>
 
@@ -243,7 +253,7 @@
           <div><h2>OSM直接統合・Valhalla使用中止</h2><p>最大の技術変更。調査を終えてから、新規データ、既存データの順に進めます。</p></div>
         </div>
 
-        <a class="report-link" href="/valhalla-browser-fitting-report.html">
+        <a class="report-link" href="valhalla-browser-fitting-report.html">
           <span>完了した2件の調査結果と、現行サービスを止めない移行計画をまとめています。</span>
           <b>調査レポートを開く →</b>
         </a>
@@ -271,8 +281,8 @@
           <article class="panel">
             <h3>先に確認すること</h3>
             <ul class="tasks">
-              <li class="done"><span class="box"></span><div><span class="task-title">Valhallaが現在行っている処理を特定する</span><span class="note">完了。1点スナップと軌跡全体のマップマッチング・Way ID取得を確認。<a href="/valhalla-browser-fitting-report.html">調査結果を見る</a></span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">ブラウザ側でフィッティングを代替できるか検証する</span><span class="note">完了。条件付きで実現可能。無停止の段階移行案を作成。<a href="/valhalla-browser-fitting-report.html#migration">移行案を見る</a></span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Valhallaが現在行っている処理を特定する</span><span class="note">完了。1点スナップと軌跡全体のマップマッチング・Way ID取得を確認。<a href="valhalla-browser-fitting-report.html">調査結果を見る</a></span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">ブラウザ側でフィッティングを代替できるか検証する</span><span class="note">完了。条件付きで実現可能。無停止の段階移行案を作成。<a href="valhalla-browser-fitting-report.html#migration">移行案を見る</a></span></div></li>
               <li><span class="box"></span><div><span class="task-title">点字ブロックを含むWayをOSMへ直接マージできるか確認する</span><span class="note">実装面の確認は進展。Way分割案、changeset送信、Version競合停止、取消送信のコードを作成済み。残りはOSM認証方式、レビュー運用、コミュニティ確認。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">PostgreSQLへOSM IDだけを保存する方式を確認する</span><span class="note">座標やタグを複製せず、OSMを正として照合できる構成を検討。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">公開・非公開データを分離できるか確認する</span><span class="note">点字ブロックはOSMへ。PROモードの柵・塀などと日常情報は公開しない。</span></div></li>
@@ -340,7 +350,7 @@
             <ul class="tasks">
               <li><span class="box"></span><div><span class="task-title">移行前に完了させる仕様変更の範囲を確定する</span><span class="note">「全て完了」の判定条件をチェックリストにする。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Valhalla廃止後のクラウド要件を決める</span><span class="note">API、PostgreSQL、画像、ログ、バックアップ、運用負荷、月額上限、OSM連携を整理。Valhalla用のCPU・メモリ・タイル容量は含めない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">2つの移行方式を比較する</span><ul class="subtasks"><li>案A：VPSへAPI・DBをまとめて移行</li><li>案B：マネージドDBとAPI実行サービスを個別契約</li><li>料金、管理負荷、バックアップ、拡張性、障害時の切り分けを比較</li></ul></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">移行方式と無料枠を比較する</span><span class="note">VPS、Google Cloud Run、AWS Lambda、Cloudflare Workers、Supabase、Renderを公式情報で比較。現状は安全優先ならVPS、無料実験ならCloud Run＋Neon＋GitHub Pages＋オブジェクトストレージを第一候補とした。<a href="cloud-migration-options.html">比較表を見る</a></span></div></li>
               <li><span class="box"></span><div><span class="task-title">構成とサービスを決定する</span><span class="pill wait">移行先・構成未定</span></div></li>
               <li><span class="box"></span><div><span class="task-title">移行費用と継続費用を見積もる</span></div></li>
               <li><span class="box"></span><div><span class="task-title">松田先生へ費用負担を相談する</span><span class="note">「可能であればご支援いただきたい」という依頼文と、見積りを準備。</span></div></li>
@@ -372,6 +382,7 @@
             <h3>公開・UI・連絡</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成し、Tailscale版とGitHub Pages版へ公開。見出し・段落・箇条書きを整形して表示する。Google認証ユーザーの同意欄はログイン画面ではなく、初回プロフィール登録画面の「画像を選ぶ」と「登録」の間に配置した。ゲスト登録時も確認を必須とし、APIは未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。devブランチ全体はmainへマージせず、GitHub Pages公開用にUI10だけをmainへ同期している。UI0とバックエンド本番系には未反映。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">開発APIを監査し一覧を公開する</span><span class="note">認証、記録、フィッティング、OSM OAuth、変更案、監査、取消しを一覧化。API・DB・OSMロックを確認するヘルスAPIを追加し、記録詳細APIのUUID型不一致を修正。開発DBを使った結合試験とOSM通信を行わないモック試験を通過。送信・取消送信は実装済みだがロック中。<a href="api-catalog.html">API一覧を見る</a></span></div></li>
               <li><span class="box"></span><div><span class="task-title">UI1へ移行する</span><span class="note">対象範囲と完了条件を先に確定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡する</span><span class="note">状況を伝え、無理のない範囲で協力可能か確認。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへデバッグを依頼するか決める</span><span class="note">忙しくなさそうで、本人が対応可能な場合のみ依頼。</span></div></li>
