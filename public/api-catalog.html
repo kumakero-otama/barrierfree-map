@@ -38,7 +38,7 @@
 
 <section class="group"><h2>OSM変更案・履歴・取消し</h2><div class="grid">
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/status</code></h3><p>変更案APIと書込ロック状態を取得。</p></article>
-<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/split-plan</code></h3><p>Way分割・Relation引継ぎを含む未送信案を作成。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/split-plan</code></h3><p>Way分割・Relation引継ぎを含む未送信案を作成。独立歩道Wayには <code>tactile_paving=yes</code>、道路中心線Wayには指定された側に応じて <code>sidewalk:left:tactile_paving=yes</code> または <code>sidewalk:right:tactile_paving=yes</code> を生成する。道路中心線Wayで左右が不明な場合は400で拒否する。OSMへは送信しない。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/plans</code></h3><p>一般の未送信変更案を作成。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/plans/:planId</code></h3><p>変更前後、要素、監査履歴を取得。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/records/:recordId</code></h3><p>記録と送信・取消changesetの1対1状態を取得。</p></article>

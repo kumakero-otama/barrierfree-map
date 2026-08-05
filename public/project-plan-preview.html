@@ -317,7 +317,7 @@
               <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Valhallaを停止する</span><span class="note">ブラウザ版とOSM統合が合格基準を満たし、一定期間の安定稼働を確認してから停止。設定と復旧手段は保管する。</span></div></li>
             </ul>
-            <div class="dependency"><strong>次に実施：</strong> 道路中心線Wayに対する点字ブロックタグの分岐を実装する。独立歩道Wayには tactile_paving=yes、道路中心線Wayには記録位置が左右どちらの歩道かを判定して sidewalk:left/right:tactile_paving=yes の未送信変更案を作る。分割区間・選択した側・追加予定タグをUI10で確認できるようにし、OSMへの実送信は行わない。</div>
+            <div class="dependency"><strong>次に実施：</strong> UI10で、GPS記録が道路中心線Wayの左右どちら側にあるかを自動判定し、その結果を変更案APIへ渡す。API側のタグ分岐は完了しており、独立歩道Wayには tactile_paving=yes、道路中心線Wayには sidewalk:left/right:tactile_paving=yes を生成する。左右が未指定の道路中心線Wayは安全のため変更案作成を拒否する。分割区間・判定した側・追加予定タグを確認画面に表示し、OSMへの実送信は行わない。</div>
             <div class="dependency"><strong>重要な順序：</strong> Valhallaは先に止めず、端末側フィッティングとOSM保存が同等以上に動くことを確認した後で停止します。</div>
           </article>
         </div>
@@ -382,7 +382,7 @@
             <h3>公開・UI・連絡</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成し、Tailscale版とGitHub Pages版へ公開。見出し・段落・箇条書きを整形して表示する。Google認証ユーザーの同意欄はログイン画面ではなく、初回プロフィール登録画面の「画像を選ぶ」と「登録」の間に配置した。ゲスト登録時も確認を必須とし、APIは未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。devブランチ全体はmainへマージせず、GitHub Pages公開用にUI10だけをmainへ同期している。UI0とバックエンド本番系には未反映。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">開発APIを監査し一覧を公開する</span><span class="note">認証、記録、フィッティング、OSM OAuth、変更案、監査、取消しを一覧化。API・DB・OSMロックを確認するヘルスAPIを追加し、記録詳細APIのUUID型不一致を修正。開発DBを使った結合試験とOSM通信を行わないモック試験を通過。送信・取消送信は実装済みだがロック中。<a href="api-catalog.html">API一覧を見る</a></span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">開発APIを監査し一覧を公開する</span><span class="note">認証、記録、フィッティング、OSM OAuth、変更案、監査、取消しを一覧化。API・DB・OSMロックを確認するヘルスAPIを追加し、記録詳細APIのUUID型不一致を修正。Way種別に応じた点字ブロックタグ生成も実装し、道路中心線Wayで左右が不明な場合は安全のため拒否する。開発DBを使った結合試験とOSM通信を行わないモック試験を通過。送信・取消送信は実装済みだがロック中。<a href="api-catalog.html">API一覧を見る</a></span></div></li>
               <li><span class="box"></span><div><span class="task-title">UI1へ移行する</span><span class="note">対象範囲と完了条件を先に確定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡する</span><span class="note">状況を伝え、無理のない範囲で協力可能か確認。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへデバッグを依頼するか決める</span><span class="note">忙しくなさそうで、本人が対応可能な場合のみ依頼。</span></div></li>
