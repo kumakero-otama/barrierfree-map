@@ -13,16 +13,16 @@ function createFittingDetailsHandler({ sendJson }) {
         `SELECT s.session_id,s.started_at,s.ended_at,
                 l.merge_plan_id,l.merge_changeset_id,l.revert_plan_id,l.revert_changeset_id,l.osm_status
            FROM tactile.sessions s
-           LEFT JOIN osmchange.record_links l ON l.record_id=s.session_id AND l.created_by=s.user_id
+           LEFT JOIN osmchange.record_links l ON l.record_id::text=s.session_id::text AND l.created_by=s.user_id
          WHERE s.user_id=? ORDER BY s.started_at DESC LIMIT 1`, [req.authUserId]
       );
       if (!sessions[0]) return sendJson(res, 404, { error: "recording_not_found" });
       const session = sessions[0];
       const [points] = await pool.query(
         `WITH raw AS (
-           SELECT row_number() OVER(ORDER BY ts,id) n,ts,geom,accuracy FROM tactile.gps_raw WHERE session_id=?
+           SELECT row_number() OVER(ORDER BY ts,id) n,ts,geom,accuracy FROM tactile.gps_raw WHERE session_id::text=?
          ), matched AS (
-           SELECT row_number() OVER(ORDER BY ts,id) n,geom,edge_id,confidence FROM tactile.gps_matched WHERE session_id=?
+           SELECT row_number() OVER(ORDER BY ts,id) n,geom,edge_id,confidence FROM tactile.gps_matched WHERE session_id::text=?
          )
          SELECT raw.n,raw.ts,ST_Y(raw.geom::geometry) raw_lat,ST_X(raw.geom::geometry) raw_lng,raw.accuracy,
                 ST_Y(matched.geom::geometry) matched_lat,ST_X(matched.geom::geometry) matched_lng,

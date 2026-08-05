@@ -22,6 +22,7 @@ const createProStatusHandler = require("./server/api/pro_status");
 const createTactileTagsHandler = require("./server/api/tactile_tags");
 const createClientLogsHandler = require("./server/api/client_logs");
 const createTactileRankingHandler = require("./server/api/tactile_ranking");
+const createHealthHandler = require("./server/api/health");
 const createDevApiGuard = require("./server/security/dev_api_guard");
 const { createLogger } = require("./server/logger");
 
@@ -382,6 +383,7 @@ const handleClientLogs = createClientLogsHandler({
 const handleTactileRanking = createTactileRankingHandler({
   sendJson,
 });
+const handleHealth = createHealthHandler({ sendJson });
 
 const guardDevApi = createDevApiGuard({
   sendJson,
@@ -441,6 +443,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/config")) {
     handleConfig(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/health")) {
+    handleHealth(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/api/records")) {

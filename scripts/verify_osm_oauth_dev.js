@@ -20,6 +20,15 @@ const { createAccessToken } = require("../server/auth_token");
   });
   const payload = await response.json();
   if (!response.ok) throw new Error(`status_failed_${response.status}`);
+  const healthResponse = await fetch("http://127.0.0.1:3100/api/health", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const healthPayload = await healthResponse.json();
+  if (!healthResponse.ok || !healthPayload.success) throw new Error(`health_failed_${healthResponse.status}`);
+  const detailsResponse = await fetch("http://127.0.0.1:3100/api/fitting-details", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (![200, 404].includes(detailsResponse.status)) throw new Error(`fitting_details_failed_${detailsResponse.status}`);
   const [tables] = await pool.query(
     `SELECT table_name FROM information_schema.tables
      WHERE table_schema='login' AND table_name IN ('osm_connections','osm_oauth_states','osm_connection_audit')`
@@ -31,6 +40,8 @@ const { createAccessToken } = require("../server/auth_token");
     connected: payload.connected,
     osmWritesEnabled: payload.osmWritesEnabled === true,
     tables: tables.map((row) => row.table_name).sort(),
+    health: healthPayload.checks,
+    fittingDetailsStatus: detailsResponse.status,
   }));
   process.exit(0);
 })().catch((error) => {
