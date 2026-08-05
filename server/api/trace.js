@@ -215,7 +215,7 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
       body += chunk.toString();
     });
 
-    req.on("end", () => {
+    req.on("end", async () => {
       let requestData;
       try {
         requestData = JSON.parse(body);
@@ -230,6 +230,47 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
       const source = requestData.source || "valhalla";
       const logPrefix = `[Trace][User:${userId} / IP:${ip}]`;
       console.log(`${logPrefix} Received ${requestData.shape?.length || 0} points`);
+
+      if (source === "browser") {
+        const matchedPoints = Array.isArray(requestData.matched_points) ? requestData.matched_points : [];
+        const edges = Array.isArray(requestData.edges) ? requestData.edges : [];
+        const validPoints = matchedPoints
+          .map((point) => ({ lat: Number(point && point.lat), lon: Number(point && point.lon) }))
+          .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon) &&
+            point.lat >= -90 && point.lat <= 90 && point.lon >= -180 && point.lon <= 180);
+        const validEdges = edges
+          .map((edge) => ({ way_id: Number(edge && edge.way_id) }))
+          .filter((edge) => Number.isSafeInteger(edge.way_id) && edge.way_id > 0);
+        if (!sessionId || validPoints.length < 2 || validPoints.length > 5000 || validPoints.length !== matchedPoints.length) {
+          sendJson(res, 400, { error: "invalid_browser_trace" });
+          return;
+        }
+        if (!pool || !req.authUserId) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+        try {
+          const [ownedSessions] = await pool.query(
+            "SELECT session_id FROM tactile.sessions WHERE session_id = ? AND user_id = ? LIMIT 1",
+            [sessionId, req.authUserId]
+          );
+          if (!Array.isArray(ownedSessions) || !ownedSessions.length) {
+            sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+            return;
+          }
+          if (canceledSessionIds && canceledSessionIds.has(sessionId)) {
+            sendJson(res, 409, { error: "session_canceled" });
+            return;
+          }
+          const browserData = { matched_points: validPoints, edges: validEdges };
+          await persistSessionPath(pool, sessionId, "browser", browserData, logPrefix);
+          sendJson(res, 200, { ...browserData, source: "browser", persisted: true, osmSent: false });
+        } catch (error) {
+          console.error(`${logPrefix} browser_trace_save_error:`, error.message);
+          sendJson(res, 500, { error: "browser_trace_save_failed" });
+        }
+        return;
+      }
 
       const valhallaRequest = {
         shape: requestData.shape,

@@ -47,6 +47,29 @@ async function run() {
     body: JSON.stringify({ sessionId: recordId, startedAt: new Date().toISOString() }),
   });
   assert.strictEqual(started.status, 200, JSON.stringify(started.body));
+  const browserTrace = await request("/api/trace", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      sessionId: recordId,
+      source: "browser",
+      matched_points: [
+        { lat: 35, lon: 139.0005 },
+        { lat: 35, lon: 139.0015 },
+        { lat: 35, lon: 139.0025 },
+      ],
+      edges: [{ way_id: 100 }],
+    }),
+  });
+  assert.strictEqual(browserTrace.status, 200, JSON.stringify(browserTrace.body));
+  assert.strictEqual(browserTrace.body.source, "browser");
+  assert.strictEqual(browserTrace.body.persisted, true);
+  assert.strictEqual(browserTrace.body.osmSent, false);
+  const [browserPathRows] = await pool.query(
+    "SELECT source FROM tactile.session_paths WHERE session_id = ? LIMIT 1",
+    [recordId]
+  );
+  assert.strictEqual(browserPathRows[0].source, "browser");
   const status = await request("/api/osm/status", { headers });
   assert.strictEqual(status.status, 200);
   assert.strictEqual(status.body.osmNetworkCodePresent, true);
