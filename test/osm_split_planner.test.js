@@ -21,6 +21,7 @@ function run() {
   assert.deepStrictEqual(middle.ways[0].sections.map((s) => s.tactile), [false, true, false]);
   assert.strictEqual(middle.ways[0].sections[1].tags.tactile_paving, "yes");
   assert.strictEqual(middle.ways[0].sections[0].tags.tactile_paving, undefined);
+  assert.strictEqual(middle.ways[0].tagStrategy.kind, "independent_walkway");
 
   const whole = createSplitPlan({ segments: [way({
     from: { kind: "node", index: 0 }, to: { kind: "node", index: 3 },
@@ -76,6 +77,15 @@ function run() {
 
   assert.throws(() => createSplitPlan({ segments: [way(), way()] }), /duplicate_way_in_route/);
   assert.strictEqual(middle.osmSent, false);
+  const roadwayLeft = createSplitPlan({ segments: [way({
+    tags: { highway: "residential", sidewalk: "both" },
+    side: "left",
+  })] });
+  const roadwayTactileSection = roadwayLeft.ways[0].sections.find((section) => section.tactile);
+  assert.strictEqual(roadwayLeft.ways[0].tagStrategy.kind, "roadway_sidewalk");
+  assert.strictEqual(roadwayTactileSection.tags["sidewalk:left:tactile_paving"], "yes");
+  assert.strictEqual(roadwayTactileSection.tags.tactile_paving, undefined);
+  assert.throws(() => createSplitPlan({ segments: [way({ tags: { highway: "residential" } })] }), /missing_side_for_roadway/);
   console.log("osm_split_planner: all tests passed");
 }
 run();

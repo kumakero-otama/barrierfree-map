@@ -1,4 +1,5 @@
 const DEFAULT_NODE_SNAP_FRACTION = 1e-6;
+const WALKABLE_WAY_HIGHWAYS = new Set(["footway", "path", "pedestrian", "steps", "corridor"]);
 
 function finiteNumber(value, label) {
   const number = Number(value);
@@ -31,6 +32,23 @@ function normalizeBoundary(raw, nodes, coordinates, snapFraction) {
       coordinates[segmentIndex][1] + (coordinates[segmentIndex + 1][1] - coordinates[segmentIndex][1]) * fraction,
     ];
   return { kind: "projection", segmentIndex, fraction, position: segmentIndex + fraction, coordinate };
+}
+
+function resolveTactileTagStrategy(segment, tactileValue) {
+  const tags = segment && segment.tags && typeof segment.tags === "object" ? segment.tags : {};
+  const highway = String(tags.highway || "").toLowerCase();
+  const requestedSide = String(segment && (segment.side || segment.tactileSide) || "").toLowerCase();
+  const independentWalkway = WALKABLE_WAY_HIGHWAYS.has(highway) || String(tags.footway || "").toLowerCase() === "sidewalk";
+  if (independentWalkway) {
+    return { kind: "independent_walkway", side: null, tags: { tactile_paving: tactileValue } };
+  }
+  if (!highway) throw new Error("missing_highway_tag");
+  if (!new Set(["left", "right"]).has(requestedSide)) throw new Error("missing_side_for_roadway");
+  return {
+    kind: "roadway_sidewalk",
+    side: requestedSide,
+    tags: { [`sidewalk:${requestedSide}:tactile_paving`]: tactileValue },
+  };
 }
 
 function planWay(segment, counters, options) {
@@ -89,6 +107,7 @@ function planWay(segment, counters, options) {
   const low = Math.min(from.position, to.position);
   const high = Math.max(from.position, to.position);
   const baseTags = segment.tags && typeof segment.tags === "object" ? { ...segment.tags } : {};
+  const tagStrategy = resolveTactileTagStrategy(segment, options.tactileValue);
   const sections = sectionEnds.map((endIndex) => {
     const refs = expandedRefs.slice(startIndex, endIndex + 1);
     const coords = expandedCoordinates.slice(startIndex, endIndex + 1);
@@ -97,7 +116,7 @@ function planWay(segment, counters, options) {
     const midpoint = (startPosition + endPosition) / 2;
     const tactile = midpoint > low && midpoint < high;
     startIndex = endIndex;
-    return { refs, coordinates: coords, tactile, tags: tactile ? { ...baseTags, tactile_paving: options.tactileValue } : { ...baseTags } };
+    return { refs, coordinates: coords, tactile, tags: tactile ? { ...baseTags, ...tagStrategy.tags } : { ...baseTags } };
   }).filter((section) => section.refs.length >= 2);
 
   const operations = boundaries.filter((boundary) => boundary.kind === "projection").map((boundary) => ({
@@ -127,7 +146,7 @@ function planWay(segment, counters, options) {
       });
     }
   });
-  return { wayId, version, from, to, sections, relationRefs, operations };
+  return { wayId, version, from, to, sections, relationRefs, operations, tagStrategy };
 }
 
 function normalizeRelations(segments) {
@@ -196,7 +215,7 @@ function createSplitPlan(input, options = {}) {
   return {
     kind: "osm_split_dry_run",
     osmSent: false,
-    tags: { tactile_paving: settings.tactileValue },
+    tagStrategies: ways.map((way) => ({ wayId: way.wayId, ...way.tagStrategy })),
     ways,
     operations,
     summary: {
@@ -210,4 +229,4 @@ function createSplitPlan(input, options = {}) {
   };
 }
 
-module.exports = { createSplitPlan, normalizeBoundary, normalizeRelations, planRelationUpdates };
+module.exports = { createSplitPlan, normalizeBoundary, normalizeRelations, planRelationUpdates, resolveTactileTagStrategy };
