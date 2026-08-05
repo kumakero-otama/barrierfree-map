@@ -53,10 +53,20 @@ async function run() {
     body: JSON.stringify({
       sessionId: recordId,
       source: "browser",
+      raw_points: [
+        { lat: 35.00003, lon: 139.0005, accuracy: 4.5 },
+        { lat: 35.00003, lon: 139.0015, accuracy: 4.0 },
+        { lat: 35.00003, lon: 139.0025, accuracy: 3.5 },
+      ],
       matched_points: [
         { lat: 35, lon: 139.0005 },
         { lat: 35, lon: 139.0015 },
         { lat: 35, lon: 139.0025 },
+      ],
+      matched_samples: [
+        { lat: 35, lon: 139.0005, way_id: 100, confidence: 0.8 },
+        { lat: 35, lon: 139.0015, way_id: 100, confidence: 0.9 },
+        { lat: 35, lon: 139.0025, way_id: 100, confidence: 0.85 },
       ],
       edges: [{ way_id: 100 }],
     }),
@@ -70,6 +80,13 @@ async function run() {
     [recordId]
   );
   assert.strictEqual(browserPathRows[0].source, "browser");
+  const [browserPointCounts] = await pool.query(
+    `SELECT
+       (SELECT COUNT(*)::int FROM tactile.gps_raw WHERE session_id = ?) raw_count,
+       (SELECT COUNT(*)::int FROM tactile.gps_matched WHERE session_id = ?) matched_count`,
+    [recordId, recordId]
+  );
+  assert.deepStrictEqual(browserPointCounts[0], { raw_count: 3, matched_count: 3 });
   const status = await request("/api/osm/status", { headers });
   assert.strictEqual(status.status, 200);
   assert.strictEqual(status.body.osmNetworkCodePresent, true);

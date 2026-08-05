@@ -233,6 +233,8 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
 
       if (source === "browser") {
         const matchedPoints = Array.isArray(requestData.matched_points) ? requestData.matched_points : [];
+        const rawPoints = Array.isArray(requestData.raw_points) ? requestData.raw_points : [];
+        const matchedSamples = Array.isArray(requestData.matched_samples) ? requestData.matched_samples : [];
         const edges = Array.isArray(requestData.edges) ? requestData.edges : [];
         const validPoints = matchedPoints
           .map((point) => ({ lat: Number(point && point.lat), lon: Number(point && point.lon) }))
@@ -241,7 +243,22 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
         const validEdges = edges
           .map((edge) => ({ way_id: Number(edge && edge.way_id) }))
           .filter((edge) => Number.isSafeInteger(edge.way_id) && edge.way_id > 0);
-        if (!sessionId || validPoints.length < 2 || validPoints.length > 5000 || validPoints.length !== matchedPoints.length) {
+        const validRawPoints = rawPoints.map((point) => ({
+          lat: Number(point && point.lat), lon: Number(point && point.lon),
+          accuracy: point && point.accuracy !== null ? Number(point.accuracy) : null,
+        })).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon) &&
+          point.lat >= -90 && point.lat <= 90 && point.lon >= -180 && point.lon <= 180 &&
+          (point.accuracy === null || (Number.isFinite(point.accuracy) && point.accuracy >= 0)));
+        const validMatchedSamples = matchedSamples.map((point) => ({
+          lat: Number(point && point.lat), lon: Number(point && point.lon),
+          way_id: Number(point && point.way_id), confidence: Number(point && point.confidence),
+        })).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon) &&
+          point.lat >= -90 && point.lat <= 90 && point.lon >= -180 && point.lon <= 180 &&
+          Number.isSafeInteger(point.way_id) && point.way_id > 0 &&
+          Number.isFinite(point.confidence) && point.confidence >= 0 && point.confidence <= 1);
+        if (!sessionId || validPoints.length < 2 || validPoints.length > 5000 || validPoints.length !== matchedPoints.length ||
+            validRawPoints.length < 2 || validRawPoints.length > 5000 || validRawPoints.length !== rawPoints.length ||
+            validMatchedSamples.length > 5000 || validMatchedSamples.length !== matchedSamples.length) {
           sendJson(res, 400, { error: "invalid_browser_trace" });
           return;
         }
@@ -264,6 +281,30 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
           }
           const browserData = { matched_points: validPoints, edges: validEdges };
           await persistSessionPath(pool, sessionId, "browser", browserData, logPrefix);
+          const conn = await pool.getConnection();
+          try {
+            await conn.beginTransaction();
+            await conn.query("DELETE FROM tactile.gps_raw WHERE session_id = ?", [sessionId]);
+            await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
+            for (const point of validRawPoints) {
+              await conn.query(
+                "INSERT INTO tactile.gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
+                [sessionId, point.lon, point.lat, point.accuracy]
+              );
+            }
+            for (const point of validMatchedSamples) {
+              await conn.query(
+                "INSERT INTO tactile.gps_matched (session_id, ts, geom, edge_id, confidence) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?, ?)",
+                [sessionId, point.lon, point.lat, point.way_id, point.confidence]
+              );
+            }
+            await conn.commit();
+          } catch (pointSaveError) {
+            await conn.rollback();
+            throw pointSaveError;
+          } finally {
+            conn.release();
+          }
           sendJson(res, 200, { ...browserData, source: "browser", persisted: true, osmSent: false });
         } catch (error) {
           console.error(`${logPrefix} browser_trace_save_error:`, error.message);
