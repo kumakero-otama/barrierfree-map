@@ -27,7 +27,7 @@
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/session/end</code></h3><p>記録を確定し集計を保存。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/session/cancel</code></h3><p>未確定セッションを取消。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/records</code></h3><p>StepByで記録されたデータを取得。</p></article>
-<article class="endpoint"><h3><span class="method">POST</span><code>/api/trace</code></h3><p>GPS生点とaccuracyを開発DBへ保存。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/trace</code></h3><p>通常記録ではブラウザ版が確定した経路、GPS生点、accuracy、フィット点、Way IDを開発DBへ保存する。通常操作ではValhallaを呼ばない。Valhalla処理は明示的な比較試験だけで利用する。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/fitting-details</code></h3><p>最新記録の生座標・フィット結果・Way・OSM案状態を取得。</p></article>
 <article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/fitting-comparisons</code></h3><p>Valhalla版とブラウザ版の比較履歴を保存・取得。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-tactile-ways</code></h3><p>周辺のOSM点字ブロックWayを読取。</p></article>
