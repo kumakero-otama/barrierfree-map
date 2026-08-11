@@ -33,7 +33,7 @@
   <rect x="45" y="370" width="1510" height="155" rx="22" class="outer" filter="url(#shadow)"/>
   <text x="70" y="403" class="section">公開・トンネリング層：Tailscale Serve / Funnel</text>
   <rect x="75" y="425" width="400" height="70" rx="14" class="prod"/><text x="96" y="452" class="boxTitle prodText">Funnel :443</text><text x="96" y="477" class="small">公開URL → 本番バックエンド localhost:3000</text>
-  <rect x="525" y="425" width="400" height="70" rx="14" class="dev"/><text x="546" y="452" class="boxTitle devText">Funnel :10000</text><text x="546" y="477" class="small">公開開発API → localhost:3100（認証・Origin・制限あり）</text>
+  <rect x="525" y="425" width="400" height="70" rx="14" class="dev"/><text x="546" y="452" class="boxTitle devText">Funnel :443 /dev-api</text><text x="546" y="477" class="small">公開開発API → localhost:3100（従来:10000も維持）</text>
   <rect x="975" y="425" width="400" height="70" rx="14" class="dev"/><text x="996" y="452" class="boxTitle devText">Serve :10001</text><text x="996" y="477" class="small">tailnet内限定 → UI10 localhost:3200</text>
   <rect x="1400" y="425" width="125" height="70" rx="14" class="infra"/><text x="1415" y="452" class="body">:8443</text><text x="1415" y="474" class="tiny">CCRT別系統</text>
 
