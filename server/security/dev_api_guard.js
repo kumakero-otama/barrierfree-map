@@ -32,7 +32,7 @@ function consumeRateLimit(key, limit) {
   };
 }
 
-function createDevApiGuard({ sendJson, logDir, allowedOrigins }) {
+function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSession = () => false }) {
   const securityLogger = createLogger(path.join(logDir, "dev_api_security.csv"));
   const adminKey = process.env.DEV_ADMIN_KEY || "";
   const tokenSecretConfigured = String(process.env.ACCESS_TOKEN_SECRET || "").length >= 32;
@@ -130,6 +130,11 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins }) {
         res.setHeader("Retry-After", String(attemptRate.retryAfterSeconds));
         sendJson(res, 429, { error: "rate_limited", retryAfterSeconds: attemptRate.retryAfterSeconds, requestId: req.securityRequestId });
         return false;
+      }
+      if (verifyAdminSession(req)) {
+        req.authUserId = "admin-session";
+        log("ADMIN_SESSION_ALLOWED", req);
+        return true;
       }
       try {
         const verified = verifyAccessToken(extractBearerToken(req));

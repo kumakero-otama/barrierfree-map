@@ -7,7 +7,7 @@ const security = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "config.s
 
 async function request(apiPath, options = {}) {
   const response = await fetch(`${BASE_URL}${apiPath}`, options);
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: await response.json(), headers: response.headers };
 }
 
 async function run() {
@@ -37,6 +37,19 @@ async function run() {
   assert.strictEqual(overview.status, 200, JSON.stringify(overview.body));
   assert.strictEqual(overview.body.environment, "development");
   assert.ok(overview.body.tables.some((table) => table.key === "tactile.way_snapshots"));
+
+  const session = await request("/admin-auth/session", {
+    method: "POST",
+    headers: { "X-StepBy-Admin-Key": security.adminKey },
+  });
+  assert.strictEqual(session.status, 200, JSON.stringify(session.body));
+  const sessionCookie = String(session.headers.get("set-cookie") || "").split(";")[0];
+  assert.ok(sessionCookie.startsWith("stepby_dev_admin_session="));
+  const cookieOverview = await request("/api/admin/database-overview", {
+    headers: { Cookie: sessionCookie },
+  });
+  assert.strictEqual(cookieOverview.status, 200, JSON.stringify(cookieOverview.body));
+  assert.strictEqual(cookieOverview.body.environment, "development");
 
   const payload = { test: true, coordinates: [139.001, 35.001], note: "development DB only" };
   const created = await request("/api/admin/experiments", {
