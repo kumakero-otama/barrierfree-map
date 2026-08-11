@@ -50,7 +50,7 @@
   <rect x="555" y="650" width="570" height="410" rx="18" class="dev"/>
   <text x="578" y="682" class="boxTitle devText">開発バックエンド</text><text x="578" y="707" class="body">/home/otama/barrierfree-map-dev　dev</text><text x="578" y="730" class="body">PM2: barrierfree-map-dev　127.0.0.1:3100</text>
   <rect x="578" y="755" width="524" height="68" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="779" class="body">共通アプリAPI</text><text x="595" y="802" class="small">Health・Google/Guest認証・OSM OAuth・プロフィール・記録・集計</text>
-  <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">ブラウザ記録・検証API</text><text x="595" y="886" class="small">生点・accuracy・Way経路保存</text><text x="595" y="906" class="small">保存GPS再実行・自動採点／Valhalla比較</text>
+  <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">ブラウザ記録・検証API</text><text x="595" y="886" class="small">低精度点の前後補間・不整合点破棄</text><text x="595" y="906" class="small">保存GPS一括再実行・自動採点／Valhalla比較</text>
   <rect x="850" y="838" width="252" height="86" rx="12" class="locked"/><text x="867" y="864" class="body warnText">OSM変更API（ロック中）</text><text x="867" y="886" class="small">Relation継承・1記録1変更案</text><text x="867" y="906" class="small">record_id取消案 / 実送信OFF</text>
   <rect x="578" y="940" width="524" height="92" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="966" class="body">安全機構・開発DB管理API</text><text x="595" y="988" class="small">管理キー→30分HttpOnly session・許可テーブル限定・レート/本文上限</text><text x="595" y="1009" class="small">OSM監査は追記型。送信・取消しは明示許可がなければ実行不可</text>
 

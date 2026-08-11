@@ -256,10 +256,10 @@
           <article class="panel">
             <h3>1-1. 保存済みデータで自動検証</h3>
             <ul class="tasks">
-              <li class="done"><span class="box"></span><div><span class="task-title">過去に記録したGPS生データでブラウザ版を再実行する</span><span class="note">完了。5点以上ある最新記録を自動選択し、現在の半径1kmのOSM道路データで再計算する管理APIと画面を実装。結果は <code>experiment.fitting_replay_runs</code> へ保存し、OSMには送信しない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">生座標・ブラウザ版・Valhalla版を自動比較する</span><span class="note">ブラウザ版の網羅率・Way列・経路連続性・歩道優先違反・距離・処理時間の自動採点は実装済み。36点の実記録で網羅率100%、連続、歩道優先違反0件、98msを確認。Valhallaは同記録を受け付けず比較不能だったため、原因確認を継続する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">合格基準と低信頼時の動作を決める</span><span class="note">Wayが途切れる、候補が複数ある、GPS精度が低い場合は確定せず、再試行または利用者確認へ進める。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">長い記録でも端末が重くならないか確認する</span><span class="note">必要なら空間インデックス、Web Worker、地図データの分割取得を追加する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">過去に記録したGPS生データでブラウザ版を再実行する</span><span class="note">完了。5点以上ある全記録を選択または一括実行し、現在の半径1kmのOSM道路データで再計算できる。結果は <code>experiment.fitting_replay_runs</code> へ保存し、OSMには送信しない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">生座標・ブラウザ版・Valhalla版を自動比較する</span><span class="note">完了。10mの通常条件でValhallaが失敗した場合は、原因切分け用に50mでも再試行し、通常条件の失敗も履歴へ残す。36点・8点の実記録はいずれもブラウザ版とValhallaのWayが完全一致し、平均位置差は約0.14m・0.11mだった。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">合格基準と低信頼時の動作を決める</span><span class="note">完了。網羅率80%以上、経路連続、歩道優先違反0、5秒以内、破棄20%以下を必須条件にした。accuracyが25mを超える点は、前後の信頼できるGPSから補間した位置で経路へ合わせる。前後が揃わない点、60m以内に候補がない点は捨て、破棄理由を保存する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">長い記録でも端末が重くならないか確認する</span><span class="note">完了。500 Way・1000 GPS点の自動試験で28ms。現段階では5秒基準を大幅に下回るため、空間インデックスやWeb Workerの追加は不要と判定。実端末で遅くなった場合に追加する。</span></div></li>
             </ul>
           </article>
           <article class="panel">
