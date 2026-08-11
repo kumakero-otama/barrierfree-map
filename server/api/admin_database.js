@@ -59,6 +59,11 @@ const TABLES = Object.freeze({
     rows: `SELECT run_id,session_id,raw_point_count,network_way_count,status,score,browser_result,valhalla_result,osm_sent,created_at
              FROM experiment.fitting_replay_runs ORDER BY created_at DESC LIMIT ?`,
   },
+  "experiment.production_record_imports": {
+    label: "本番DB読取専用コピー履歴",
+    rows: `SELECT import_id,development_session_id,source_session_digest,raw_point_count,matched_point_count,note,imported_at
+             FROM experiment.production_record_imports ORDER BY imported_at DESC LIMIT ?`,
+  },
 });
 
 function readJson(req, maxBytes = 64 * 1024) {
@@ -118,6 +123,10 @@ function createAdminDatabaseHandler({ sendJson }) {
         raw_point_count integer NOT NULL,network_way_count integer NOT NULL,browser_result jsonb NOT NULL,
         valhalla_result jsonb,score jsonb NOT NULL,status text NOT NULL,osm_sent boolean NOT NULL DEFAULT false,
         created_at timestamptz NOT NULL DEFAULT NOW())`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS experiment.production_record_imports(
+        import_id uuid PRIMARY KEY,development_session_id uuid UNIQUE NOT NULL,source_session_digest text NOT NULL,
+        raw_point_count integer NOT NULL,matched_point_count integer NOT NULL,imported_at timestamptz NOT NULL DEFAULT NOW(),
+        note text NOT NULL)`);
     })().catch((schemaError) => { schemaReady = null; throw schemaError; });
     return schemaReady;
   }
