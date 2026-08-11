@@ -294,8 +294,8 @@
             <h3>2-2. OSM開発環境で1件だけ追加・取消し確認</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">変更予定Wayをブラウザで選択・表示する</span><span class="note">完了。管理画面の地図でWay 464458979を青、点字ブロックタグ追加予定区間を緑、GPS rawを灰色点線、開始終了をマーカー表示する。Wayを押すとID、Version、左右、追加予定タグを選択状態として確認できる。表示用背景は本番OSMの読取専用タイルで、送信先ではない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM開発環境へ試験用の元Wayを用意し、変更前を保存する</span><span class="note">開発環境の地図DBは本番OSMと別物なので、本番Way IDを直接使わない。コピーした経路形状から開発環境専用Wayを作り、そのID、Version、Node、タグ、形状を記録する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM開発環境へ tactile_paving=yes を送信する</span><span class="note">開発環境のchangeset画面とAPIで、タグ、Way履歴、編集コメントのStepBy表記を目視・機械確認する。本番OSMには影響しない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境へ試験用の元Wayを用意し、変更前を保存する</span><span class="note">完了。本番Way 464458979に対応するコピー済み経路から、OSM開発環境にNode 4件と試験用Way 4307542046（Version 1）を新規作成した。本番DBは読み取りのみ、本番OSMへの送信はなし。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境へ tactile_paving=yes を送信する</span><span class="note">完了。Way 4307542046へ <code>highway=footway</code>、<code>footway=sidewalk</code>、<code>tactile_paving=yes</code>、<code>source=survey</code> を登録。changeset 659441にはStepByのコメント、created_by、source、plan IDを記録し、APIとブラウザで確認した。送信後は書込みフラグと一時トークンを再ロック済み。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM開発環境で取消しAPIを実行する</span><span class="note">現在Versionを再取得し、反対変更を新しいchangesetとして送る。追加changesetと取消changesetの両方が履歴に残ることを目視・機械確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">変更対象が元の状態へ戻ったことを確認する</span><span class="note">タグ・Node・Way・Relationを変更前の記録と比較する。競合時は上書きせず停止する。</span></div></li>
             </ul>
