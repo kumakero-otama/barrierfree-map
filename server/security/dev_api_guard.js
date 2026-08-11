@@ -87,15 +87,19 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins }) {
       sendJson(res, 413, { error: "payload_too_large", requestId: req.securityRequestId });
       return false;
     }
-    let streamedBytes = 0;
-    req.on("data", (chunk) => {
-      streamedBytes += chunk.length;
-      if (streamedBytes > maxBodyBytes && !res.headersSent) {
-        log("STREAM_BODY_REJECTED", req, { streamedBytes, maxBodyBytes });
-        sendJson(res, 413, { error: "payload_too_large", requestId: req.securityRequestId });
-        req.destroy();
-      }
-    });
+    // 管理APIは後段で本文上限付きのJSON readerを使う。ここでdata listenerを付けると、
+    // 後段が購読する前に本文が流れ始める競合が起きるためContent-Length検査だけに留める。
+    if (!pathname.startsWith("/api/admin/")) {
+      let streamedBytes = 0;
+      req.on("data", (chunk) => {
+        streamedBytes += chunk.length;
+        if (streamedBytes > maxBodyBytes && !res.headersSent) {
+          log("STREAM_BODY_REJECTED", req, { streamedBytes, maxBodyBytes });
+          sendJson(res, 413, { error: "payload_too_large", requestId: req.securityRequestId });
+          req.destroy();
+        }
+      });
+    }
 
     const publicRoute = pathname === "/api/config" || pathname === "/auth/guest" || pathname === "/auth/google" || pathname === "/auth/google/signup" || pathname === "/auth/osm/callback";
     if (publicRoute) {
@@ -118,6 +122,36 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins }) {
       log("SECURITY_CONFIG_MISSING", req);
       sendJson(res, 503, { error: "security_not_configured", requestId: req.securityRequestId });
       return false;
+    }
+
+    if (pathname.startsWith("/api/admin/")) {
+      const attemptRate = consumeRateLimit(`admin-api-attempt:${ip}`, 30);
+      if (!attemptRate.allowed) {
+        res.setHeader("Retry-After", String(attemptRate.retryAfterSeconds));
+        sendJson(res, 429, { error: "rate_limited", retryAfterSeconds: attemptRate.retryAfterSeconds, requestId: req.securityRequestId });
+        return false;
+      }
+      try {
+        const verified = verifyAccessToken(extractBearerToken(req));
+        req.authUserId = verified.userId;
+      } catch (error) {
+        log("ADMIN_AUTH_REJECTED", req, { reason: error.message });
+        sendJson(res, 401, { error: "unauthorized", requestId: req.securityRequestId });
+        return false;
+      }
+      if (!adminKey || !safeEqual(req.headers["x-stepby-admin-key"], adminKey)) {
+        log("ADMIN_REJECTED", req);
+        sendJson(res, 403, { error: "admin_required", requestId: req.securityRequestId });
+        return false;
+      }
+      const rate = consumeRateLimit(`admin-api:${ip}:${req.authUserId}`, 60);
+      if (!rate.allowed) {
+        res.setHeader("Retry-After", String(rate.retryAfterSeconds));
+        sendJson(res, 429, { error: "rate_limited", retryAfterSeconds: rate.retryAfterSeconds, requestId: req.securityRequestId });
+        return false;
+      }
+      log("ADMIN_ALLOWED", req);
+      return true;
     }
 
     if (pathname === "/api/fitting-comparisons" && req.method === "GET") {

@@ -1,4 +1,5 @@
 const http = require("http");
+const crypto = require("crypto");
 const { createDbPool } = require("../db");
 
 const SIDEWALK_PRIORITY_RADIUS_METERS = 10;
@@ -7,6 +8,22 @@ const PEDESTRIAN_SIDEWALK_COSTING_OPTIONS = Object.freeze({
   walkway_factor: 0.1,
   sidewalk_factor: 0.1,
 });
+
+let waySnapshotSchemaReady = null;
+async function ensureWaySnapshotSchema(pool) {
+  if (!waySnapshotSchemaReady) {
+    waySnapshotSchemaReady = pool.query(`CREATE TABLE IF NOT EXISTS tactile.way_snapshots (
+      snapshot_id uuid PRIMARY KEY,record_id uuid NOT NULL,segment_order integer NOT NULL CHECK(segment_order>=0),
+      way_id bigint NOT NULL,way_version integer NOT NULL CHECK(way_version>0),node_ids jsonb NOT NULL,
+      full_coordinates jsonb NOT NULL,segment_from jsonb NOT NULL,segment_to jsonb NOT NULL,
+      original_tags jsonb NOT NULL,relation_context jsonb NOT NULL DEFAULT '[]'::jsonb,
+      tactile_side text CHECK(tactile_side IS NULL OR tactile_side IN ('left','right')),
+      planned_tags jsonb NOT NULL DEFAULT '{}'::jsonb,source text NOT NULL DEFAULT 'browser_osm_snapshot',
+      captured_at timestamptz NOT NULL DEFAULT NOW(),UNIQUE(record_id,segment_order))`)
+      .catch((schemaError) => { waySnapshotSchemaReady = null; throw schemaError; });
+  }
+  return waySnapshotSchemaReady;
+}
 
 // Valhallaのencoded polylineを [lat, lon] 配列へ戻す。
 function decodePolyline(str, precision = 6) {
@@ -235,6 +252,7 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
         const matchedPoints = Array.isArray(requestData.matched_points) ? requestData.matched_points : [];
         const rawPoints = Array.isArray(requestData.raw_points) ? requestData.raw_points : [];
         const matchedSamples = Array.isArray(requestData.matched_samples) ? requestData.matched_samples : [];
+        const waySegments = Array.isArray(requestData.way_segments) ? requestData.way_segments : [];
         const edges = Array.isArray(requestData.edges) ? requestData.edges : [];
         const validPoints = matchedPoints
           .map((point) => ({ lat: Number(point && point.lat), lon: Number(point && point.lon) }))
@@ -256,9 +274,25 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
           point.lat >= -90 && point.lat <= 90 && point.lon >= -180 && point.lon <= 180 &&
           Number.isSafeInteger(point.way_id) && point.way_id > 0 &&
           Number.isFinite(point.confidence) && point.confidence >= 0 && point.confidence <= 1);
+        const validWaySegments = waySegments.map((segment, index) => ({
+          segmentOrder: index,
+          wayId: Number(segment && segment.way_id),
+          wayVersion: Number(segment && segment.way_version),
+          nodeIds: Array.isArray(segment && segment.node_ids) ? segment.node_ids : [],
+          fullCoordinates: Array.isArray(segment && segment.full_coordinates) ? segment.full_coordinates : [],
+          segmentFrom: segment && segment.segment_from,
+          segmentTo: segment && segment.segment_to,
+          originalTags: segment && typeof segment.original_tags === "object" ? segment.original_tags : {},
+          relations: Array.isArray(segment && segment.relations) ? segment.relations : [],
+          side: segment && ["left", "right"].includes(segment.side) ? segment.side : null,
+          plannedTags: segment && typeof segment.planned_tags === "object" ? segment.planned_tags : {},
+        })).filter((segment) => Number.isSafeInteger(segment.wayId) && segment.wayId > 0 &&
+          Number.isInteger(segment.wayVersion) && segment.wayVersion > 0 && segment.nodeIds.length >= 2 &&
+          segment.fullCoordinates.length === segment.nodeIds.length && segment.segmentFrom && segment.segmentTo);
         if (!sessionId || validPoints.length < 2 || validPoints.length > 5000 || validPoints.length !== matchedPoints.length ||
             validRawPoints.length < 2 || validRawPoints.length > 5000 || validRawPoints.length !== rawPoints.length ||
-            validMatchedSamples.length > 5000 || validMatchedSamples.length !== matchedSamples.length) {
+            validMatchedSamples.length > 5000 || validMatchedSamples.length !== matchedSamples.length ||
+            validWaySegments.length < 1 || validWaySegments.length > 100 || validWaySegments.length !== waySegments.length) {
           sendJson(res, 400, { error: "invalid_browser_trace" });
           return;
         }
@@ -280,12 +314,14 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
             return;
           }
           const browserData = { matched_points: validPoints, edges: validEdges };
+          await ensureWaySnapshotSchema(pool);
           await persistSessionPath(pool, sessionId, "browser", browserData, logPrefix);
           const conn = await pool.getConnection();
           try {
             await conn.beginTransaction();
             await conn.query("DELETE FROM tactile.gps_raw WHERE session_id = ?", [sessionId]);
             await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
+            await conn.query("DELETE FROM tactile.way_snapshots WHERE record_id = ?", [sessionId]);
             for (const point of validRawPoints) {
               await conn.query(
                 "INSERT INTO tactile.gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
@@ -296,6 +332,20 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
               await conn.query(
                 "INSERT INTO tactile.gps_matched (session_id, ts, geom, edge_id, confidence) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?, ?)",
                 [sessionId, point.lon, point.lat, point.way_id, point.confidence]
+              );
+            }
+            for (const segment of validWaySegments) {
+              await conn.query(
+                `INSERT INTO tactile.way_snapshots(
+                   snapshot_id,record_id,segment_order,way_id,way_version,node_ids,full_coordinates,
+                   segment_from,segment_to,original_tags,relation_context,tactile_side,planned_tags)
+                 VALUES(?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,?::jsonb,?::jsonb,?,?::jsonb)
+                 RETURNING snapshot_id`,
+                [crypto.randomUUID(), sessionId, segment.segmentOrder, segment.wayId, segment.wayVersion,
+                  JSON.stringify(segment.nodeIds), JSON.stringify(segment.fullCoordinates),
+                  JSON.stringify(segment.segmentFrom), JSON.stringify(segment.segmentTo),
+                  JSON.stringify(segment.originalTags), JSON.stringify(segment.relations), segment.side,
+                  JSON.stringify(segment.plannedTags)]
               );
             }
             await conn.commit();

@@ -68,6 +68,18 @@ async function run() {
         { lat: 35, lon: 139.0015, way_id: 100, confidence: 0.9 },
         { lat: 35, lon: 139.0025, way_id: 100, confidence: 0.85 },
       ],
+      way_segments: [{
+        way_id: 100,
+        way_version: 7,
+        node_ids: [10, 11, 12, 13],
+        full_coordinates: [[139, 35], [139.001, 35], [139.002, 35], [139.003, 35]],
+        segment_from: { kind: "projection", segmentIndex: 0, fraction: 0.5 },
+        segment_to: { kind: "projection", segmentIndex: 2, fraction: 0.5 },
+        original_tags: { highway: "footway" },
+        relations: [],
+        side: null,
+        planned_tags: { tactile_paving: "yes" },
+      }],
       edges: [{ way_id: 100 }],
     }),
   });
@@ -87,6 +99,15 @@ async function run() {
     [recordId, recordId]
   );
   assert.deepStrictEqual(browserPointCounts[0], { raw_count: 3, matched_count: 3 });
+  const [snapshotRows] = await pool.query(
+    `SELECT way_id,way_version,node_ids,full_coordinates,planned_tags
+       FROM tactile.way_snapshots WHERE record_id=? ORDER BY segment_order`,
+    [recordId]
+  );
+  assert.strictEqual(snapshotRows.length, 1);
+  assert.strictEqual(Number(snapshotRows[0].way_id), 100);
+  assert.strictEqual(snapshotRows[0].way_version, 7);
+  assert.deepStrictEqual(snapshotRows[0].planned_tags, { tactile_paving: "yes" });
   const status = await request("/api/osm/status", { headers });
   assert.strictEqual(status.status, 200);
   assert.strictEqual(status.body.osmNetworkCodePresent, true);
