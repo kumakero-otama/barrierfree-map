@@ -69,6 +69,16 @@ const TABLES = Object.freeze({
     rows: `SELECT replay_id,session_id,event_count,historical_way_ids,replay_result,status,osm_sent,created_at
              FROM experiment.gps_replay_runs ORDER BY created_at DESC LIMIT ?`,
   },
+  "experiment.production_fitting_batches": {
+    label: "本番全記録フィッティング比較集計",
+    rows: `SELECT batch_id,total_records,eligible_records,status,summary,started_at,completed_at
+             FROM experiment.production_fitting_batches ORDER BY started_at DESC LIMIT ?`,
+  },
+  "experiment.production_fitting_batch_results": {
+    label: "本番全記録フィッティング比較結果",
+    rows: `SELECT batch_id,source_session_digest,started_at,raw_point_count,status,browser_result,valhalla_result,error,created_at
+             FROM experiment.production_fitting_batch_results ORDER BY created_at DESC LIMIT ?`,
+  },
 });
 
 function readJson(req, maxBytes = 64 * 1024) {
