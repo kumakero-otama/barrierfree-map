@@ -277,27 +277,28 @@
       <section class="track track-osm" id="osm-test">
         <div class="track-head">
           <div class="track-number">02</div>
-          <div><h2>OSMへの追加・取消しを検証する</h2><p>まずOSM開発環境とモックで確認し、本番OSMは対象Wayと操作についてその都度明示的な許可を受けてから1件だけ試します。</p></div>
+          <div><h2>OSMへの追加・取消しを検証する</h2><p>本番DBから読み取り専用で1記録を開発DBへコピーし、OSM開発環境とモックで確認します。この段階では本番OSMを使いません。</p></div>
         </div>
         <div class="columns">
           <article class="panel">
             <h3>2-1. 実送信前の安全確認</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">変更案の内容を画面だけに表示する</span><span class="note">分割するWay、開始・終了Node、左右、追加タグ、変更前後、編集コメントを確認する。OSMへは送らない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">本番DBの線記録を読み取り専用で開発DBへコピーする</span><span class="note">完了。約469m、GPS26点、既存フィット26点、Way 1本の記録を選択。本番DBはREAD ONLYトランザクションで読み、ユーザー情報を除いて新しい開発用session_idへコピーした。本番DB書込み0件、OSM送信0件。コピー元IDは平文で持たずハッシュだけを監査保存する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">コピーした記録から変更案を作り、画面だけに表示する</span><span class="note">分割するWay、開始・終了Node、左右、追加タグ、変更前後、編集コメントを確認する。OSMへは送らない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM開発環境で追加・取消しAPIを試験する</span><span class="note">Way分割、Relation引継ぎ、Version競合、失敗、再送、changeset IDの保存を確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">全履歴が追記型で残ることを確認する</span><span class="note">送信要求、変更前後、対象ID・Version、結果、エラー、取消要求・結果を削除せず保存する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSMコミュニティへタグと運用方法を確認する</span><span class="note">tactile_paving、道路左右、created_by=StepBy、支援型編集・継続的編集の扱いを相談する。</span></div></li>
             </ul>
           </article>
           <article class="panel">
-            <h3>2-2. 許可後に本番OSMで1件だけ確認</h3>
+            <h3>2-2. OSM開発環境で1件だけ追加・取消し確認</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">試験対象のWayを1本決め、変更前を保存する</span><span class="note">Way ID、Version、Node、Relation、タグ、形状を記録する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">管理者の明示許可後に tactile_paving=yes を送信する</span><span class="note">タグ、changeset、編集コメントのStepBy表記を目視とAPIで確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">別の明示許可後に取消しAPIを実行する</span><span class="note">現在Versionを再取得し、第三者編集がなければ反対変更を新しいchangesetとして送る。履歴やchangeset自体は消さない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM開発環境へ試験用の元Wayを用意し、変更前を保存する</span><span class="note">開発環境の地図DBは本番OSMと別物なので、本番Way IDを直接使わない。コピーした経路形状から開発環境専用Wayを作り、そのID、Version、Node、タグ、形状を記録する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM開発環境へ tactile_paving=yes を送信する</span><span class="note">開発環境のchangeset画面とAPIで、タグ、Way履歴、編集コメントのStepBy表記を目視・機械確認する。本番OSMには影響しない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM開発環境で取消しAPIを実行する</span><span class="note">現在Versionを再取得し、反対変更を新しいchangesetとして送る。追加changesetと取消changesetの両方が履歴に残ることを目視・機械確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">変更対象が元の状態へ戻ったことを確認する</span><span class="note">タグ・Node・Way・Relationを変更前の記録と比較する。競合時は上書きせず停止する。</span></div></li>
             </ul>
-            <div class="dependency"><strong>絶対ルール：</strong> 本番OSMへの追加と取消しは別々の書込みです。それぞれ実行直前に、対象と操作を指定した許可が必要です。</div>
+            <div class="dependency"><strong>確認方法：</strong> OSM開発環境には通常の専用地図レンダリングやOverpassがないため、主にchangeset詳細、Way詳細・履歴、APIレスポンスで目視確認します。本番OSMでの試験は、この開発環境試験とは別の将来タスクです。</div>
           </article>
           <article class="panel wide">
             <h3>2-3. 一般利用者の記録フローを完成させる</h3>
