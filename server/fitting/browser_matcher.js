@@ -1,4 +1,5 @@
 const EARTH_METERS_PER_DEGREE = 111320;
+const LOW_ACCURACY_METERS = 25;
 
 function distanceMeters(a, b) {
   const meanLat = ((a.lat + b.lat) / 2) * Math.PI / 180;
@@ -37,6 +38,21 @@ function chooseBestMatch(point, ways, previousWayId) {
   return best;
 }
 
+function preparePoints(points, lowAccuracyMeters = LOW_ACCURACY_METERS) {
+  const normalized = points.map((point, index) => ({ ...point, originalIndex: index,
+    accuracy: Number.isFinite(Number(point.accuracy)) ? Number(point.accuracy) : null }));
+  return normalized.map((point, index) => {
+    if (point.accuracy === null || point.accuracy <= lowAccuracyMeters) return { ...point, quality: "observed" };
+    let previous = null, next = null;
+    for (let i = index - 1; i >= 0; i -= 1) if (normalized[i].accuracy === null || normalized[i].accuracy <= lowAccuracyMeters) { previous = normalized[i]; break; }
+    for (let i = index + 1; i < normalized.length; i += 1) if (normalized[i].accuracy === null || normalized[i].accuracy <= lowAccuracyMeters) { next = normalized[i]; break; }
+    if (!previous || !next || next.originalIndex === previous.originalIndex) return { ...point, quality: "discarded", discardReason: "low_accuracy_without_neighbors" };
+    const ratio = (index - previous.originalIndex) / (next.originalIndex - previous.originalIndex);
+    return { ...point, lat: previous.lat + (next.lat - previous.lat) * ratio, lng: previous.lng + (next.lng - previous.lng) * ratio,
+      quality: "interpolated", interpolatedFrom: [previous.originalIndex, next.originalIndex] };
+  });
+}
+
 function connectedPathExists(ways, ids) {
   if (!ids.length) return false;
   const byId = new Map(ways.map((way) => [way.id, way]));
@@ -55,23 +71,31 @@ function connectedPathExists(ways, ids) {
 function replay(points, ways) {
   const startedAt = Date.now();
   let previousWayId = null;
-  const matches = points.map((point) => {
+  const preparedPoints = preparePoints(points);
+  const matches = preparedPoints.map((point) => {
+    if (point.quality === "discarded") return null;
     const match = chooseBestMatch(point, ways, previousWayId);
     if (match) previousWayId = match.wayId;
-    return match;
+    return match ? { ...match, inputQuality: point.quality, originalIndex: point.originalIndex } : null;
   });
   const valid = matches.filter(Boolean);
   const wayIds = valid.reduce((ids, match) => ids.at(-1) === match.wayId ? ids : [...ids, match.wayId], []);
-  const missedPedestrianPriority = valid.filter((match, index) => {
+  const missedPedestrianPriority = valid.filter((match) => {
     if (match.priority === "pedestrian") return false;
-    return ways.some((way) => way.priority === "pedestrian" && chooseBestMatch(points[index], [way], null)?.distance <= 10);
+    const point = preparedPoints[match.originalIndex];
+    return ways.some((way) => way.priority === "pedestrian" && chooseBestMatch(point, [way], null)?.distance <= 10);
   }).length;
+  const discardedPoints = preparedPoints.filter((point, index) => point.quality === "discarded" || !matches[index]).map((point) => ({
+    index: point.originalIndex, accuracy: point.accuracy, reason: point.discardReason || "no_candidate_within_60m",
+  }));
   return { matches, wayIds, durationMs: Date.now() - startedAt, coverage: points.length ? valid.length / points.length : 0,
     connected: valid.every((match) => match.connectedToPrevious !== false) && connectedPathExists(ways, wayIds),
     pedestrianMatches: valid.filter((match) => match.priority === "pedestrian").length,
+    interpolatedPointCount: preparedPoints.filter((point) => point.quality === "interpolated").length,
+    discardedPointCount: discardedPoints.length, discardedPoints,
     missedPedestrianPriority,
     meanSnapDistance: valid.length ? valid.reduce((sum, match) => sum + match.distance, 0) / valid.length : null,
     maxSnapDistance: valid.length ? Math.max(...valid.map((match) => match.distance)) : null };
 }
 
-module.exports = { distanceMeters, projectToSegment, chooseBestMatch, replay };
+module.exports = { LOW_ACCURACY_METERS, distanceMeters, projectToSegment, chooseBestMatch, preparePoints, replay };

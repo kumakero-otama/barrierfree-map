@@ -15,9 +15,9 @@ function readJson(req) {
   });
 }
 
-function requestValhalla(points) {
+function requestValhalla(points, searchRadius = 10) {
   const payload = JSON.stringify({ shape: points.map((p) => ({ lat: p.lat, lon: p.lng })), costing: "pedestrian", shape_match: "map_snap",
-    trace_options: { search_radius: 10 },
+    trace_options: { search_radius: searchRadius },
     costing_options: { pedestrian: { walkway_factor: 0.1, sidewalk_factor: 0.1 } } });
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
@@ -39,6 +39,14 @@ function requestValhalla(points) {
   });
 }
 
+async function compareWithValhalla(points) {
+  try { return { ...(await requestValhalla(points, 10)), searchRadius: 10, diagnosticFallback: false }; }
+  catch (primaryError) {
+    const fallback = await requestValhalla(points, 50);
+    return { ...fallback, searchRadius: 50, diagnosticFallback: true, primaryError: primaryError.message };
+  }
+}
+
 async function fetchNetworkWithFallback(lat, lng) {
   const hosts = [...new Set([process.env.OVERPASS_HOST, "overpass-api.de", "overpass.kumi.systems", "overpass.nchc.org.tw"].filter(Boolean))];
   let lastError;
@@ -55,7 +63,8 @@ function valhallaSummary(result, browserMatches) {
   const wayIds = (result.data.edges || []).map((edge) => Number(edge.way_id || edge.edge_info?.way_id)).filter(Number.isSafeInteger);
   const distances = points.slice(0, browserMatches.length).map((point, index) => browserMatches[index]
     ? distanceMeters(point, { lat: browserMatches[index].lat, lng: browserMatches[index].lng }) : null).filter(Number.isFinite);
-  return { durationMs: result.durationMs, matchedPointCount: points.length, wayIds: [...new Set(wayIds)],
+  return { durationMs: result.durationMs, searchRadius: result.searchRadius, diagnosticFallback: result.diagnosticFallback,
+    primaryError: result.primaryError || null, matchedPointCount: points.length, wayIds: [...new Set(wayIds)],
     meanDifferenceMeters: distances.length ? distances.reduce((sum, value) => sum + value, 0) / distances.length : null,
     maxDifferenceMeters: distances.length ? Math.max(...distances) : null };
 }
@@ -71,9 +80,10 @@ function grade(browser, valhalla) {
     connectedRoute: browser.connected,
     pedestrianPriority: browser.missedPedestrianPriority === 0,
     browserSpeed: browser.durationMs <= 5000,
+    discardedPointRatio: browser.matches.length ? browser.discardedPointCount / browser.matches.length <= 0.2 : false,
     valhallaAvailable: Boolean(valhalla),
   };
-  const required = [checks.browserCoverage, checks.connectedRoute, checks.pedestrianPriority, checks.browserSpeed];
+  const required = [checks.browserCoverage, checks.connectedRoute, checks.pedestrianPriority, checks.browserSpeed, checks.discardedPointRatio];
   return { status: required.every(Boolean) && checks.valhallaAvailable ? "pass" : browser.coverage >= 0.5 ? "warning" : "fail", checks };
 }
 
@@ -97,7 +107,11 @@ function createFittingReplayHandler({ sendJson }) {
       if (req.method === "GET") {
         const [rows] = await pool.query(`SELECT run_id,session_id,raw_point_count,network_way_count,browser_result,
           valhalla_result,score,status,osm_sent,created_at FROM experiment.fitting_replay_runs ORDER BY created_at DESC LIMIT 50`);
-        return sendJson(res, 200, { success: true, runs: rows });
+        const [sessions] = await pool.query(`SELECT s.session_id,s.started_at,COUNT(r.*)::int raw_point_count,
+          COUNT(*) FILTER(WHERE r.accuracy>25)::int low_accuracy_point_count
+          FROM tactile.sessions s JOIN tactile.gps_raw r ON r.session_id=s.session_id
+          GROUP BY s.session_id,s.started_at HAVING COUNT(r.*)>=5 ORDER BY s.started_at DESC LIMIT 100`);
+        return sendJson(res, 200, { success: true, runs: rows, sessions });
       }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method_not_allowed" });
       const body = await readJson(req);
@@ -118,7 +132,7 @@ function createFittingReplayHandler({ sendJson }) {
       const network = await fetchNetworkWithFallback(center.lat, center.lng);
       const browser = replay(points, network.ways);
       let valhalla = null, valhallaError = null;
-      try { valhalla = valhallaSummary(await requestValhalla(points), browser.matches); } catch (requestError) { valhallaError = requestError.message; }
+      try { valhalla = valhallaSummary(await compareWithValhalla(points), browser.matches); } catch (requestError) { valhallaError = requestError.message; }
       if (valhalla) valhalla.wayJaccard = jaccard(browser.wayIds, valhalla.wayIds);
       const score = grade(browser, valhalla);
       const browserResult = { ...browser, matches: browser.matches.map((match) => match && ({ lat: match.lat, lng: match.lng, wayId: match.wayId,
