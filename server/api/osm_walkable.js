@@ -89,6 +89,22 @@ function normalizeWays(payload) {
   });
 }
 
+function fetchWalkableNetwork(centerLat, centerLng, radiusMeters = DEFAULT_RADIUS_METERS, host = process.env.OVERPASS_HOST || "overpass-api.de") {
+  const radius = Math.round(Math.min(MAX_RADIUS_METERS, Math.max(100, Number(radiusMeters) || DEFAULT_RADIUS_METERS)));
+  const cacheKey = `${Number(centerLat).toFixed(3)}:${Number(centerLng).toFixed(3)}:${radius}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) return Promise.resolve({ ...cached.response, cached: true });
+  return new Promise((resolve, reject) => {
+    fetchOverpass(host, buildQuery(centerLat, centerLng, radius), (error, payload) => {
+      if (error) return reject(error);
+      const ways = normalizeWays(payload);
+      const response = { success: true, centerLat, centerLng, radiusMeters: radius, wayCount: ways.length, ways, cached: false };
+      cache.set(cacheKey, { createdAt: Date.now(), response });
+      resolve(response);
+    });
+  });
+}
+
 function createOsmWalkableNetworkHandler({ sendJson }) {
   const overpassHost = process.env.OVERPASS_HOST || "overpass-api.de";
   return function handleOsmWalkableNetwork(req, res) {
@@ -131,3 +147,4 @@ function createOsmWalkableNetworkHandler({ sendJson }) {
 module.exports = createOsmWalkableNetworkHandler;
 module.exports.buildQuery = buildQuery;
 module.exports.normalizeWays = normalizeWays;
+module.exports.fetchWalkableNetwork = fetchWalkableNetwork;

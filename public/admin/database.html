@@ -2,6 +2,7 @@
 <header><p class="badge">UI10・開発DB限定</p><h1>開発データベース確認</h1><p>管理画面とAPIを同じドメイン内で安全に接続します。本番DBとOSMには接続しません。</p></header>
 <section class="card"><h2>管理者確認</h2><label>開発管理者キー<input id="admin-key" type="password" autocomplete="off" placeholder="この画面内だけで使用"></label><button id="load-overview" type="button">開発DBを読み込む</button><p id="status" role="status">未読込</p></section>
 <section id="overview" class="card hidden"><h2>DB概要</h2><div id="database-summary"></div><div id="table-cards" class="table-cards"></div></section>
+<section id="replay" class="card hidden"><h2>保存済みGPSのフィッティング再検証</h2><p>最新記録のGPS生データで、現在のブラウザ版ロジックとValhalla版を再計算します。OSMには送信しません。</p><button id="run-replay" type="button">最新記録を再検証する</button><div id="replay-result"></div></section>
 <section id="table-view" class="card hidden"><div class="section-heading"><h2 id="table-title">テーブル内容</h2><button id="close-table" type="button">閉じる</button></div><p class="warning">GPS座標を含む場合があります。第三者へ共有しないでください。</p><div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div></section>
 <section id="experiment" class="card hidden"><h2>API作成・削除実験</h2><label>ラベル<input id="experiment-label" value="管理画面からの開発DB試験"></label><label>JSONデータ<textarea id="experiment-payload" rows="5">{"test":true,"source":"dev admin","osmSent":false}</textarea></label><button id="create-experiment" type="button">開発DBへ試験データを作成</button><div id="experiment-result"></div></section>
 </main><script src="database.js"></script></body></html>

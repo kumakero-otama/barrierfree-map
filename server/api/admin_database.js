@@ -54,6 +54,11 @@ const TABLES = Object.freeze({
     rows: `SELECT event_id,experiment_id,event_type,actor_user_id,payload_digest,created_at
              FROM experiment.api_record_audit ORDER BY created_at DESC LIMIT ?`,
   },
+  "experiment.fitting_replay_runs": {
+    label: "保存済みGPSのフィッティング再検証",
+    rows: `SELECT run_id,session_id,raw_point_count,network_way_count,status,score,browser_result,valhalla_result,osm_sent,created_at
+             FROM experiment.fitting_replay_runs ORDER BY created_at DESC LIMIT ?`,
+  },
 });
 
 function readJson(req, maxBytes = 64 * 1024) {
@@ -108,6 +113,11 @@ function createAdminDatabaseHandler({ sendJson }) {
       await pool.query(`CREATE TABLE IF NOT EXISTS experiment.api_record_audit (
         event_id uuid PRIMARY KEY,experiment_id uuid NOT NULL,event_type text NOT NULL CHECK(event_type IN ('created','deleted')),
         actor_user_id bigint NOT NULL,payload_digest text NOT NULL,created_at timestamptz NOT NULL DEFAULT NOW())`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS experiment.fitting_replay_runs (
+        run_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),session_id uuid NOT NULL,requested_by text NOT NULL,
+        raw_point_count integer NOT NULL,network_way_count integer NOT NULL,browser_result jsonb NOT NULL,
+        valhalla_result jsonb,score jsonb NOT NULL,status text NOT NULL,osm_sent boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT NOW())`);
     })().catch((schemaError) => { schemaReady = null; throw schemaError; });
     return schemaReady;
   }

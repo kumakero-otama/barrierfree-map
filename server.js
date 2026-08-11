@@ -24,6 +24,7 @@ const createClientLogsHandler = require("./server/api/client_logs");
 const createTactileRankingHandler = require("./server/api/tactile_ranking");
 const createHealthHandler = require("./server/api/health");
 const createAdminDatabaseHandler = require("./server/api/admin_database");
+const createFittingReplayHandler = require("./server/api/fitting_replay");
 const createDevApiGuard = require("./server/security/dev_api_guard");
 const { createAdminSession } = require("./server/security/admin_session");
 const { createLogger } = require("./server/logger");
@@ -387,6 +388,7 @@ const handleTactileRanking = createTactileRankingHandler({
 });
 const handleHealth = createHealthHandler({ sendJson });
 const handleAdminDatabase = createAdminDatabaseHandler({ sendJson });
+const handleFittingReplay = createFittingReplayHandler({ sendJson });
 const adminSession = createAdminSession({ sendJson });
 
 const guardDevApi = createDevApiGuard({
@@ -456,6 +458,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/health")) {
     handleHealth(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/admin/fitting-replay")) {
+    handleFittingReplay(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/api/admin/")) {
