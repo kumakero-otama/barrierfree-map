@@ -50,7 +50,7 @@
   <rect x="555" y="650" width="570" height="410" rx="18" class="dev"/>
   <text x="578" y="682" class="boxTitle devText">開発バックエンド</text><text x="578" y="707" class="body">/home/otama/barrierfree-map-dev　dev</text><text x="578" y="730" class="body">PM2: barrierfree-map-dev　127.0.0.1:3100</text>
   <rect x="578" y="755" width="524" height="68" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="779" class="body">共通アプリAPI</text><text x="595" y="802" class="small">Health・Google/Guest認証・OSM OAuth・プロフィール・記録・集計</text>
-  <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">ブラウザ記録・検証API</text><text x="595" y="886" class="small">生点・accuracy・Way経路保存</text><text x="595" y="906" class="small">周辺Way取得／Valhalla比較のみ</text>
+  <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">ブラウザ記録・検証API</text><text x="595" y="886" class="small">生点・accuracy・Way経路保存</text><text x="595" y="906" class="small">保存GPS再実行・自動採点／Valhalla比較</text>
   <rect x="850" y="838" width="252" height="86" rx="12" class="locked"/><text x="867" y="864" class="body warnText">OSM変更API（ロック中）</text><text x="867" y="886" class="small">Relation継承・1記録1変更案</text><text x="867" y="906" class="small">record_id取消案 / 実送信OFF</text>
   <rect x="578" y="940" width="524" height="92" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="966" class="body">安全機構・開発DB管理API</text><text x="595" y="988" class="small">管理キー→30分HttpOnly session・許可テーブル限定・レート/本文上限</text><text x="595" y="1009" class="small">OSM監査は追記型。送信・取消しは明示許可がなければ実行不可</text>
 
@@ -58,7 +58,7 @@
   <text x="1183" y="682" class="boxTitle">PostgreSQL 16</text><text x="1183" y="706" class="body">同じDBサーバープロセス　:5432</text>
   <rect x="1183" y="730" width="309" height="42" rx="10" fill="#fff" stroke="#818cf8"/><text x="1200" y="756" class="body prodText">公開DB：barrierfree_map</text>
   <rect x="1183" y="783" width="309" height="42" rx="10" fill="#fff" stroke="#34d399"/><text x="1200" y="809" class="body devText">開発DB：stepby_app_dev</text>
-  <text x="1183" y="851" class="small">※構造は同系統、データは分離</text><text x="1183" y="870" class="tiny">開発DB：Way座標snapshot・API実験・変更案・追記監査</text>
+  <text x="1183" y="851" class="small">※構造は同系統、データは分離</text><text x="1183" y="870" class="tiny">開発DB：Way座標・再検証採点・API実験・変更案・追記監査</text>
 
   <rect x="1160" y="885" width="355" height="175" rx="18" class="infra"/>
   <text x="1183" y="917" class="boxTitle">Docker / 同居サービス</text><text x="1183" y="944" class="body">Valhallaコンテナ　:8002</text><text x="1183" y="966" class="small">現行UI0のマップマッチングで使用</text><text x="1183" y="993" class="body">CCRTコンテナ　localhost:8080</text><text x="1183" y="1015" class="small">Funnel :8443（StepByとは別系統）</text><text x="1183" y="1042" class="small">Netdata等の運用コンテナも同居</text>
