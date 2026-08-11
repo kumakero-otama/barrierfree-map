@@ -32,7 +32,7 @@ module.exports = {
         OSM_OAUTH_AUTHORIZE_URL: process.env.OSM_OAUTH_AUTHORIZE_URL || "https://master.apis.dev.openstreetmap.org/oauth2/authorize",
         OSM_OAUTH_TOKEN_URL: process.env.OSM_OAUTH_TOKEN_URL || "https://master.apis.dev.openstreetmap.org/oauth2/token",
         OSM_USER_DETAILS_URL: process.env.OSM_USER_DETAILS_URL || "https://master.apis.dev.openstreetmap.org/api/0.6/user/details.json",
-        CORS_ALLOWED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000,https://barrierfree-map.tail5de5e1.ts.net:10001,https://kumakero-otama.github.io",
+        CORS_ALLOWED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000,https://barrierfree-map.tail5de5e1.ts.net,https://barrierfree-map.tail5de5e1.ts.net:10001,https://kumakero-otama.github.io",
       },
     },
   ],

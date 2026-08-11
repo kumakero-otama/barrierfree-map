@@ -100,7 +100,8 @@ function createRecordReplayHandler({ sendJson }) {
         if (existing[0]) {
           const [plans] = await pool.query("SELECT plan_id,summary,elements,client_context,created_at FROM osmchange.change_plans WHERE plan_id=? LIMIT 1", [existing[0].merge_plan_id]);
           return sendJson(res, 200, { success: true, reused: true, sessionId, planId: existing[0].merge_plan_id,
-            plan: plans[0], side, segment, splitPlan, boundaryDistancesMeters: { start: from.distance, end: to.distance }, osmSent: false });
+            plan: plans[0], side, segment, rawPoints: record.points.map((point) => [point.lat, point.lng]), splitPlan,
+            boundaryDistancesMeters: { start: from.distance, end: to.distance }, osmSent: false });
         }
         const planId = crypto.randomUUID(), summary = "StepBy production READ ONLY copy: tactile paving preview (not sent)";
         const context = { previewOnly: true, osmWriteRequested: false, source: "production_readonly_copy", sessionId, side,
@@ -118,6 +119,7 @@ function createRecordReplayHandler({ sendJson }) {
           await conn.commit();
         } catch (insertError) { await conn.rollback(); throw insertError; } finally { conn.release(); }
         return sendJson(res, 201, { success: true, reused: false, sessionId, planId, status: "draft", side, segment,
+          rawPoints: record.points.map((point) => [point.lat, point.lng]),
           splitPlan, boundaryDistancesMeters: context.boundaryDistancesMeters, osmSent: false });
       }
       return sendJson(res, 404, { error: "not_found" });
