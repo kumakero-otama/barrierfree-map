@@ -263,13 +263,13 @@
             </ul>
           </article>
           <article class="panel">
-            <h3>1-2. 現地で行う確認</h3>
+            <h3>1-2. 本番rawデータで記録を再現</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">歩きながらリアルタイムでフィッティングできるか確認する</span><span class="note">道路と歩道が近い場合に歩道が選ばれ、前回のWayから不自然に飛ばないことを見る。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">記録終了後に経路全体を再計算する</span><span class="note">Way途中から始まり別Way途中で終わる場合も、OSM上でつながる一つの経路になることを確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">フィッティング結果が開発DBへ保存されることを確認する</span><span class="note">Way IDを主キーとして扱いながら、当面のバックアップとしてWay座標・Node・Version・元タグも保存する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">GPSを時刻順に1点ずつ入力し、リアルタイム処理を再現する</span><span class="note">完了。本番DBからREAD ONLYコピーした26点を元の時刻順で処理し、各点のaccuracy、選択Way、前回Wayとの接続、補間・破棄判断をイベントとして保存した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">記録終了後に経路全体を再計算する</span><span class="note">完了。逐次処理では最初に近接歩道Wayを選び、その後の道路Wayと非連続になることを検出。記録全体では多数の点が属する接続成分へ再計算し、過去に確定したWay 464458979へ全26点を矛盾なく揃えた。網羅率100%、過去Way一致率100%、補間0、破棄0。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">フィッティング結果が開発DBへ保存されることを確認する</span><span class="note">完了。時刻順の全判断と最終経路を <code>experiment.gps_replay_runs</code> に保存。元のWay ID・経路座標・raw・accuracyも開発DBのコピー側に保持し、本番DBは変更していない。</span></div></li>
             </ul>
-            <div class="dependency"><strong>現在の制約：</strong> 現地調査ができない間は1-1を先に進めます。ここではOSMマージAPIを呼びません。</div>
+            <div class="dependency"><strong>現地で後から確認するもの：</strong> 実端末のGPS受信、通信断、バックグラウンド動作、電池消費だけは保存データで再現できないため、後日別途確認します。フィッティングロジックの1-2試験は完了です。</div>
           </article>
         </div>
       </section>
@@ -284,10 +284,10 @@
             <h3>2-1. 実送信前の安全確認</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">本番DBの線記録を読み取り専用で開発DBへコピーする</span><span class="note">完了。約469m、GPS26点、既存フィット26点、Way 1本の記録を選択。本番DBはREAD ONLYトランザクションで読み、ユーザー情報を除いて新しい開発用session_idへコピーした。本番DB書込み0件、OSM送信0件。コピー元IDは平文で持たずハッシュだけを監査保存する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">コピーした記録から変更案を作り、画面だけに表示する</span><span class="note">分割するWay、開始・終了Node、左右、追加タグ、変更前後、編集コメントを確認する。OSMへは送らない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM開発環境で追加・取消しAPIを試験する</span><span class="note">Way分割、Relation引継ぎ、Version競合、失敗、再送、changeset IDの保存を確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">全履歴が追記型で残ることを確認する</span><span class="note">送信要求、変更前後、対象ID・Version、結果、エラー、取消要求・結果を削除せず保存する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSMコミュニティへタグと運用方法を確認する</span><span class="note">tactile_paving、道路左右、created_by=StepBy、支援型編集・継続的編集の扱いを相談する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">コピーした記録から変更案を作り、画面だけに表示する</span><span class="note">完了。Way 464458979の途中区間を左右判定し、左側へ <code>sidewalk:left:tactile_paving=yes</code> を追加する未送信案を作成。開始距離誤差0.68m、終了1.93m、新規Node 2、分割後の新規Way 2、Relation更新1を含む計6操作を地図と変更前後表で確認できる。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">送信前の分割・Relation・競合条件を確認する</span><span class="note">完了。Way ID/Version、全Node、元タグ、Relation member、開始終了投影、左右、追加予定タグを変更案へ固定した。実行時は現在Versionを再取得し、不一致なら停止する設計。実送信試験は2-2で行う。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">未送信変更案と監査履歴が追記型で残ることを確認する</span><span class="note">完了。Plan ID、6操作、変更前後、recordとの対応、<code>split_plan_created</code>監査イベントを保存。既存案の再利用時は重複作成しない。OSM送信0件。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSMコミュニティへ確認する内容を整理する</span><span class="note">完了。道路左右の点字ブロックタグ、created_by=StepBy、source=survey、Way分割とRelation引継ぎ、支援型・継続的編集、開発環境試験結果を相談項目とする。実際の相談送信は運営判断後に行う。</span></div></li>
             </ul>
           </article>
           <article class="panel">
