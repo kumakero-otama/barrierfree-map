@@ -166,6 +166,10 @@
     .architecture-frame { display: block; width: 100%; aspect-ratio: 1600 / 1320; border: 1px solid var(--line); border-radius: 17px; background: #f6f9ff; }
     .architecture-rule { margin-top: 15px !important; padding: 12px 15px; border-left: 3px solid var(--blue); border-radius: 0 12px 12px 0; background: var(--blue-soft); }
 
+    details { margin: 20px 0 70px; }
+    details > summary { cursor: pointer; padding: 17px 20px; border: 1px solid var(--line); border-radius: 16px; color: var(--muted); background: rgba(255,255,255,.58); font-size: .82rem; font-weight: 750; }
+    details[open] > summary { margin-bottom: 52px; }
+
     .cloud-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 0 0 22px 110px; }
     .cloud-option { padding: 23px; border: 1px solid rgba(255,255,255,.9); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
     .cloud-option small { display: block; margin-bottom: 9px; color: var(--blue); font-size: .66rem; font-weight: 850; letter-spacing: .1em; }
@@ -202,29 +206,29 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true">S</span>STEPBY ROADMAP</div>
-      <div class="updated">2026年8月11日 更新</div>
+      <div class="updated">2026年8月11日 実行順に再整理</div>
     </header>
 
     <main>
       <section class="hero">
         <p class="eyebrow">Project overview</p>
-        <h1>次のStepByを、<br>3つの仕事に分ける。</h1>
-        <p class="lead">点字ブロックデータをOSMへつなぐこと、運用基盤をクラウドへ移すこと、そして日々の使いやすさを整えること。混ざっていた作業を3本の流れに整理しました。</p>
+        <h1>StepByの、<br>これからやること。</h1>
+        <p class="lead">今から実行する順番に並べたタスクリストです。まずValhallaを使わない記録処理を完成させ、その後にOSM連携、PROモード、クラウド移行、既存データ移行へ進みます。</p>
       </section>
 
-      <nav class="summary" aria-label="3つの作業分野">
-        <a href="#osm"><span class="summary-number">01</span><strong>OSM直接統合・Valhalla廃止</strong><small>調査 → 方式決定 → 新規・既存データ移行</small></a>
-        <a href="#cloud"><span class="summary-number">02</span><strong>クラウドサーバー移行</strong><small>移行条件確定 → 選定・費用相談 → 実移行</small></a>
-        <a href="#other"><span class="summary-number">03</span><strong>その他の仕様・運用変更</strong><small>規約公開、UI1移行、協力者への連絡</small></a>
+      <nav class="summary" aria-label="現在の3段階">
+        <a href="#next-actions"><span class="summary-number">NOW</span><strong>フィッティングを検証</strong><small>保存済みGPSで再現 → 比較 → 合格基準</small></a>
+        <a href="#osm-test"><span class="summary-number">NEXT</span><strong>OSM連携を検証</strong><small>開発環境 → 許可後に本番1件 → 取消し</small></a>
+        <a href="#cloud"><span class="summary-number">LATER</span><strong>クラウドへ移行</strong><small>Valhalla廃止後にGoogle系を第一候補として実施</small></a>
       </nav>
 
       <section class="sequence" aria-labelledby="sequence-title">
         <p class="sequence-label" id="sequence-title">Recommended order / 推奨する全体順序</p>
         <ol>
-          <li><strong>調査と要件確定</strong><span>Valhallaの役割、OSMへの書込み条件、非公開情報を確認</span></li>
-          <li><strong>仕様変更を実装</strong><span>新規データ統合、既存データ移行、UIなどを完成</span></li>
-          <li><strong>クラウドを決定</strong><span>必要性能と費用を確定し、松田先生へ相談</span></li>
-          <li><strong>移行・検証</strong><span>バックアップ後に移行し、動作と公開範囲を確認</span></li>
+          <li><strong>フィッティング完成</strong><span>リアルタイムと記録終了後の経路を、OSMへ送らず検証</span></li>
+          <li><strong>OSM連携完成</strong><span>変更・取消し・監査を確認。実送信には毎回明示許可が必要</span></li>
+          <li><strong>PRO・表示完成</strong><span>公開対象を分離し、記録種別を色で判別できるようにする</span></li>
+          <li><strong>クラウド・既存移行</strong><span>Valhalla停止後にサーバーを移し、最後に既存データを扱う</span></li>
         </ol>
       </section>
 
@@ -243,6 +247,154 @@
         <b>クラウド移行案の比較表を開く →</b>
       </a>
 
+      <section class="track track-osm" id="next-actions">
+        <div class="track-head">
+          <div class="track-number">01</div>
+          <div><h2>フィッティングを完成させる</h2><p>まずここから実施します。OSMへは送信せず、ブラウザ内の計算と開発DBへの保存だけを確認します。</p></div>
+        </div>
+        <div class="columns">
+          <article class="panel">
+            <h3>1-1. 保存済みデータで自動検証</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">過去に記録したGPS生データでブラウザ版を再実行する</span><span class="note">現地へ行かなくても、同じ入力で何度でも結果を再現できるようにする。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">生座標・ブラウザ版・Valhalla版を自動比較する</span><span class="note">位置差、Way ID、歩道優先、前回Wayとの連続性、処理時間を記録単位で集計する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">合格基準と低信頼時の動作を決める</span><span class="note">Wayが途切れる、候補が複数ある、GPS精度が低い場合は確定せず、再試行または利用者確認へ進める。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">長い記録でも端末が重くならないか確認する</span><span class="note">必要なら空間インデックス、Web Worker、地図データの分割取得を追加する。</span></div></li>
+            </ul>
+          </article>
+          <article class="panel">
+            <h3>1-2. 現地で行う確認</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">歩きながらリアルタイムでフィッティングできるか確認する</span><span class="note">道路と歩道が近い場合に歩道が選ばれ、前回のWayから不自然に飛ばないことを見る。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">記録終了後に経路全体を再計算する</span><span class="note">Way途中から始まり別Way途中で終わる場合も、OSM上でつながる一つの経路になることを確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">フィッティング結果が開発DBへ保存されることを確認する</span><span class="note">Way IDを主キーとして扱いながら、当面のバックアップとしてWay座標・Node・Version・元タグも保存する。</span></div></li>
+            </ul>
+            <div class="dependency"><strong>現在の制約：</strong> 現地調査ができない間は1-1を先に進めます。ここではOSMマージAPIを呼びません。</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="track track-osm" id="osm-test">
+        <div class="track-head">
+          <div class="track-number">02</div>
+          <div><h2>OSMへの追加・取消しを検証する</h2><p>まずOSM開発環境とモックで確認し、本番OSMは対象Wayと操作についてその都度明示的な許可を受けてから1件だけ試します。</p></div>
+        </div>
+        <div class="columns">
+          <article class="panel">
+            <h3>2-1. 実送信前の安全確認</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">変更案の内容を画面だけに表示する</span><span class="note">分割するWay、開始・終了Node、左右、追加タグ、変更前後、編集コメントを確認する。OSMへは送らない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM開発環境で追加・取消しAPIを試験する</span><span class="note">Way分割、Relation引継ぎ、Version競合、失敗、再送、changeset IDの保存を確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">全履歴が追記型で残ることを確認する</span><span class="note">送信要求、変更前後、対象ID・Version、結果、エラー、取消要求・結果を削除せず保存する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSMコミュニティへタグと運用方法を確認する</span><span class="note">tactile_paving、道路左右、created_by=StepBy、支援型編集・継続的編集の扱いを相談する。</span></div></li>
+            </ul>
+          </article>
+          <article class="panel">
+            <h3>2-2. 許可後に本番OSMで1件だけ確認</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">試験対象のWayを1本決め、変更前を保存する</span><span class="note">Way ID、Version、Node、Relation、タグ、形状を記録する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">管理者の明示許可後に tactile_paving=yes を送信する</span><span class="note">タグ、changeset、編集コメントのStepBy表記を目視とAPIで確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">別の明示許可後に取消しAPIを実行する</span><span class="note">現在Versionを再取得し、第三者編集がなければ反対変更を新しいchangesetとして送る。履歴やchangeset自体は消さない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">変更対象が元の状態へ戻ったことを確認する</span><span class="note">タグ・Node・Way・Relationを変更前の記録と比較する。競合時は上書きせず停止する。</span></div></li>
+            </ul>
+            <div class="dependency"><strong>絶対ルール：</strong> 本番OSMへの追加と取消しは別々の書込みです。それぞれ実行直前に、対象と操作を指定した許可が必要です。</div>
+          </article>
+          <article class="panel wide">
+            <h3>2-3. 一般利用者の記録フローを完成させる</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">記録開始から変更内容の最終確認までを通して試験する</span><span class="note">Googleログイン → GPS記録 → ブラウザフィッティング → 経路確定 → OSM連携確認 → 変更案表示まで、迷わず操作できるようにする。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM未連携時だけ小窓で連携・サインアップへ案内する</span><span class="note">連携済みの利用者にはOSM画面を表示しない。拒否・中断時もStepBy側の記録を失わない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">本番OSMへの送信フラグは無効のまま、開発DBに記録・変更案・Wayバックアップ・監査履歴が揃うことを確認する。</span></div></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="track track-other" id="pro-mode">
+        <div class="track-head">
+          <div class="track-number">03</div>
+          <div><h2>PROモードと地図表示を完成させる</h2><p>OSMへ公開する点字ブロックと、StepBy内だけに保存する情報を明確に分離します。</p></div>
+        </div>
+        <div class="columns">
+          <article class="panel wide">
+            <h3>3-1. 記録対象と公開範囲</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">PROモードの記録項目を実装する</span><span class="note">点字ブロック、JIS適合・非適合の点字ブロックだけをOSM変更案の対象とし、柵・塀・グレーチング・ひとことメモなどは開発DBだけに保存する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">地図上の色分けを実装する</span><span class="note">OSM由来でStepBy印なしは青、StepBy由来は緑、PROモードの点字ブロック以外は赤で表示する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">PROモード中であることを明確に表示する</span><span class="note">地図を赤枠にし、上部バーにもPROバッジを表示して誤操作を防ぐ。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">公開・非公開データのAPI試験を行う</span><span class="note">非公開項目がOSM変更案や外部レスポンスへ混入しないことを自動試験する。</span></div></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="track track-osm" id="valhalla-stop">
+        <div class="track-head">
+          <div class="track-number">04</div>
+          <div><h2>Valhallaを停止できる状態にする</h2><p>先に止めず、ブラウザ版が合格基準を満たし、一般利用者の記録フローが安定してから切り離します。</p></div>
+        </div>
+        <div class="columns">
+          <article class="panel wide">
+            <h3>4-1. 切替え判定</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">ブラウザ版とValhalla版の比較結果を集計する</span><span class="note">経路連続性、歩道優先、位置差、失敗率、処理速度が合格基準を満たすか判定する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">限定利用で安定性を確認する</span><span class="note">開発者、協力者、一部利用者の順に広げ、問題があればValhallaへ戻せる状態を保つ。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Valhalla依存を削除し、復旧手順を保存する</span><span class="note">API、設定、プロセス、構成図を更新する。すぐ戻せる設定と手順は一定期間保管する。</span></div></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="track track-cloud" id="cloud">
+        <div class="track-head">
+          <div class="track-number">05</div>
+          <div><h2>クラウドサーバーへ移行する</h2><p>Valhallaを廃止した軽い構成を前提に、Google系サービスを第一候補として費用と運用を確認します。</p></div>
+        </div>
+        <div class="columns">
+          <article class="panel">
+            <h3>5-1. 移行先を決める</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">必要なAPI・DB・画像・ログ容量を測る</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">VPS一式移行とクラウド分割構成を比較する</span><span class="note">候補はVPS、Cloud Run＋マネージドPostgreSQL、AWS系、Cloudflare系など。無料枠終了後の費用も確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">構成・費用を決定し、松田先生へ相談する</span><span class="note">可能であれば費用をご支援いただきたい、という依頼文と見積りを用意する。</span></div></li>
+            </ul>
+          </article>
+          <article class="panel">
+            <h3>5-2. 安全に移行する</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">バックアップ・復元・切戻し手順を作る</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">クラウドへ開発環境を作り、総合試験する</span><span class="note">認証、記録、DB、OSM OAuth、非公開情報、監査、性能、バックアップ復元を確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">本番を切り替え、監視する</span><span class="note">旧サーバーはすぐ停止せず、切戻し可能な期間を設ける。</span></div></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="track track-other" id="existing-data">
+        <div class="track-head">
+          <div class="track-number">06</div>
+          <div><h2>既存データ移行と残りの運用作業</h2><p>新しい記録方式とクラウド環境が安定してから、既存の点字ブロックデータを少量ずつ扱います。</p></div>
+        </div>
+        <div class="columns">
+          <article class="panel">
+            <h3>6-1. 既存データをOSMへ移す</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">既存データの件数・品質・重複・公開可否を調査する</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">自動で一括送信せず、問題のある記録を除外できるようにする。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">コミュニティ確認と明示許可後、少量ずつマージする</span><span class="note">全件のchangeset・Way・結果を監査履歴へ保存する。</span></div></li>
+            </ul>
+          </article>
+          <article class="panel">
+            <h3>6-2. 公開前の残作業</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">利用規約・プライバシーポリシーを本番用に確定する</span><span class="note">問い合わせ先、運営者表示、保存期間、法務確認を完了する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">UI1移行の範囲を決める</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡し、可能ならデバッグを依頼する</span></div></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
       <section class="architecture" id="architecture" aria-labelledby="architecture-title">
         <div class="architecture-head">
           <div><h2 id="architecture-title">現在のシステム構成</h2><p>公開版・開発版・ローカルサーバー・Tailscale・DB・外部サービスの接続関係です。</p></div>
@@ -252,7 +404,9 @@
         <p class="architecture-rule"><strong>更新ルール：</strong>フロント、API、ポート、PM2、Tailscale、DB、コンテナ、外部サービスまたは認証方式を変更した作業では、この構成図も同時に更新します。秘密情報は掲載しません。</p>
       </section>
 
-      <section class="track track-osm" id="osm">
+      <details>
+        <summary>これまでの詳しい検討記録・完了済みタスクを表示</summary>
+      <section class="track track-osm" id="legacy-osm">
         <div class="track-head">
           <div class="track-number">01</div>
           <div><h2>OSM直接統合・Valhalla使用中止</h2><p>最大の技術変更。調査を終えてから、新規データ、既存データの順に進めます。</p></div>
@@ -332,7 +486,7 @@
         </div>
       </section>
 
-      <section class="track track-cloud" id="cloud">
+      <section class="track track-cloud" id="legacy-cloud">
         <div class="track-head">
           <div class="track-number">02</div>
           <div><h2>クラウドサーバー移行</h2><p>ブラウザフィッティングへの移行を完了し、Valhallaを廃止した構成を前提に検討します。現時点では移行先・構成とも未定です。</p></div>
@@ -380,7 +534,7 @@
         </div>
       </section>
 
-      <section class="track track-other" id="other">
+      <section class="track track-other" id="legacy-other">
         <div class="track-head">
           <div class="track-number">03</div>
           <div><h2>その他の仕様・運用変更</h2><p>法務文書、UI移行、協力依頼、開発環境など、独立して進められる項目です。</p></div>
@@ -400,6 +554,7 @@
           </article>
         </div>
       </section>
+      </details>
     </main>
 
     <footer><span>StepBy Project Roadmap</span><span>未確定事項は調査結果に合わせて更新します。</span></footer>
