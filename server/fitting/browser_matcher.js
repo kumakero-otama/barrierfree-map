@@ -17,6 +17,35 @@ function projectToSegment(point, start, end) {
   return { lat: point.lat + y / EARTH_METERS_PER_DEGREE, lng: point.lng + x / scaleX, distance: Math.hypot(x, y), fraction };
 }
 
+function signedOffsetMeters(point, start, end) {
+  const meanLat = ((point.lat + start.lat + end.lat) / 3) * Math.PI / 180;
+  const scaleX = EARTH_METERS_PER_DEGREE * Math.cos(meanLat);
+  const vx = (end.lng - start.lng) * scaleX, vy = (end.lat - start.lat) * EARTH_METERS_PER_DEGREE;
+  const px = (point.lng - start.lng) * scaleX, py = (point.lat - start.lat) * EARTH_METERS_PER_DEGREE;
+  const length = Math.hypot(vx, vy);
+  return length ? (vx * py - vy * px) / length : 0;
+}
+
+function inferWaySide(points, way) {
+  if (["footway", "path", "pedestrian", "steps", "corridor"].includes(String(way.tags?.highway || "").toLowerCase()) ||
+      String(way.tags?.footway || "").toLowerCase() === "sidewalk") return null;
+  const offsets = [];
+  for (const point of points) {
+    let nearest = null;
+    for (let index = 0; index < (way.coordinates || []).length - 1; index += 1) {
+      const start = { lng: way.coordinates[index][0], lat: way.coordinates[index][1] };
+      const end = { lng: way.coordinates[index + 1][0], lat: way.coordinates[index + 1][1] };
+      const projected = projectToSegment(point, start, end);
+      if (!nearest || projected.distance < nearest.distance) nearest = { distance: projected.distance, offset: signedOffsetMeters(point, start, end) };
+    }
+    if (nearest && nearest.distance <= 30 && Math.abs(nearest.offset) >= .75) offsets.push(nearest.offset);
+  }
+  if (!offsets.length) return null;
+  const left = offsets.filter((offset) => offset > 0).length, right = offsets.length - left;
+  if (Math.max(left, right) / offsets.length < .6) return null;
+  return left > right ? "left" : "right";
+}
+
 function sharesNode(a, b) {
   const nodes = new Set((a && a.nodes) || []);
   return Boolean(a && b && (b.nodes || []).some((id) => nodes.has(id)));
@@ -68,16 +97,47 @@ function connectedPathExists(ways, ids) {
   return true;
 }
 
+function dominantConnectedComponent(ways, matches) {
+  const matchedCounts = new Map();
+  matches.filter(Boolean).forEach((match) => matchedCounts.set(match.wayId, (matchedCounts.get(match.wayId) || 0) + 1));
+  const seen = new Set(); let bestWays = ways, bestCount = -1;
+  for (const way of ways) {
+    if (seen.has(way.id)) continue;
+    const queue = [way], component = []; seen.add(way.id);
+    while (queue.length) {
+      const current = queue.shift(); component.push(current);
+      for (const candidate of ways) if (!seen.has(candidate.id) && sharesNode(current, candidate)) { seen.add(candidate.id); queue.push(candidate); }
+    }
+    const count = component.reduce((sum, item) => sum + (matchedCounts.get(item.id) || 0), 0);
+    if (count > bestCount) { bestCount = count; bestWays = component; }
+  }
+  return bestWays;
+}
+
 function replay(points, ways) {
   const startedAt = Date.now();
   let previousWayId = null;
   const preparedPoints = preparePoints(points);
-  const matches = preparedPoints.map((point) => {
+  let matches = preparedPoints.map((point) => {
     if (point.quality === "discarded") return null;
     const match = chooseBestMatch(point, ways, previousWayId);
     if (match) previousWayId = match.wayId;
     return match ? { ...match, inputQuality: point.quality, originalIndex: point.originalIndex } : null;
   });
+  let routeSmoothed = false;
+  const initialIds = matches.filter(Boolean).reduce((ids, match) => ids.at(-1) === match.wayId ? ids : [...ids, match.wayId], []);
+  if (!connectedPathExists(ways, initialIds)) {
+    const routeWays = dominantConnectedComponent(ways, matches);
+    let previous = null;
+    const smoothed = preparedPoints.map((point) => {
+      if (point.quality === "discarded") return null;
+      const match = chooseBestMatch(point, routeWays, previous);
+      if (match) previous = match.wayId;
+      return match ? { ...match, inputQuality: point.quality, originalIndex: point.originalIndex } : null;
+    });
+    const smoothedIds = smoothed.filter(Boolean).reduce((ids, match) => ids.at(-1) === match.wayId ? ids : [...ids, match.wayId], []);
+    if (connectedPathExists(routeWays, smoothedIds)) { matches = smoothed; routeSmoothed = true; }
+  }
   const valid = matches.filter(Boolean);
   const wayIds = valid.reduce((ids, match) => ids.at(-1) === match.wayId ? ids : [...ids, match.wayId], []);
   const missedPedestrianPriority = valid.filter((match) => {
@@ -88,7 +148,7 @@ function replay(points, ways) {
   const discardedPoints = preparedPoints.filter((point, index) => point.quality === "discarded" || !matches[index]).map((point) => ({
     index: point.originalIndex, accuracy: point.accuracy, reason: point.discardReason || "no_candidate_within_60m",
   }));
-  return { matches, wayIds, durationMs: Date.now() - startedAt, coverage: points.length ? valid.length / points.length : 0,
+  return { matches, wayIds, routeSmoothed, initialWayIds: initialIds, durationMs: Date.now() - startedAt, coverage: points.length ? valid.length / points.length : 0,
     connected: valid.every((match) => match.connectedToPrevious !== false) && connectedPathExists(ways, wayIds),
     pedestrianMatches: valid.filter((match) => match.priority === "pedestrian").length,
     interpolatedPointCount: preparedPoints.filter((point) => point.quality === "interpolated").length,
@@ -98,4 +158,4 @@ function replay(points, ways) {
     maxSnapDistance: valid.length ? Math.max(...valid.map((match) => match.distance)) : null };
 }
 
-module.exports = { LOW_ACCURACY_METERS, distanceMeters, projectToSegment, chooseBestMatch, preparePoints, replay };
+module.exports = { LOW_ACCURACY_METERS, distanceMeters, projectToSegment, signedOffsetMeters, inferWaySide, chooseBestMatch, preparePoints, replay };

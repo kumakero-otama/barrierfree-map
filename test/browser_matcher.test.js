@@ -21,6 +21,18 @@ assert.strictEqual(result.connected, true);
 assert.strictEqual(result.missedPedestrianPriority, 0);
 assert.deepStrictEqual(result.wayIds, [20, 21]);
 
+const smoothed = replay([
+  { lat: 35.00001, lng: 139.0001, accuracy: 5 },
+  { lat: 35, lng: 139.0011, accuracy: 5 },
+  { lat: 35, lng: 139.0015, accuracy: 5 },
+], [
+  { id: 30, version: 1, priority: "pedestrian", nodes: [30, 31], coordinates: [[139, 35.00001], [139.0003, 35.00001]] },
+  { id: 31, version: 1, priority: "road", nodes: [40, 41], coordinates: [[139, 35], [139.002, 35]] },
+]);
+assert.strictEqual(smoothed.routeSmoothed, true);
+assert.strictEqual(smoothed.connected, true);
+assert.deepStrictEqual(smoothed.wayIds, [31]);
+
 const prepared = preparePoints([
   { lat: 35, lng: 139, accuracy: 5 },
   { lat: 36, lng: 140, accuracy: 80 },
