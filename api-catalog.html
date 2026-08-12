@@ -30,7 +30,7 @@
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/trace</code></h3><p>通常記録ではブラウザ版が確定した経路、GPS生点、accuracy、フィット点、Way IDを開発DBへ保存する。Way ID・Version・Node列・全座標・開始終了位置・元タグ・Relation・アプリが自動判定した左右・追加予定タグもバックアップする。<code>route_confirmed=true</code>を必須とし、Way区間が共有Nodeで連続していなければサーバー側でも拒否する。通常操作ではValhallaを呼ばない。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/fitting-details</code></h3><p>最新記録の生座標・フィット結果・Way・OSM案状態を取得。</p></article>
 <article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/fitting-comparisons</code></h3><p>Valhalla版とブラウザ版の比較履歴を保存・取得。</p></article>
-<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-tactile-ways</code></h3><p>周辺のOSM点字ブロックWayを読取。公開タグ内にStepBy表記がある地物は <code>stepby_recorded=true</code> として返す。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-tactile-ways</code></h3><p>周辺のOSM点字ブロックWayをメタデータ付きで読取。OSM changeset IDをStepByの追記型マージ履歴と照合し、StepBy由来の地物は <code>stepby_recorded=true</code> として返す。公開タグ内のStepBy表記も補助判定に使う。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-walkable-network</code></h3><p>約1km圏の歩行可能Way・Node・Relationを取得・キャッシュ。</p></article>
 <article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/tactile-tags</code>ほか</h3><p>点字ブロックタグ、セッションタグ、記録詳細タグを管理。固定3種だけ <code>osmExportable=true</code>、柵・塀等と利用者追加タグはStepBy内限定。</p></article>
 <article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/road-info</code></h3><p>OSMへ送らない道情報・画像を保存・取得。新規投稿では <code>Idempotency-Key</code> を必須とし、通信再試行で同じキーを受け取った場合は既存の保存結果を返して二重投稿を防ぐ。</p></article>
