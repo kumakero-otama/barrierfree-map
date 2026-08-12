@@ -217,7 +217,7 @@
       </section>
 
       <nav class="summary" aria-label="現在の3段階">
-        <a href="#next-actions"><span class="summary-number">NOW</span><strong>フィッティングを検証</strong><small>保存済みGPSで再現 → 比較 → 合格基準</small></a>
+        <a href="#valhalla-stop"><span class="summary-number">DONE</span><strong>ブラウザ版へ切替済み</strong><small>一般画面はValhalla非依存・比較は管理画面のみ</small></a>
         <a href="#osm-test"><span class="summary-number">NEXT</span><strong>OSM連携を検証</strong><small>開発環境 → 許可後に本番1件 → 取消し</small></a>
         <a href="#cloud"><span class="summary-number">LATER</span><strong>クラウドへ移行</strong><small>新バージョンのValhalla依存解消後にGoogle系を第一候補として実施</small></a>
       </nav>
@@ -351,10 +351,10 @@
           <article class="panel wide">
             <h3>4-1. 開発版の依存切離し判定</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">ブラウザ版とValhalla版の比較結果を集計する</span><span class="note">経路連続性、歩道優先、位置差、失敗率、処理速度が合格基準を満たすか判定する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">限定利用で開発版の安定性を確認する</span><span class="note">開発者、協力者、一部利用者の順に広げる。比較試験ではValhallaを呼べる状態を保つが、通常の記録処理はブラウザ版だけで完結させる。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">一般利用者の画面からフィッティング比較UIを外す</span><span class="note">GPS生座標・Valhalla版・ブラウザ版の3経路表示、画面下の比較パネル、試験ボタン、実験用詳細表示を通常画面から削除する。比較機能自体は開発者専用の検証画面へ移し、項目4の合格判定が終わるまでは利用できるように残す。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">開発版の通常処理からValhalla依存を削除する</span><span class="note">新バージョンのAPI、設定、処理経路、構成図を更新する。現行版のプロセス・ポート・Valhalla・DBは変更も停止もせず、比較・復旧手順も保存する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">ブラウザ版とValhalla版の比較結果を集計する</span><span class="note">完了。本番保存データの一括試験は比較可能119件まで集計し、過去の主要集計では位置差中央値0.12m、90%点2.18m、Way集合完全一致98/107、経路連続106/107、1000点処理28msだった。取得失敗216件はフィッティング誤りではなくOverpass上流のタイムアウト等として分離。移動追従キャッシュ、既存範囲継続、再試行を実装したうえで、通常利用をブラウザ版へ切り替える判定とした。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">限定利用で開発版の安定性を確認する</span><span class="note">完了。開発DBで直近14日20セッション、ブラウザ保存経路8件を確認し、通常記録、再起動後の送信再開、経路確定、詳細保存を結合試験した。一般処理はブラウザ版だけで完結する。Valhalla比較は管理者専用画面に残し、今後の協力者試験と切戻し確認に利用できる。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">一般利用者の画面からフィッティング比較UIを外す</span><span class="note">完了。日本語・英語・ヒンディー語のマップからGPS・Valhalla・ブラウザの比較表示、比較パネル、東京駅試験ボタン、OSM試験ボタン、開発用詳細モーダルを削除した。比較・全記録再検証・誤差経路地図は認証された<a href="https://barrierfree-map.tail5de5e1.ts.net/dev-api/admin/database.html" target="_blank" rel="noopener">開発管理画面</a>に維持した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">開発版の通常処理からValhalla依存を削除する</span><span class="note">完了。UI10の現在地処理は <code>browserOsmMatcher.match()</code> だけを呼び、<code>/api/match</code>・<code>/api/trace</code>・比較履歴APIを呼ばない。設定APIへ <code>normalFittingEngine=browser_osm</code>、半径1km、650m更新、Valhallaは開発者比較専用と明記した。自動試験6件に合格。UI0、本番API、Valhalla、DB、ポートは変更も停止もしていない。</span></div></li>
             </ul>
           </article>
         </div>
