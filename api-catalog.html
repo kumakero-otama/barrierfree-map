@@ -26,19 +26,19 @@
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/session/start</code></h3><p>GPS記録セッションを開始。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/session/end</code></h3><p>記録を確定し集計を保存。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/session/cancel</code></h3><p>未確定セッションを取消。</p></article>
-<article class="endpoint"><h3><span class="method">GET</span><code>/api/records</code></h3><p>StepByで記録されたデータを取得。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/records</code></h3><p>StepByで記録されたデータを取得。地図色分け用に点字ブロックは <code>stepby_tactile</code>、PRO非公開記録は <code>pro_private</code> を返す。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/trace</code></h3><p>通常記録ではブラウザ版が確定した経路、GPS生点、accuracy、フィット点、Way IDを開発DBへ保存する。Way ID・Version・Node列・全座標・開始終了位置・元タグ・Relation・アプリが自動判定した左右・追加予定タグもバックアップする。<code>route_confirmed=true</code>を必須とし、Way区間が共有Nodeで連続していなければサーバー側でも拒否する。通常操作ではValhallaを呼ばない。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/fitting-details</code></h3><p>最新記録の生座標・フィット結果・Way・OSM案状態を取得。</p></article>
 <article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/fitting-comparisons</code></h3><p>Valhalla版とブラウザ版の比較履歴を保存・取得。</p></article>
-<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-tactile-ways</code></h3><p>周辺のOSM点字ブロックWayを読取。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-tactile-ways</code></h3><p>周辺のOSM点字ブロックWayを読取。公開タグ内にStepBy表記がある地物は <code>stepby_recorded=true</code> として返す。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-walkable-network</code></h3><p>約1km圏の歩行可能Way・Node・Relationを取得・キャッシュ。</p></article>
-<article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/tactile-tags</code>ほか</h3><p>点字ブロックタグ、セッションタグ、記録詳細タグを管理。</p></article>
+<article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/tactile-tags</code>ほか</h3><p>点字ブロックタグ、セッションタグ、記録詳細タグを管理。固定3種だけ <code>osmExportable=true</code>、柵・塀等と利用者追加タグはStepBy内限定。</p></article>
 <article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/road-info</code></h3><p>OSMへ送らない道情報・画像を保存・取得。新規投稿では <code>Idempotency-Key</code> を必須とし、通信再試行で同じキーを受け取った場合は既存の保存結果を返して二重投稿を防ぐ。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/stats</code> / <code>/api/tactile-ranking</code></h3><p>合計値・ランキングを取得。</p></article></div></section>
 
 <section class="group"><h2>OSM変更案・履歴・取消し</h2><div class="grid">
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/status</code></h3><p>変更案APIと書込ロック状態を取得。</p></article>
-<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/split-plan</code></h3><p>Way分割・Relation引継ぎを含む未送信案を作成。独立歩道Wayには <code>tactile_paving=yes</code>、道路中心線WayにはGPSとOSM Way方向からクライアントが自動判定した側へ <code>sidewalk:left:tactile_paving=yes</code> または <code>sidewalk:right:tactile_paving=yes</code> を生成する。利用者へ左右選択を要求しない。OSMへは送信しない。</p></article>
+<article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/split-plan</code></h3><p>Way分割・Relation引継ぎを含む未送信案を作成。独立歩道Wayには <code>tactile_paving=yes</code>、道路中心線WayにはGPSとOSM Way方向からクライアントが自動判定した側へ左右別タグを生成する。PRO非公開項目だけの記録はサーバー側で409拒否し、メモや非公開タグを変更案へ含めない。OSMへは送信しない。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/api/osm/plans</code></h3><p>一般の未送信変更案を作成。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/plans/:planId</code></h3><p>変更前後、要素、監査履歴を取得。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm/records/:recordId</code></h3><p>記録と送信・取消changesetの1対1状態を取得。</p></article>
