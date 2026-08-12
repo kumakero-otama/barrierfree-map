@@ -206,20 +206,20 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true">S</span>STEPBY ROADMAP</div>
-      <div class="updated">2026年8月11日 実行順に再整理</div>
+      <div class="updated">2026年8月12日 実行順に再整理</div>
     </header>
 
     <main>
       <section class="hero">
         <p class="eyebrow">Project overview</p>
         <h1>StepByの、<br>これからやること。</h1>
-        <p class="lead">今から実行する順番に並べたタスクリストです。まずValhallaを使わない記録処理を完成させ、その後にOSM連携、PROモード、クラウド移行、既存データ移行へ進みます。</p>
+        <p class="lead">今から実行する順番に並べたタスクリストです。まず開発版でValhallaを使わない記録処理を完成させ、その後にOSM連携、PROモード、クラウド移行、既存データ移行へ進みます。現行版と、そのValhallaは並行して稼働を続けます。</p>
       </section>
 
       <nav class="summary" aria-label="現在の3段階">
         <a href="#next-actions"><span class="summary-number">NOW</span><strong>フィッティングを検証</strong><small>保存済みGPSで再現 → 比較 → 合格基準</small></a>
         <a href="#osm-test"><span class="summary-number">NEXT</span><strong>OSM連携を検証</strong><small>開発環境 → 許可後に本番1件 → 取消し</small></a>
-        <a href="#cloud"><span class="summary-number">LATER</span><strong>クラウドへ移行</strong><small>Valhalla廃止後にGoogle系を第一候補として実施</small></a>
+        <a href="#cloud"><span class="summary-number">LATER</span><strong>クラウドへ移行</strong><small>新バージョンのValhalla依存解消後にGoogle系を第一候補として実施</small></a>
       </nav>
 
       <section class="sequence" aria-labelledby="sequence-title">
@@ -228,7 +228,7 @@
           <li><strong>フィッティング完成</strong><span>リアルタイムと記録終了後の経路を、OSMへ送らず検証</span></li>
           <li><strong>OSM連携完成</strong><span>変更・取消し・監査を確認。実送信には毎回明示許可が必要</span></li>
           <li><strong>PRO・表示完成</strong><span>公開対象を分離し、記録種別を色で判別できるようにする</span></li>
-          <li><strong>クラウド・既存移行</strong><span>Valhalla停止後にサーバーを移し、最後に既存データを扱う</span></li>
+          <li><strong>クラウド・既存移行</strong><span>新バージョンのValhalla依存解消後にサーバーを移し、最後に既存データを扱う</span></li>
         </ol>
       </section>
 
@@ -271,6 +271,15 @@
             </ul>
             <div class="dependency"><strong>現地で後から確認するもの：</strong> 実端末のGPS受信、通信断、バックグラウンド動作、電池消費だけは保存データで再現できないため、後日別途確認します。フィッティングロジックの1-2試験は完了です。</div>
           </article>
+          <article class="panel wide">
+            <h3>1-3. 移動に追従してOSM地図データを補充</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">現在地の移動に応じて次の範囲を先読みする</span><span class="note">最初の約1km圏だけで終わらせず、現在地が取得済み範囲の外周へ近づいた時点で、進行方向を考慮して隣接範囲の歩行可能Way・Nodeをバックグラウンド取得する。記録操作とフィッティングを止めない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">取得済み範囲を再利用し、差分だけ追加する</span><span class="note">取得範囲、取得時刻、Way ID・VersionをIndexedDBで管理し、同じ範囲の重複取得を避ける。古い範囲は有効期限後に更新し、通信量とOverpass負荷を抑える。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">通信失敗・高速移動・長時間記録を試験する</span><span class="note">追加取得に失敗しても取得済み範囲で記録を継続し、未取得区間を保留して後で再試行する。境界通過、往復、通信断と復帰、長時間移動で経路が欠けないことを自動試験する。</span></div></li>
+            </ul>
+            <div class="dependency"><strong>実装時の初期案：</strong> 取得済み範囲の中心から約500〜700m移動、または外周まで約300mになった時点で次の約1km圏を先読みする。実端末の通信量・速度を測って閾値を調整します。</div>
+          </article>
         </div>
       </section>
 
@@ -304,6 +313,9 @@
           <article class="panel wide">
             <h3>2-3. 一般利用者の記録フローを完成させる</h3>
             <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">確定・投稿後は待たせず次の画面へ進める</span><span class="note">利用者が確定または投稿を押したら、入力内容を端末内の送信待ちキューへ安全に保存して直ちに次画面へ遷移する。フィッティング確定、StepBy API送信、変更案作成などはバックグラウンドで順番に完了させる。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">バックグラウンド送信の状態と再試行を実装する</span><span class="note">送信中・完了・要再試行・利用者確認が必要、を表示する。通信断、画面遷移、アプリ再起動後もキューを復元し、同じ記録を二重投稿しない冪等キーを付ける。失敗時は記録を消さず自動再試行する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">利用者判断が必要な処理だけ確定前に止める</span><span class="note">左右判定不能、経路不成立、利用規約未同意、OSM未連携など、利用者の入力がなければ進められない項目は確認する。それ以外の通信・保存処理では画面を待たせない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">記録開始から変更内容の最終確認までを通して試験する</span><span class="note">Googleログイン → GPS記録 → ブラウザフィッティング → 経路確定 → OSM連携確認 → 変更案表示まで、迷わず操作できるようにする。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM未連携時だけ小窓で連携・サインアップへ案内する</span><span class="note">連携済みの利用者にはOSM画面を表示しない。拒否・中断時もStepBy側の記録を失わない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">本番OSMへの送信フラグは無効のまま、開発DBに記録・変更案・Wayバックアップ・監査履歴が揃うことを確認する。</span></div></li>
@@ -333,15 +345,15 @@
       <section class="track track-osm" id="valhalla-stop">
         <div class="track-head">
           <div class="track-number">04</div>
-          <div><h2>Valhallaを停止できる状態にする</h2><p>先に止めず、ブラウザ版が合格基準を満たし、一般利用者の記録フローが安定してから切り離します。</p></div>
+          <div><h2>開発版のValhalla依存をなくす</h2><p>現行版と現行Valhallaは停止せず並行稼働させます。新しい開発版だけが、通常利用でValhallaを必要としない状態を完成させます。</p></div>
         </div>
         <div class="columns">
           <article class="panel wide">
-            <h3>4-1. 切替え判定</h3>
+            <h3>4-1. 開発版の依存切離し判定</h3>
             <ul class="tasks">
               <li><span class="box"></span><div><span class="task-title">ブラウザ版とValhalla版の比較結果を集計する</span><span class="note">経路連続性、歩道優先、位置差、失敗率、処理速度が合格基準を満たすか判定する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">限定利用で安定性を確認する</span><span class="note">開発者、協力者、一部利用者の順に広げ、問題があればValhallaへ戻せる状態を保つ。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Valhalla依存を削除し、復旧手順を保存する</span><span class="note">API、設定、プロセス、構成図を更新する。すぐ戻せる設定と手順は一定期間保管する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">限定利用で開発版の安定性を確認する</span><span class="note">開発者、協力者、一部利用者の順に広げる。比較試験ではValhallaを呼べる状態を保つが、通常の記録処理はブラウザ版だけで完結させる。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">開発版の通常処理からValhalla依存を削除する</span><span class="note">新バージョンのAPI、設定、処理経路、構成図を更新する。現行版のプロセス・ポート・Valhalla・DBは変更も停止もせず、比較・復旧手順も保存する。</span></div></li>
             </ul>
           </article>
         </div>
@@ -350,7 +362,7 @@
       <section class="track track-cloud" id="cloud">
         <div class="track-head">
           <div class="track-number">05</div>
-          <div><h2>クラウドサーバーへ移行する</h2><p>Valhallaを廃止した軽い構成を前提に、Google系サービスを第一候補として費用と運用を確認します。</p></div>
+          <div><h2>クラウドサーバーへ移行する</h2><p>新バージョンがValhallaへ依存しない軽い構成を前提に、Google系サービスを第一候補として費用と運用を確認します。現行版は切替え完了まで並行稼働します。</p></div>
         </div>
         <div class="columns">
           <article class="panel">
@@ -480,10 +492,10 @@
               <li><span class="box"></span><div><span class="task-title">限定利用から段階的に切り替える</span><span class="note">開発者、協力者、一部利用者、標準利用の順に拡大。低信頼・データ不足・処理失敗時はValhallaへ自動退避。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">件数、品質、重複、マージ可否、公開対象を確認し、少量の試験から始める。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Valhallaを停止する</span><span class="note">ブラウザ版とOSM統合が合格基準を満たし、一定期間の安定稼働を確認してから停止。設定と復旧手段は保管する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">新バージョンのValhalla依存を解消する</span><span class="note">開発版のブラウザフィッティングとOSM統合が合格基準を満たしたら、新バージョンの通常処理からValhalla呼出しをなくす。現行版と現行Valhallaは停止せず並行稼働し、本番切替えは別途明示的に判断する。</span></div></li>
             </ul>
             <div class="dependency"><strong>次に実施：</strong> 保存済みの実験データと今後の現地記録を使い、ブラウザ版の経路連続性・歩道優先・左右判定・長時間記録時の速度について合格基準を決めて集計する。低信頼時の案内と再試行を整え、UI10の通常操作が安定した段階でValhalla比較を終了できるか判定する。OSMへの実送信は行わない。</div>
-            <div class="dependency"><strong>重要な順序：</strong> Valhallaは先に止めず、端末側フィッティングとOSM保存が同等以上に動くことを確認した後で停止します。</div>
+            <div class="dependency"><strong>重要な方針：</strong> ここで行うのは開発版のValhalla依存解消です。現行版と現行Valhallaは止めずに並行稼働させ、本番切替え・停止はこのタスクへ含めません。</div>
           </article>
         </div>
       </section>
@@ -491,7 +503,7 @@
       <section class="track track-cloud" id="legacy-cloud">
         <div class="track-head">
           <div class="track-number">02</div>
-          <div><h2>クラウドサーバー移行</h2><p>ブラウザフィッティングへの移行を完了し、Valhallaを廃止した構成を前提に検討します。現時点では移行先・構成とも未定です。</p></div>
+          <div><h2>クラウドサーバー移行</h2><p>新バージョンのブラウザフィッティングを完成させ、Valhallaへ依存しない構成を前提に検討します。現時点では移行先・構成とも未定で、現行版と現行Valhallaは並行稼働します。</p></div>
         </div>
 
         <div class="cloud-options" aria-label="クラウド移行の2つの候補">
