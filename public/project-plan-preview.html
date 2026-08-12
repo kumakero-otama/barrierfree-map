@@ -306,7 +306,7 @@
               <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境へ試験用の元Wayを用意し、変更前を保存する</span><span class="note">完了。本番Way 464458979に対応するコピー済み経路から、OSM開発環境にNode 4件と試験用Way 4307542046（Version 1）を新規作成した。本番DBは読み取りのみ、本番OSMへの送信はなし。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境へ tactile_paving=yes を送信する</span><span class="note">完了。Way 4307542046へ <code>highway=footway</code>、<code>footway=sidewalk</code>、<code>tactile_paving=yes</code>、<code>source=survey</code> を登録。changeset 659441にはStepByのコメント、created_by、source、plan IDを記録し、APIとブラウザで確認した。送信後は書込みフラグと一時トークンを再ロック済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境で取消しAPIを実行する</span><span class="note">完了。作成changeset 659441を元に反対変更を生成し、取消changeset 659462でWay 4307542046とNode 4件を削除した。全5要素がAPIでHTTP 410となること、created 0・modified 0・deleted 5、StepBy表記、元Planと取消Planの追記型監査履歴を確認。書込みフラグと一時トークンは再ロック済み。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">変更対象が元の状態へ戻ったことを確認する</span><span class="note">タグ・Node・Way・Relationを変更前の記録と比較する。競合時は上書きせず停止する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">変更対象が元の状態へ戻ったことを確認する</span><span class="note">完了。取消後にWay 4307542046と作成Node 4件がAPIでHTTP 410になり、changeset 659462が5要素の削除を記録していることを確認。さらにプロジェクト管理者がOSM開発環境の画面でWayが存在しないことを目視確認したため、試験用Way作成前と同じ「対象要素が存在しない状態」へ戻ったと判定した。</span></div></li>
             </ul>
             <div class="dependency"><strong>確認方法：</strong> OSM開発環境には通常の専用地図レンダリングやOverpassがないため、主にchangeset詳細、Way詳細・履歴、APIレスポンスで目視確認します。本番OSMでの試験は、この開発環境試験とは別の将来タスクです。</div>
           </article>
@@ -316,9 +316,9 @@
               <li class="done"><span class="box"></span><div><span class="task-title">確定・投稿後は待たせず次の画面へ進める</span><span class="note">完了。点字ブロック確定と道情報投稿は、内容をIndexedDBの送信待ちキューへ先に保存し、確認画面を閉じる／地図画面へ戻る。経路・raw・Wayバックアップ・メモ・タグ・OSM未送信案の保存は裏で続ける。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">バックグラウンド送信の状態と再試行を実装する</span><span class="note">完了。送信中・完了・再試行をトースト表示し、通信断・画面遷移・再起動後もキューを復元する。成功した工程をチェックポイント保存して再実行せず、2秒から最大5分の間隔で自動再試行する。記録ID／道情報のIdempotency-Keyで二重保存を防ぐ自動試験に合格。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">利用者判断が必要な処理だけ確定前に止める</span><span class="note">完了。経路不成立、左右判定不能、PROタグ未選択などは確定前に確認する。確定後のAPI通信では画面を止めない。OSM未連携時の小窓は利用者操作が必要なため確定操作から開始するが、StepBy記録キューとは独立し、連携失敗でも記録を失わない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">記録開始から変更内容の最終確認までを通して試験する</span><span class="note">Googleログイン → GPS記録 → ブラウザフィッティング → 経路確定 → OSM連携確認 → 変更案表示まで、迷わず操作できるようにする。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM未連携時だけ小窓で連携・サインアップへ案内する</span><span class="note">連携済みの利用者にはOSM画面を表示しない。拒否・中断時もStepBy側の記録を失わない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">本番OSMへの送信フラグは無効のまま、開発DBに記録・変更案・Wayバックアップ・監査履歴が揃うことを確認する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">記録開始から変更内容の最終確認までを通して試験する</span><span class="note">完了。StepBy認証済み利用者のセッション開始 → GPS raw → ブラウザフィッティング → 共有Nodeで連続する経路確定 → セッション終了 → OSM連携状態確認 → Way分割・Relation引継ぎを含む未送信変更案 → 詳細画面、の順で結合試験に合格。確定後の保存は永続キューへ渡すため画面を待たせない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM未連携時だけ小窓で連携・サインアップへ案内する</span><span class="note">完了。サーバー設定済みかつ未連携の場合だけOAuth小窓を開き、連携済みまたはサーバー未設定では開かない判定を独立実装して3分岐を自動試験した。小窓の拒否・中断・開始失敗は記録キューへ影響せず、記録と未送信案を失わない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">完了。開発DBにセッション終了日時、GPS raw 3点、フィット点3点、ブラウザ経路、Way ID/Version/Node/全座標/追加予定タグのスナップショット、未送信変更案、1記録1変更案リンク、<code>split_plan_created</code>監査イベントが揃うことを確認。送信・取消送信APIはいずれも423で停止し、OSM送信0件。</span></div></li>
             </ul>
           </article>
         </div>

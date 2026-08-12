@@ -17,7 +17,7 @@
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/pro-status</code></h3><p>PRO権限の状態を取得。</p></article></div></section>
 
 <section class="group"><h2>OSM OAuth</h2><div class="grid">
-<article class="endpoint"><h3><span class="method">GET</span><code>/auth/osm/status</code></h3><p>OSMアカウント連携状態を取得。</p></article>
+<article class="endpoint"><h3><span class="method">GET</span><code>/auth/osm/status</code></h3><p>OSMアカウント連携状態を取得。UI10は「OAuth設定済みかつ未連携」の場合だけ初回記録確定時に小窓を開き、連携済み利用者にはOSM画面を表示しない。連携処理は端末内の記録送信キューと分離する。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/auth/osm/start</code></h3><p>PKCE状態を保存し、小窓用のOSM開発環境認証URLを発行。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/auth/osm/callback</code></h3><p>OSM認証コードを交換し、暗号化トークンと追記監査履歴を保存。</p></article>
 <article class="endpoint"><h3><span class="method">POST</span><code>/auth/osm/disconnect</code></h3><p>保存トークンを破棄し、解除履歴を追加。</p></article></div></section>
