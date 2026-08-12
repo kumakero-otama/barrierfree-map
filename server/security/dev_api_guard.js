@@ -89,7 +89,11 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
     }
     // 管理APIは後段で本文上限付きのJSON readerを使う。ここでdata listenerを付けると、
     // 後段が購読する前に本文が流れ始める競合が起きるためContent-Length検査だけに留める。
-    if (!pathname.startsWith("/api/admin/")) {
+    // 認証・PRO更新は、後段で認証DBを確認してから本文readerを登録する。
+    // ここでdata listenerを付けると、その待ち時間に本文を先に消費してしまい
+    // 後段がendを受け取れずタイムアウトするため、Content-Length検査だけにする。
+    const delayedBodyReaderRoute = pathname === "/auth/profile" || pathname === "/api/pro-status";
+    if (!pathname.startsWith("/api/admin/") && !delayedBodyReaderRoute) {
       let streamedBytes = 0;
       req.on("data", (chunk) => {
         streamedBytes += chunk.length;

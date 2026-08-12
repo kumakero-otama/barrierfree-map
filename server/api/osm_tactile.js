@@ -221,9 +221,9 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const centerLat = Number(url.searchParams.get("centerLat"));
       const centerLng = Number(url.searchParams.get("centerLng"));
       const radiusKmRaw = Number(url.searchParams.get("radiusKm"));
-      const radiusKm = Number.isFinite(radiusKmRaw) && radiusKmRaw > 0 ? radiusKmRaw : 10;
-      // 過大なクエリを避けるため、半径は最大 10km に丸める。
-      const radiusMeters = Math.round(Math.min(radiusKm, 10) * 1000);
+      const radiusKm = Number.isFinite(radiusKmRaw) && radiusKmRaw > 0 ? radiusKmRaw : 1;
+      // UI10の移動追従キャッシュと同じ範囲に限定し、過大なOSM読取を防ぐ。
+      const radiusMeters = Math.round(Math.min(radiusKm, 1) * 1000);
 
       if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
         sendJson(res, 400, { error: "invalid_center" });
