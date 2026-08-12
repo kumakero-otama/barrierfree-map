@@ -289,10 +289,13 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
         })).filter((segment) => Number.isSafeInteger(segment.wayId) && segment.wayId > 0 &&
           Number.isInteger(segment.wayVersion) && segment.wayVersion > 0 && segment.nodeIds.length >= 2 &&
           segment.fullCoordinates.length === segment.nodeIds.length && segment.segmentFrom && segment.segmentTo);
+        const segmentsConnected = validWaySegments.every((segment, index) => index === 0 ||
+          segment.nodeIds.some((nodeId) => validWaySegments[index - 1].nodeIds.includes(nodeId)));
         if (!sessionId || validPoints.length < 2 || validPoints.length > 5000 || validPoints.length !== matchedPoints.length ||
             validRawPoints.length < 2 || validRawPoints.length > 5000 || validRawPoints.length !== rawPoints.length ||
             validMatchedSamples.length > 5000 || validMatchedSamples.length !== matchedSamples.length ||
-            validWaySegments.length < 1 || validWaySegments.length > 100 || validWaySegments.length !== waySegments.length) {
+            validWaySegments.length < 1 || validWaySegments.length > 100 || validWaySegments.length !== waySegments.length ||
+            requestData.route_confirmed !== true || !segmentsConnected) {
           sendJson(res, 400, { error: "invalid_browser_trace" });
           return;
         }

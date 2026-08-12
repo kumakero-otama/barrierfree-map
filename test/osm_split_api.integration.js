@@ -53,6 +53,7 @@ async function run() {
     body: JSON.stringify({
       sessionId: recordId,
       source: "browser",
+      route_confirmed: true,
       raw_points: [
         { lat: 35.00003, lon: 139.0005, accuracy: 4.5 },
         { lat: 35.00003, lon: 139.0015, accuracy: 4.0 },

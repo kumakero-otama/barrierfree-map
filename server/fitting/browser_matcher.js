@@ -51,6 +51,54 @@ function sharesNode(a, b) {
   return Boolean(a && b && (b.nodes || []).some((id) => nodes.has(id)));
 }
 
+function buildWayGraph(ways) {
+  const byId = new Map(ways.map((way) => [way.id, way])), byNode = new Map();
+  for (const way of ways) for (const nodeId of way.nodes || []) {
+    if (!byNode.has(nodeId)) byNode.set(nodeId, []);
+    byNode.get(nodeId).push(way.id);
+  }
+  const neighbors = new Map(ways.map((way) => [way.id, new Set()]));
+  for (const ids of byNode.values()) for (const id of ids) for (const other of ids) if (id !== other) neighbors.get(id).add(other);
+  return { byId, neighbors };
+}
+
+function findConnectedWayPath(ways, startWayId, endWayId) {
+  if (startWayId === endWayId) return [startWayId];
+  const graph = buildWayGraph(ways);
+  if (!graph.byId.has(startWayId) || !graph.byId.has(endWayId)) return null;
+  const queue = [{ id: startWayId, cost: 0 }], costs = new Map([[startWayId, 0]]), previous = new Map();
+  while (queue.length) {
+    queue.sort((a, b) => a.cost - b.cost);
+    const current = queue.shift();
+    if (current.cost !== costs.get(current.id)) continue;
+    if (current.id === endWayId) break;
+    for (const nextId of graph.neighbors.get(current.id) || []) {
+      const nextWay = graph.byId.get(nextId);
+      const cost = current.cost + (nextWay.priority === "pedestrian" ? 1 : 3);
+      if (!costs.has(nextId) || cost < costs.get(nextId)) {
+        costs.set(nextId, cost); previous.set(nextId, current.id); queue.push({ id: nextId, cost });
+      }
+    }
+  }
+  if (!previous.has(endWayId)) return null;
+  const path = [endWayId];
+  while (path[0] !== startWayId) path.unshift(previous.get(path[0]));
+  return path;
+}
+
+function expandConnectedRoute(ways, observedWayIds) {
+  if (!observedWayIds.length) return null;
+  const route = [observedWayIds[0]];
+  for (let index = 1; index < observedWayIds.length; index += 1) {
+    const target = observedWayIds[index];
+    if (route.at(-1) === target) continue;
+    const bridge = findConnectedWayPath(ways, route.at(-1), target);
+    if (!bridge) return null;
+    route.push(...bridge.slice(1));
+  }
+  return route;
+}
+
 function chooseBestMatch(point, ways, previousWayId) {
   const previousWay = ways.find((way) => way.id === previousWayId) || null;
   let best = null;
@@ -139,7 +187,12 @@ function replay(points, ways) {
     if (connectedPathExists(routeWays, smoothedIds)) { matches = smoothed; routeSmoothed = true; }
   }
   const valid = matches.filter(Boolean);
-  const wayIds = valid.reduce((ids, match) => ids.at(-1) === match.wayId ? ids : [...ids, match.wayId], []);
+  const observedWayIds = valid.reduce((ids, match) => ids.at(-1) === match.wayId ? ids : [...ids, match.wayId], []);
+  const connectedWayIds = expandConnectedRoute(ways, observedWayIds);
+  const wayIds = connectedWayIds || observedWayIds;
+  const connectorWayIds = connectedWayIds ? connectedWayIds.filter((id) => !observedWayIds.includes(id)) : [];
+  const coverage = points.length ? valid.length / points.length : 0;
+  const routeConfirmed = Boolean(connectedWayIds) && coverage >= 0.8;
   const missedPedestrianPriority = valid.filter((match) => {
     if (match.priority === "pedestrian") return false;
     const point = preparedPoints[match.originalIndex];
@@ -148,8 +201,8 @@ function replay(points, ways) {
   const discardedPoints = preparedPoints.filter((point, index) => point.quality === "discarded" || !matches[index]).map((point) => ({
     index: point.originalIndex, accuracy: point.accuracy, reason: point.discardReason || "no_candidate_within_60m",
   }));
-  return { matches, wayIds, routeSmoothed, initialWayIds: initialIds, durationMs: Date.now() - startedAt, coverage: points.length ? valid.length / points.length : 0,
-    connected: valid.every((match) => match.connectedToPrevious !== false) && connectedPathExists(ways, wayIds),
+  return { matches, wayIds, observedWayIds, connectorWayIds, routeConfirmed, routeSmoothed, initialWayIds: initialIds, durationMs: Date.now() - startedAt, coverage,
+    connected: routeConfirmed,
     pedestrianMatches: valid.filter((match) => match.priority === "pedestrian").length,
     interpolatedPointCount: preparedPoints.filter((point) => point.quality === "interpolated").length,
     discardedPointCount: discardedPoints.length, discardedPoints,
@@ -158,4 +211,4 @@ function replay(points, ways) {
     maxSnapDistance: valid.length ? Math.max(...valid.map((match) => match.distance)) : null };
 }
 
-module.exports = { LOW_ACCURACY_METERS, distanceMeters, projectToSegment, signedOffsetMeters, inferWaySide, chooseBestMatch, preparePoints, replay };
+module.exports = { LOW_ACCURACY_METERS, distanceMeters, projectToSegment, signedOffsetMeters, inferWaySide, chooseBestMatch, preparePoints, buildWayGraph, findConnectedWayPath, expandConnectedRoute, replay };

@@ -33,6 +33,29 @@ assert.strictEqual(smoothed.routeSmoothed, true);
 assert.strictEqual(smoothed.connected, true);
 assert.deepStrictEqual(smoothed.wayIds, [31]);
 
+const bridged = replay([
+  { lat: 35, lng: 139.0002, accuracy: 5 },
+  { lat: 35, lng: 139.0028, accuracy: 5 },
+], [
+  { id: 40, version: 1, priority: "pedestrian", nodes: [1, 2], coordinates: [[139, 35], [139.001, 35]] },
+  { id: 41, version: 1, priority: "pedestrian", nodes: [2, 3], coordinates: [[139.001, 35], [139.002, 35.0005]] },
+  { id: 42, version: 1, priority: "pedestrian", nodes: [3, 4], coordinates: [[139.002, 35.0005], [139.003, 35]] },
+]);
+assert.strictEqual(bridged.routeConfirmed, true);
+assert.deepStrictEqual(bridged.observedWayIds, [40, 42]);
+assert.deepStrictEqual(bridged.wayIds, [40, 41, 42]);
+assert.deepStrictEqual(bridged.connectorWayIds, [41]);
+
+const unconnected = replay([
+  { lat: 35, lng: 139.0001, accuracy: 5 },
+  { lat: 35, lng: 139.0101, accuracy: 5 },
+], [
+  { id: 50, version: 1, priority: "pedestrian", nodes: [10, 11], coordinates: [[139, 35], [139.001, 35]] },
+  { id: 51, version: 1, priority: "pedestrian", nodes: [20, 21], coordinates: [[139.01, 35], [139.011, 35]] },
+]);
+assert.strictEqual(unconnected.routeConfirmed, false, "全体を連続経路にできなければ確定しない");
+assert.deepStrictEqual(unconnected.wayIds.length, 1);
+
 const prepared = preparePoints([
   { lat: 35, lng: 139, accuracy: 5 },
   { lat: 36, lng: 140, accuracy: 80 },
