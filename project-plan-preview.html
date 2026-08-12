@@ -371,14 +371,15 @@
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">実利用量と無料枠を確認する</span><span class="note">完了。開発DB約19.8MB、APIログ約7MB/10日、Node開発API約113MB、通常CPU 1%未満。無料対象地域のe2-micro、Standard Persistent Disk 30GB、Cloud Storage 5GB、Secret Manager 6有効Versionを基本上限にする。外向き通信は計測と予算通知を追加する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">折衷案の構成を決定する</span><span class="note">完了。Compute Engine e2-micro（Oregon us-west1）1台にNode.js API・PostgreSQL・Caddyを同居。Persistent Disk、Cloud Storageバックアップ、Secret Manager、標準Monitoringを利用し、GitHub Pagesを継続する。Cloud SQL、Cloud Run、Firestore、Cloud DNSは使用しない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Google Cloud管理アカウントを保護する</span><span class="note">管理者は yamashita.3154@gmail.com。Google側で2段階認証と復旧手段を確認し、MacはGoogle Cloud CLIのブラウザ認証、VMはOS Login＋SSH公開鍵を使用する。パスワード・秘密鍵はAIやGitへ渡さない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">請求保護を設定する</span><span class="note">専用プロジェクト、請求先、月額予算、50%・80%・100%通知、想定外サービスの停止確認、外向き通信量の日次記録を設定する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Google Cloud管理アカウントを保護する</span><span class="note">管理者は yamashita.3154@gmail.com。MacのGoogle Cloud CLIブラウザ認証、プロジェクトOS Login、プロジェクト共通SSH鍵の禁止まで完了。Googleアカウント側の2段階認証・復旧手段は本人設定画面で最終確認する。パスワード・秘密鍵はAIやGitへ渡さない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">専用プロジェクトと請求通知を設定する</span><span class="note">完了。プロジェクト <code>stepby-cloud-dev-202608</code>、us-west1/us-west1-b、有効な請求先を設定。月500円の予算に50%・80%・100%通知を作成した。予算は警告であり自動停止ではないため、リソース作成後に利用量監視と停止手順を追加する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">クラウド操作とVM接続の認証基盤を作る</span><span class="note">完了。Google Cloud CLI 580.0.0を導入し管理者本人で認証。OS Loginを有効化、プロジェクト共通SSH鍵を禁止し、VM実行用サービスアカウント <code>stepby-vm-dev</code> を人の管理アカウントから分離した。サービスアカウント鍵ファイルは発行しない。</span></div></li>
             </ul>
           </article>
           <article class="panel">
             <h3>5-2. Google Cloud開発環境を構築する</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">Cloud CLIと専用プロジェクトを準備する</span><span class="note">Macへgcloudを導入し、管理アカウントでブラウザ認証する。プロジェクトID、リージョンus-west1、ゾーン、必要APIだけを設定し、ユーザー権限とVMサービスアカウントを分離する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Cloud CLIと専用プロジェクトを準備する</span><span class="note">完了。必要API（Compute Engine、Secret Manager、Billing Budgets、IAM）だけを有効化し、リージョンus-west1、ゾーンus-west1-bを設定した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">e2-micro VMと30GB以内のStandard Diskを作る</span><span class="note">Ubuntu LTS、OS Login、SSH鍵認証、パスワードSSH禁止、最小ファイアウォール（HTTP/HTTPSのみ）、自動セキュリティ更新を設定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Node.js・PostgreSQL・Caddyを構築する</span><span class="note">開発APIは別ユーザーで実行し、DBは外部公開しない。GitHub PagesからHTTPS APIへ接続し、gzip、レート制限、CORS、ログローテーションを設定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Secret Managerを設定する</span><span class="note">6有効Version以内に統合し、起動時だけVMサービスアカウントが取得する。Google認証、OSM OAuth、署名・暗号化鍵、DB/管理設定をログ・バックアップ・Gitへ含めない。</span></div></li>
