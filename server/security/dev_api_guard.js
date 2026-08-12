@@ -79,8 +79,10 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
     }
 
     const contentLength = Number(req.headers["content-length"] || 0);
-    const maxBodyBytes = pathname.startsWith("/auth/profile")
-      ? 6 * 1024 * 1024
+    const isProfileWriteRoute = pathname.startsWith("/auth/profile") || pathname === "/auth/google/signup";
+    // 5MBの画像はBase64化で約6.7MBになるため、JSONの付帯情報を含めて8MBまで許可する。
+    const maxBodyBytes = isProfileWriteRoute
+      ? 8 * 1024 * 1024
       : pathname === "/api/osm/split-plan" ? 1024 * 1024 : 128 * 1024;
     if (Number.isFinite(contentLength) && contentLength > maxBodyBytes) {
       log("BODY_REJECTED", req, { contentLength, maxBodyBytes });
@@ -92,7 +94,7 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
     // 認証・PRO更新は、後段で認証DBを確認してから本文readerを登録する。
     // ここでdata listenerを付けると、その待ち時間に本文を先に消費してしまい
     // 後段がendを受け取れずタイムアウトするため、Content-Length検査だけにする。
-    const delayedBodyReaderRoute = pathname === "/auth/profile" || pathname === "/api/pro-status";
+    const delayedBodyReaderRoute = isProfileWriteRoute || pathname === "/api/pro-status";
     if (!pathname.startsWith("/api/admin/") && !delayedBodyReaderRoute) {
       let streamedBytes = 0;
       req.on("data", (chunk) => {
