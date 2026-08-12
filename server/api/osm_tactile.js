@@ -2,6 +2,7 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const yaml = require("yaml");
+const { createDbPool } = require("../db");
 
 const RULES_PATH = path.join(__dirname, "..", "..", "config", "osm_tactile_rules.yaml");
 
@@ -63,7 +64,7 @@ function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
 (
 ${selectors}
 );
-out geom;
+out meta geom;
 `;
 }
 
@@ -146,6 +147,7 @@ function toFeatureCollection(overpassJson, rules) {
           osm_type: "way",
           matched_tag_key: matched.key,
           matched_tag_value: matchedValue,
+          osm_changeset_id: el.changeset == null ? null : Number(el.changeset),
           stepby_recorded: isStepBy(el.tags),
         },
         geometry: {
@@ -170,6 +172,7 @@ function toFeatureCollection(overpassJson, rules) {
           osm_type: "node",
           matched_tag_key: matched.key,
           matched_tag_value: matchedValue,
+          osm_changeset_id: el.changeset == null ? null : Number(el.changeset),
           stepby_recorded: isStepBy(el.tags),
         },
         geometry: {
@@ -189,6 +192,7 @@ function toFeatureCollection(overpassJson, rules) {
 // 指定範囲の点字ブロック関連 OSM データを返す API ハンドラを生成する。
 function createOsmTactileWaysHandler({ sendJson }) {
   const OVERPASS_HOST = process.env.OVERPASS_HOST || "overpass-api.de";
+  const { pool } = createDbPool();
   let rules;
   try {
     rules = loadRules();
@@ -227,7 +231,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
       }
 
       const query = buildOverpassQuery(centerLat, centerLng, radiusMeters, rules);
-      fetchOverpass(OVERPASS_HOST, query, (err, overpassJson) => {
+      fetchOverpass(OVERPASS_HOST, query, async (err, overpassJson) => {
         if (err) {
           console.error("[osm_tactile] fetch error:", err.message);
           sendJson(res, 502, { error: "osm_upstream_error", message: err.message });
@@ -235,6 +239,27 @@ function createOsmTactileWaysHandler({ sendJson }) {
         }
         // レスポンスは FeatureCollection ではなく features 配列中心で返し、既存フロント構造に合わせる。
         const featureCollection = toFeatureCollection(overpassJson, rules);
+        if (pool && featureCollection.features.length) {
+          const changesetIds = [...new Set(featureCollection.features
+            .map((feature) => feature.properties.osm_changeset_id)
+            .filter(Number.isFinite))];
+          if (changesetIds.length) {
+            try {
+              const placeholders = changesetIds.map(() => "?").join(",");
+              const [rows] = await pool.query(
+                `SELECT merge_changeset_id FROM osmchange.record_links
+                 WHERE osm_status='merged' AND merge_changeset_id IN (${placeholders})`,
+                changesetIds
+              );
+              const known = new Set(rows.map((row) => Number(row.merge_changeset_id)));
+              featureCollection.features.forEach((feature) => {
+                if (known.has(feature.properties.osm_changeset_id)) feature.properties.stepby_recorded = true;
+              });
+            } catch (dbError) {
+              console.warn("[osm_tactile] StepBy changeset lookup skipped:", dbError.message);
+            }
+          }
+        }
         sendJson(res, 200, {
           success: true,
           centerLat,
