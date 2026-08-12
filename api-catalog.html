@@ -1,6 +1,6 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StepBy 開発API一覧</title>
 <style>:root{--ink:#17343b;--line:#d9e4e5;--green:#19745f;--red:#9b3d31}*{box-sizing:border-box}body{margin:0;background:#f4f8f8;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;line-height:1.65}main{max-width:1180px;margin:auto;padding:28px 16px 64px}a{color:#087365}.hero,.group{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}.endpoint{border:1px solid var(--line);border-radius:13px;padding:14px}.endpoint h3{margin:0 0 5px;font-size:1rem}code{background:#edf3f3;padding:.12em .35em;border-radius:5px;overflow-wrap:anywhere}.method{display:inline-block;min-width:48px;text-align:center;color:#fff;background:#397c72;border-radius:6px;margin-right:7px;font-size:.78rem}.locked{color:var(--red);font-weight:700}.done{color:var(--green);font-weight:700}.small{font-size:.9rem;color:#5d7076}.back{display:inline-block;margin-bottom:18px}@media(max-width:600px){main{padding:18px 10px}.hero,.group{padding:16px}}</style></head><body><main>
-<a class="back" href="project-plan-preview.html">← タスクリストへ戻る</a><section class="hero"><h1>StepBy 開発API一覧</h1><p>UI10が利用する開発APIの目的・認証・実装状態をまとめたもの。2026-08-11更新。</p><p><span class="done">通常APIは実装済み</span>。OSM送信・取消送信APIもコードは存在するが、管理者の明示許可がないためサーバー機能フラグで常時ロック中。</p></section>
+<a class="back" href="project-plan-preview.html">← タスクリストへ戻る</a><section class="hero"><h1>StepBy 開発API一覧</h1><p>UI10が利用する開発APIの目的・認証・実装状態をまとめたもの。2026-08-12更新。</p><p><span class="done">通常APIは実装済み</span>。確定後の保存は端末内の永続キューから再試行可能。OSM送信・取消送信APIもコードは存在するが、管理者の明示許可がないためサーバー機能フラグで常時ロック中。</p></section>
 
 <section class="group"><h2>稼働・設定</h2><div class="grid">
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/health</code></h3><p>API、PostgreSQL、OSM OAuth設定、OSM書込ロックを一括確認。</p></article>
@@ -33,7 +33,7 @@
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-tactile-ways</code></h3><p>周辺のOSM点字ブロックWayを読取。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/osm-walkable-network</code></h3><p>約1km圏の歩行可能Way・Node・Relationを取得・キャッシュ。</p></article>
 <article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/tactile-tags</code>ほか</h3><p>点字ブロックタグ、セッションタグ、記録詳細タグを管理。</p></article>
-<article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/road-info</code></h3><p>OSMへ送らない道情報・画像を保存・取得。</p></article>
+<article class="endpoint"><h3><span class="method">GET/POST</span><code>/api/road-info</code></h3><p>OSMへ送らない道情報・画像を保存・取得。新規投稿では <code>Idempotency-Key</code> を必須とし、通信再試行で同じキーを受け取った場合は既存の保存結果を返して二重投稿を防ぐ。</p></article>
 <article class="endpoint"><h3><span class="method">GET</span><code>/api/stats</code> / <code>/api/tactile-ranking</code></h3><p>合計値・ランキングを取得。</p></article></div></section>
 
 <section class="group"><h2>OSM変更案・履歴・取消し</h2><div class="grid">
