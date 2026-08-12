@@ -22,7 +22,7 @@
   <rect x="45" y="120" width="1510" height="215" rx="22" class="outer" filter="url(#shadow)"/>
   <text x="70" y="153" class="section">利用端末とフロントエンド</text>
   <rect x="75" y="175" width="245" height="120" rx="16" class="infra"/>
-  <text x="98" y="207" class="boxTitle">利用者の端末</text><text x="98" y="233" class="body">スマートフォン / PCブラウザ</text><text x="98" y="256" class="small">GPS・IndexedDB（移動追従OSM範囲キャッシュ）</text><text x="98" y="277" class="small">永続送信キュー・工程再開・二重投稿防止ID</text>
+  <text x="98" y="207" class="boxTitle">利用者の端末</text><text x="98" y="233" class="body">スマートフォン / PCブラウザ</text><text x="98" y="256" class="small">GPS・IndexedDB（OSM半径1km／650m移動で更新）</text><text x="98" y="277" class="small">永続送信キュー・工程再開・二重投稿防止ID</text>
   <rect x="390" y="175" width="385" height="120" rx="16" class="prod"/>
   <text x="414" y="205" class="boxTitle prodText">公開フロント UI0</text><text x="414" y="232" class="body">GitHub Pages / StepBy mainブランチ</text><text x="414" y="255" class="small">kumakero-otama.github.io/StepBy/UI0/</text><text x="414" y="277" class="small">API接続先：Tailscale Funnel 標準HTTPS</text>
   <rect x="845" y="175" width="650" height="120" rx="16" class="dev"/>
