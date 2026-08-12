@@ -16,7 +16,7 @@
   </defs>
   <rect width="1600" height="1320" fill="url(#bg)"/>
   <text x="60" y="58" class="title">StepBy / barrierfree-map 現在のシステム構成</text>
-  <text x="60" y="88" class="subtitle">2026年8月11日時点　青＝公開版　緑＝開発版　橙＝外部サービス　破線＝制限・未稼働経路</text>
+  <text x="60" y="88" class="subtitle">2026年8月12日時点　青＝公開版　緑＝開発版　橙＝外部サービス　破線＝制限・未稼働経路</text>
 
   <!-- clients and frontend -->
   <rect x="45" y="120" width="1510" height="215" rx="22" class="outer" filter="url(#shadow)"/>
@@ -50,7 +50,7 @@
   <rect x="555" y="650" width="570" height="410" rx="18" class="dev"/>
   <text x="578" y="682" class="boxTitle devText">開発バックエンド</text><text x="578" y="707" class="body">/home/otama/barrierfree-map-dev　dev</text><text x="578" y="730" class="body">PM2: barrierfree-map-dev　127.0.0.1:3100</text>
   <rect x="578" y="755" width="524" height="68" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="779" class="body">共通アプリAPI</text><text x="595" y="802" class="small">Health・Google/Guest認証・OSM OAuth・プロフィール・記録・集計</text>
-  <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">ブラウザ記録・検証API</text><text x="595" y="886" class="small">raw時刻順再生・前後補間・経路全体再計算</text><text x="595" y="906" class="small">未送信Way分割案・自動採点／Valhalla比較</text>
+  <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">ブラウザ記録・検証API</text><text x="595" y="886" class="small">raw再生・前後補間・OSM Node接続経路拘束</text><text x="595" y="906" class="small">未送信Way分割案・自動採点／Valhalla比較</text>
   <rect x="850" y="838" width="252" height="86" rx="12" class="locked"/><text x="867" y="864" class="body warnText">OSM変更API（ロック中）</text><text x="867" y="886" class="small">Relation継承・1記録1変更案</text><text x="867" y="906" class="small">record_id取消案 / 実送信OFF</text>
   <rect x="578" y="940" width="524" height="92" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="966" class="body">安全機構・開発DB管理API</text><text x="595" y="988" class="small">管理キー→30分HttpOnly session・許可テーブル限定・レート/本文上限</text><text x="595" y="1009" class="small">OSM監査は追記型。送信・取消しは明示許可がなければ実行不可</text>
 
