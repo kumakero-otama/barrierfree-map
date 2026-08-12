@@ -8,6 +8,20 @@ const { loadRoadInfoConfig } = require("../road_info_config");
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "uploads", "road_info_media");
 // これらのコードは「問題解決済み」とみなし、ポイント状態も inactive へ寄せる。
 const COMPLETION_TAG_CODES = new Set(["complete", "completed", "done", "resolved", "inactive"]);
+let submissionKeySchemaReady = null;
+
+function ensureSubmissionKeySchema(pool) {
+  if (!submissionKeySchemaReady) {
+    submissionKeySchemaReady = pool.query(`CREATE TABLE IF NOT EXISTS roadinfo.submission_keys (
+      user_id bigint NOT NULL,
+      submission_key text NOT NULL,
+      response_payload jsonb NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(user_id, submission_key)
+    )`).catch((error) => { submissionKeySchemaReady = null; throw error; });
+  }
+  return submissionKeySchemaReady;
+}
 
 // JSON ボディを受け取り、サイズ超過や JSON 不正を共通処理する。
 function parseJsonBody(req, callback) {
@@ -523,6 +537,8 @@ function createRoadInfoHandler({ sendJson }) {
       const images = Array.isArray(body?.images) ? body.images : [];
       const tagCodes = sanitizeTagIds(body?.tagIds);
       const statusRequested = normalizePointStatus(body?.status);
+      const submissionKeyRaw = String(req.headers["idempotency-key"] || body?.clientSubmissionId || "").trim();
+      const submissionKey = /^[A-Za-z0-9:_-]{8,120}$/.test(submissionKeyRaw) ? submissionKeyRaw : null;
       const roadInfoConfig = loadRoadInfoConfig();
       const maxImageBytes = roadInfoConfig.imageMaxBytes;
       const hasExistingPointId = Number.isInteger(pointIdFromBody) && pointIdFromBody > 0;
@@ -546,6 +562,13 @@ function createRoadInfoHandler({ sendJson }) {
           return;
         }
 
+        if (!hasExistingPointId && !submissionKey) {
+          sendJson(res, 400, { error: "missing_idempotency_key" });
+          return;
+        }
+
+        await ensureSubmissionKeySchema(pool);
+
         await ensureUploadDir();
       } catch (err) {
         console.error("[road_info] upload_dir_error:", err.message);
@@ -557,6 +580,18 @@ function createRoadInfoHandler({ sendJson }) {
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
+
+        if (!hasExistingPointId) {
+          const [existingSubmissions] = await conn.query(
+            "SELECT response_payload FROM roadinfo.submission_keys WHERE user_id = ? AND submission_key = ? LIMIT 1",
+            [userId, submissionKey]
+          );
+          if (Array.isArray(existingSubmissions) && existingSubmissions.length) {
+            await conn.commit();
+            sendJson(res, 200, { ...existingSubmissions[0].response_payload, duplicate: true });
+            return;
+          }
+        }
 
         let pointId = null;
         let pointOwnerUserId = userId;
@@ -655,15 +690,22 @@ function createRoadInfoHandler({ sendJson }) {
           await refreshUserRoadPostCount(conn, pointOwnerUserId);
         }
 
-        await conn.commit();
-        sendJson(res, 201, {
+        const responsePayload = {
           success: true,
           pointId,
           noteId,
           tagsCount: resolvedTagIds.length,
           createdTags,
           mediaCount: images.length,
-        });
+        };
+        if (!hasExistingPointId) {
+          await conn.query(
+            "INSERT INTO roadinfo.submission_keys(user_id,submission_key,response_payload) VALUES(?,?,?::jsonb) RETURNING submission_key",
+            [userId, submissionKey, JSON.stringify(responsePayload)]
+          );
+        }
+        await conn.commit();
+        sendJson(res, 201, responsePayload);
       } catch (err) {
         await conn.rollback();
         for (const absPath of savedFiles) {
