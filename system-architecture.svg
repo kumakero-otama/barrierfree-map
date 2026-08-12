@@ -81,7 +81,7 @@
   <!-- approved cloud target: planned, not yet running -->
   <rect x="45" y="1320" width="1510" height="430" rx="22" fill="#fffbeb" stroke="#d97706" stroke-width="3" stroke-dasharray="10 7" filter="url(#shadow)"/>
   <text x="70" y="1358" class="section warnText">移行先として採用済みのGoogle Cloud構成（未構築）</text>
-  <text x="70" y="1384" class="small">Oregon us-west1／無料枠優先。現行ローカルサーバーを停止せず、UI10開発環境から段階移行する。</text>
+  <text x="70" y="1384" class="small">Project: stepby-cloud-dev-202608／Oregon us-west1。プロジェクト・予算・OS Login構築済、VM等は未構築。</text>
 
   <rect x="75" y="1415" width="285" height="130" rx="16" class="prod"/>
   <text x="98" y="1447" class="boxTitle prodText">GitHub Pages</text><text x="98" y="1474" class="body">UI10フロントを継続配信</text><text x="98" y="1498" class="small">HTTPSでCloud APIへ接続</text><text x="98" y="1521" class="small">切戻し時は接続先設定を戻す</text>
@@ -101,7 +101,7 @@
   <text x="1053" y="1631" class="body">標準Cloud Monitoring・予算通知</text><text x="1053" y="1652" class="small">高度なLogging、Cloud DNSは当面不使用</text>
 
   <path d="M360 1480 H410" class="lineDev"/><path d="M980 1460 H1030" class="lineExt"/><path d="M980 1548 H1030" class="lineExt"/>
-  <text x="75" y="1700" class="body warnText">認証方針：Google管理アカウントは2段階認証／Macはgcloudブラウザ認証／VMはOS Login＋SSH公開鍵／パスワードSSH禁止</text>
+  <text x="75" y="1700" class="body warnText">認証：gcloud本人認証済／OS Login有効／共通SSH鍵禁止／VMサービスアカウント分離（鍵ファイルは発行しない）</text>
   <text x="75" y="1725" class="small">本番OSM書込みロック、追記型監査、本番・開発分離はクラウド移行後も同じ絶対ルールを維持する。</text>
   <text x="1270" y="1785" class="tiny">構成変更時は system-architecture.svg とタスクリストを同時更新する</text>
 </svg>
