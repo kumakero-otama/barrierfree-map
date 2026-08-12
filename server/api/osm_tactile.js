@@ -199,6 +199,7 @@ function toFeatureCollection(overpassJson, rules) {
 function createOsmTactileWaysHandler({ sendJson }) {
   const OVERPASS_HOSTS = [...new Set([
     process.env.OVERPASS_HOST,
+    "overpass.kumi.systems",
     "overpass.private.coffee",
     "overpass-api.de",
   ].filter(Boolean))];
