@@ -384,15 +384,15 @@
               <li class="done"><span class="box"></span><div><span class="task-title">Node.js・PostgreSQL・Caddyを構築する</span><span class="note">完了。Node.js 18.19.1、PostgreSQL 16.14＋PostGIS、Caddy 2.6.2、自動セキュリティ更新を導入。専用OSユーザーのAPIをsystemdで常時起動し、固定IPとHTTPSホスト <code>stepby-api-8-229-191-182.sslip.io</code> から公開。API・DB正常、CORS、TLS、OSM書込みロックを確認した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">Secret Managerを設定する</span><span class="note">完了。Google認証、OSM開発OAuth、署名・暗号化鍵、DB/管理設定を1つのSecret Versionへ統合。VMサービスアカウントがメタデータ認証で起動時に直接取得し、サービスアカウント鍵ファイル、Git、DBバックアップには含めない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">開発DBを暗号化して移行する</span><span class="note">完了。現行の開発DBだけを整合dumpで複製し、クラウド専用 <code>stepby_app_dev</code> へ復元。PostGISを含む36テーブル、約19.6MB、全テーブルの件数一致を確認し、一時dumpを両サーバーとMacから削除した。本番DBには接続していない。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">Cloud Storageバックアップと復元試験を作る</span><span class="note">完了。日次タイマーと30日後の自動削除を設定し、VMサービスアカウントだけが書込・復元用読取できるバケットへ初回バックアップ。別の一時DBへ復元し、36テーブル・推定総行数10,768の一致を確認後、一時DBと復元ファイルを削除した。秘密情報はバックアップ対象外。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Cloud Storageバックアップと復元試験を作る</span><span class="note">完了。日次タイマーと30日後の自動削除を設定し、開発DBとプロフィール画像等のuploadsをバックアップ。DBは別の一時DBへ復元し、36テーブル・推定総行数10,768の一致を確認後、一時DBと復元ファイルを削除した。秘密情報はバックアップ対象外。</span></div></li>
             </ul>
           </article>
           <article class="panel wide">
             <h3>5-3. 総合試験・段階切替え・切戻し</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">クラウドUI10を通し試験する</span><span class="note">GitHub Pages UI10のクラウドAPI接続、CORS、ゲスト登録、アクセストークン、DB、管理画面を確認済み。復元DBの所有権不足も修正。残りはGoogle本人ログイン、OSM OAuth、GPSを使う1kmフィッティング、650m更新、記録キュー、変更案の実端末確認。OSM実送信はロックしたまま。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">クラウドUI10を通し試験する</span><span class="note">GitHub Pages UI10のクラウドAPI接続、CORS、ゲスト登録、アクセストークン、DB、管理画面、Google認証から初回プロフィール画面まで確認済み。復元DBの所有権不足を修正し、開発uploads 2件も移行・HTTP 200を確認。残りは本人による初回プロフィール登録と、GPSを使う1kmフィッティング、650m更新、記録キュー、変更案の実端末確認。OSM実送信はロックしたまま。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">性能・容量・費用を測る</span><span class="note">応答時間、メモリ、CPU、DB/ディスク、バックアップ、外向き通信を7日以上観測。e2-microで不足する場合だけ、費用提示後にサイズ変更を判断する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">認証リダイレクト先を追加する</span><span class="note">サーバー側のOSMコールバックをクラウドHTTPSへ変更済み。残りはOSM開発環境のOAuthアプリ設定に <code>https://stepby-api-8-229-191-182.sslip.io/auth/osm/callback</code> を登録し、実際の連携を確認する。Google認証はGitHub Pages上で継続。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">認証リダイレクト先を追加する</span><span class="note">完了。OSM開発環境のOAuthアプリとサーバー側を <code>https://stepby-api-8-229-191-182.sslip.io/auth/osm/callback</code> に変更。認可コード交換、OSM利用者情報取得、既存StepByユーザーへの再連携、追記型監査履歴を確認した。重複OSMアカウントを別ユーザーへ結び付けない制約も正常。Google認証はGitHub Pages上でクラウドAPIまで到達確認済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">GitHub Pages UI10のAPI接続先をクラウドへ切り替える</span><span class="note">完了。UI10の設定、認証、PWA、Service Worker、プロフィール画像、道情報、管理画面をクラウドHTTPS APIへ変更してdev/mainへ反映。UI0・現行API・現行Valhallaは変更も停止もしていない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">切戻し可能な並行稼働期間を完了する</span><span class="note">クラウド側の保存を正とする時点を明示し、旧開発環境を読み取り専用化。バックアップと復旧手順を再確認してから正式移行を判定する。</span></div></li>
             </ul>

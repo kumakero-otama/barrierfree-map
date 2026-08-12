@@ -16,9 +16,12 @@ install -d -m 0700 -o root -g root "$BACKUP_DIR"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 OBJECT_NAME="stepby_app_dev-${STAMP}.dump"
 BACKUP_PATH="${BACKUP_DIR}/${OBJECT_NAME}"
+UPLOADS_OBJECT_NAME="stepby_uploads-${STAMP}.tar.gz"
+UPLOADS_BACKUP_PATH="${BACKUP_DIR}/${UPLOADS_OBJECT_NAME}"
 
 cleanup() {
   test ! -e "$BACKUP_PATH" || unlink "$BACKUP_PATH"
+  test ! -e "$UPLOADS_BACKUP_PATH" || unlink "$UPLOADS_BACKUP_PATH"
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -42,4 +45,13 @@ curl --fail --silent --show-error \
   -H 'Content-Type: application/octet-stream' \
   --data-binary "@$BACKUP_PATH" \
   "https://storage.googleapis.com/upload/storage/v1/b/${BUCKET}/o?uploadType=media&name=${OBJECT_NAME}" \
+  >/dev/null
+
+tar -czf "$UPLOADS_BACKUP_PATH" -C /srv/stepby/current uploads
+curl --fail --silent --show-error \
+  -X POST \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H 'Content-Type: application/gzip' \
+  --data-binary "@$UPLOADS_BACKUP_PATH" \
+  "https://storage.googleapis.com/upload/storage/v1/b/${BUCKET}/o?uploadType=media&name=${UPLOADS_OBJECT_NAME}" \
   >/dev/null

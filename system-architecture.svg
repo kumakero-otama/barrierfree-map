@@ -96,7 +96,7 @@
   <rect x="1030" y="1415" width="450" height="74" rx="14" class="external"/>
   <text x="1053" y="1443" class="boxTitle">Secret Manager</text><text x="1053" y="1468" class="small">1有効Version／VMサービスアカウントだけ読取</text>
   <rect x="1030" y="1510" width="450" height="74" rx="14" class="external"/>
-  <text x="1053" y="1538" class="boxTitle">Cloud Storage</text><text x="1053" y="1563" class="small">日次DBバックアップ稼働／30日保持／復元試験済</text>
+  <text x="1053" y="1538" class="boxTitle">Cloud Storage</text><text x="1053" y="1563" class="small">日次DB＋uploadsバックアップ／30日保持／復元試験済</text>
   <rect x="1030" y="1605" width="450" height="60" rx="14" class="external"/>
   <text x="1053" y="1631" class="body">標準Cloud Monitoring・予算通知</text><text x="1053" y="1652" class="small">高度なLogging、Cloud DNSは当面不使用</text>
 

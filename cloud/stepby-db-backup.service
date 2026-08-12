@@ -12,4 +12,5 @@ ProtectHome=true
 ProtectSystem=strict
 StateDirectory=stepby-backups
 StateDirectoryMode=0700
+ReadOnlyPaths=/srv/stepby/current/uploads
 ReadWritePaths=/run/stepby
