@@ -51,13 +51,17 @@ function loadRules() {
 
 // ルールと中心点から Overpass QL クエリを組み立てる。
 function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
+  // 表示対象は tactile_paving の存在する地物に限定する。orientation等を個別検索すると
+  // 同じ10km圏を何度も走査してOverpass負荷が大きくなるため、2 selectorへ集約する。
+  const tactileRule = rules.matchers.find((matcher) => matcher.key === "tactile_paving");
+  const valueRegex = (tactileRule ? tactileRule.values : ["yes", "both", "contrasted"])
+    .map(escapeRegexValue).join("|");
+  const latDelta = radiusMeters / 111320;
+  const lngDelta = radiusMeters / (111320 * Math.max(0.2, Math.cos(centerLat * Math.PI / 180)));
+  const bbox = [centerLat - latDelta, centerLng - lngDelta, centerLat + latDelta, centerLng + lngDelta]
+    .map((value) => value.toFixed(7)).join(",");
   const selectors = rules.elementTypes
-    .flatMap((elementType) =>
-      rules.matchers.map((matcher) => {
-        const valueRegex = matcher.values.map(escapeRegexValue).join("|");
-        return `${elementType}(around:${radiusMeters},${centerLat},${centerLng})["${matcher.key}"~"^(${valueRegex})$"];`;
-      })
-    )
+    .map((elementType) => `${elementType}["tactile_paving"~"^(${valueRegex})$"](${bbox});`)
     .join("\n");
   return `
 [out:json][timeout:25];
@@ -99,6 +103,8 @@ function fetchOverpass(overpassHost, query, callback) {
       }
     });
   });
+
+  req.setTimeout(30000, () => req.destroy(new Error("overpass_timeout")));
 
   req.on("error", (err) => {
     callback(new Error(`overpass_request_error:${err.message}`));
@@ -191,8 +197,13 @@ function toFeatureCollection(overpassJson, rules) {
 
 // 指定範囲の点字ブロック関連 OSM データを返す API ハンドラを生成する。
 function createOsmTactileWaysHandler({ sendJson }) {
-  const OVERPASS_HOST = process.env.OVERPASS_HOST || "overpass-api.de";
+  const OVERPASS_HOSTS = [...new Set([
+    process.env.OVERPASS_HOST,
+    "overpass.private.coffee",
+    "overpass-api.de",
+  ].filter(Boolean))];
   const { pool } = createDbPool();
+  const responseCache = new Map();
   let rules;
   try {
     rules = loadRules();
@@ -231,10 +242,21 @@ function createOsmTactileWaysHandler({ sendJson }) {
       }
 
       const query = buildOverpassQuery(centerLat, centerLng, radiusMeters, rules);
-      fetchOverpass(OVERPASS_HOST, query, async (err, overpassJson) => {
+      const cacheKey = `${centerLat.toFixed(2)}:${centerLng.toFixed(2)}:${radiusMeters}`;
+      const cached = responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.savedAt < 5 * 60 * 1000) {
+        sendJson(res, 200, { ...cached.payload, cached: true });
+        return;
+      }
+      const tryHost = (index) => {
+        fetchOverpass(OVERPASS_HOSTS[index], query, async (err, overpassJson) => {
         if (err) {
-          console.error("[osm_tactile] fetch error:", err.message);
-          sendJson(res, 502, { error: "osm_upstream_error", message: err.message });
+          console.warn(`[osm_tactile] host failed ${OVERPASS_HOSTS[index]}:`, err.message);
+          if (index + 1 < OVERPASS_HOSTS.length) {
+            tryHost(index + 1);
+            return;
+          }
+          sendJson(res, 502, { error: "osm_upstream_error", message: "all_overpass_hosts_failed" });
           return;
         }
         // レスポンスは FeatureCollection ではなく features 配列中心で返し、既存フロント構造に合わせる。
@@ -260,15 +282,20 @@ function createOsmTactileWaysHandler({ sendJson }) {
             }
           }
         }
-        sendJson(res, 200, {
+        const responsePayload = {
           success: true,
           centerLat,
           centerLng,
           radiusKm: radiusMeters / 1000,
           count: featureCollection.features.length,
           features: featureCollection.features,
-        });
+          cached: false,
+        };
+        responseCache.set(cacheKey, { savedAt: Date.now(), payload: responsePayload });
+        sendJson(res, 200, responsePayload);
       });
+      };
+      tryHost(0);
     } catch (err) {
       console.error("[osm_tactile] handler error:", err.message);
       sendJson(res, 500, { error: "osm_tactile_handler_error", message: err.message });
