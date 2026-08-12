@@ -196,26 +196,28 @@ function createOsmWalkableNetworkHandler({ sendJson }) {
       sendJson(res, 200, { ...cached.response, cached: true });
       return;
     }
-    fetchOverpassWithFallback(overpassHosts, buildQuery(centerLat, centerLng, radiusMeters), (err, payload) => {
-      if (err) {
-        console.warn("[osm_walkable] Overpass unavailable, using read-only OSM map fallback:", err.message);
-        fetchOsmMap(centerLat, centerLng, radiusMeters, (mapError, mapPayload) => {
-          if (mapError) {
-            console.error("[osm_walkable] all read sources failed:", mapError.message);
-            sendJson(res, 502, { error: "osm_upstream_error", message: mapError.message });
-            return;
-          }
-          const ways = normalizeWays(mapPayload);
-          const response = { success: true, centerLat, centerLng, radiusMeters, wayCount: ways.length, ways, cached: false, source: "osm_map_read_fallback" };
-          cache.set(cacheKey, { createdAt: Date.now(), response });
-          sendJson(res, 200, response);
-        });
+    // フィッティング用1km道路網は、現在のOSMデータを直接返す公式map APIを優先する。
+    // これによりOverpass混雑時も記録終了までにWayを準備できる。
+    fetchOsmMap(centerLat, centerLng, radiusMeters, (mapError, mapPayload) => {
+      if (!mapError) {
+        const ways = normalizeWays(mapPayload);
+        const response = { success: true, centerLat, centerLng, radiusMeters, wayCount: ways.length, ways, cached: false, source: "osm_map_read" };
+        cache.set(cacheKey, { createdAt: Date.now(), response });
+        sendJson(res, 200, response);
         return;
       }
-      const ways = normalizeWays(payload);
-      const response = { success: true, centerLat, centerLng, radiusMeters, wayCount: ways.length, ways, cached: false };
-      cache.set(cacheKey, { createdAt: Date.now(), response });
-      sendJson(res, 200, response);
+      console.warn("[osm_walkable] OSM map read failed, trying Overpass:", mapError.message);
+      fetchOverpassWithFallback(overpassHosts, buildQuery(centerLat, centerLng, radiusMeters), (overpassError, payload) => {
+        if (overpassError) {
+          console.error("[osm_walkable] all read sources failed:", overpassError.message);
+          sendJson(res, 502, { error: "osm_upstream_error", message: overpassError.message });
+          return;
+        }
+        const ways = normalizeWays(payload);
+        const response = { success: true, centerLat, centerLng, radiusMeters, wayCount: ways.length, ways, cached: false, source: "overpass_fallback" };
+        cache.set(cacheKey, { createdAt: Date.now(), response });
+        sendJson(res, 200, response);
+      });
     });
   };
 }
