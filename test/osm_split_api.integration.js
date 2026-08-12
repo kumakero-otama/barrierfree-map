@@ -109,6 +109,17 @@ async function run() {
   assert.strictEqual(Number(snapshotRows[0].way_id), 100);
   assert.strictEqual(snapshotRows[0].way_version, 7);
   assert.deepStrictEqual(snapshotRows[0].planned_tags, { tactile_paving: "yes" });
+  const ended = await request("/api/session/end", {
+    method: "POST", headers,
+    body: JSON.stringify({ sessionId: recordId, endedAt: new Date().toISOString() }),
+  });
+  assert.strictEqual(ended.status, 200, JSON.stringify(ended.body));
+  const [endedRows] = await pool.query("SELECT ended_at FROM tactile.sessions WHERE session_id=? LIMIT 1", [recordId]);
+  assert.ok(endedRows[0].ended_at, "recording session must be finalized");
+  const oauthStatus = await request("/auth/osm/status", { headers });
+  assert.strictEqual(oauthStatus.status, 200, JSON.stringify(oauthStatus.body));
+  assert.strictEqual(oauthStatus.body.configured, true);
+  assert.strictEqual(oauthStatus.body.connected, false, "fresh guest must be treated as OSM-unconnected");
   const status = await request("/api/osm/status", { headers });
   assert.strictEqual(status.status, 200);
   assert.strictEqual(status.body.osmNetworkCodePresent, true);
