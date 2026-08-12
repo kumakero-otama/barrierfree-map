@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { getRecordPublication } = require("../pro_record_policy");
 const { createDbPool } = require("../db");
 const { createSplitPlan } = require("../osm/split_planner");
 const { executeWithClient, createConfiguredClient } = require("../osm/osm_executor");
@@ -189,6 +190,11 @@ function createOsmChangesHandler({ sendJson }) {
       if (url.pathname === "/api/osm/split-plan" && req.method === "POST") {
         const body = await pendingBody;
         const recordId = await requireOwnedRecord(body.recordId, req.authUserId);
+        const publication = await getRecordPublication(pool, recordId, req.authUserId);
+        if (!publication.osmEligible) {
+          sendJson(res, 409, { error: "record_is_stepby_only", osmEligible: false });
+          return;
+        }
         const splitPlan = createSplitPlan({ segments: body.segments }, { tactileValue: "yes" });
         const planId = crypto.randomUUID();
         const summary = String(body.summary || "UI10 tactile paving split dry-run").trim().slice(0, 500);
@@ -198,6 +204,10 @@ function createOsmChangesHandler({ sendJson }) {
           osmWriteRequested: false,
           planner: "split_planner_v2_relations",
           recordId,
+          publication: {
+            osmEligible: true,
+            containsStepByOnlyData: publication.hasPrivateTag,
+          },
           splitSummary: splitPlan.summary,
         };
         const conn = await pool.getConnection();

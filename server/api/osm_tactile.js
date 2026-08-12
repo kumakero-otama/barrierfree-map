@@ -110,6 +110,9 @@ function fetchOverpass(overpassHost, query, callback) {
 function toFeatureCollection(overpassJson, rules) {
   const elements = Array.isArray(overpassJson && overpassJson.elements) ? overpassJson.elements : [];
   const features = [];
+  const isStepBy = (tags = {}) => Object.entries(tags).some(([key, value]) =>
+    /stepby/i.test(String(key)) || /stepby/i.test(String(value))
+  );
 
   elements.forEach((el) => {
     if (!el || !rules.elementTypes.includes(el.type)) {
@@ -143,6 +146,7 @@ function toFeatureCollection(overpassJson, rules) {
           osm_type: "way",
           matched_tag_key: matched.key,
           matched_tag_value: matchedValue,
+          stepby_recorded: isStepBy(el.tags),
         },
         geometry: {
           type: "LineString",
@@ -166,6 +170,7 @@ function toFeatureCollection(overpassJson, rules) {
           osm_type: "node",
           matched_tag_key: matched.key,
           matched_tag_value: matchedValue,
+          stepby_recorded: isStepBy(el.tags),
         },
         geometry: {
           type: "Point",

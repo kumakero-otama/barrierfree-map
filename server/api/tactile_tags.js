@@ -2,6 +2,7 @@ const { createDbPool } = require("../db");
 const { resolveAuthenticatedUserId } = require("../auth_user");
 const { createLogger } = require("../logger");
 const path = require("path");
+const { ensureProTagSchema } = require("../pro_record_policy");
 
 // タグ保存 API 用の JSON ボディを読み取り、生データも監査ログ向けに残す。
 function readJsonBody(req) {
@@ -44,6 +45,9 @@ function normalizeTagRow(row) {
     labelJa: row.label_ja,
     sortOrder: Number(row.sort_order || 0),
     isActive: Boolean(row.is_active),
+    osmExportable: Boolean(row.osm_exportable),
+    displayColor: row.display_color || "red",
+    systemDefined: Boolean(row.system_defined),
   };
 }
 
@@ -142,6 +146,7 @@ function createTactileTagsHandler({ sendJson }) {
           is_active BOOLEAN NOT NULL DEFAULT TRUE
         )
       `);
+      await ensureProTagSchema(pool);
       await pool.query(`
         CREATE TABLE IF NOT EXISTS tactile.sessions (
           session_id UUID PRIMARY KEY,
@@ -204,7 +209,7 @@ function createTactileTagsHandler({ sendJson }) {
       whereSql = "WHERE is_active = true";
     }
     const [rows] = await pool.query(
-      `SELECT id, code, label_ja, sort_order, is_active
+      `SELECT id, code, label_ja, sort_order, is_active, osm_exportable, display_color, system_defined
        FROM tactile.tags
        ${whereSql}
        ORDER BY sort_order ASC, id ASC`,

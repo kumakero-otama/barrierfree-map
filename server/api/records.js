@@ -1,5 +1,6 @@
 const { createDbPool } = require("../db");
 const { resolveAuthenticatedUserId } = require("../auth_user");
+const { ensureProTagSchema } = require("../pro_record_policy");
 
 // 保存済み経路一覧を返す API ハンドラを生成し、必要なら認証ユーザーで絞り込む。
 function createRecordsHandler({ sendJson }) {
@@ -27,6 +28,7 @@ function createRecordsHandler({ sendJson }) {
     }
 
     try {
+      await ensureProTagSchema(pool);
       const url = new URL(req.url, `http://${req.headers.host}`);
       const centerLat = Number(url.searchParams.get("centerLat"));
       const centerLng = Number(url.searchParams.get("centerLng"));
@@ -49,13 +51,19 @@ function createRecordsHandler({ sendJson }) {
           source,
           sp.created_at,
           ST_AsGeoJSON(sp.geom) AS geom_geojson,
-          COALESCE(tag_info.tags, ARRAY[]::text[]) AS tags
+          COALESCE(tag_info.tags, ARRAY[]::text[]) AS tags,
+          COALESCE(tag_info.tag_codes, ARRAY[]::text[]) AS tag_codes,
+          CASE WHEN COALESCE(tag_info.has_private,FALSE) AND NOT COALESCE(tag_info.has_public,FALSE)
+            THEN 'pro_private' ELSE 'stepby_tactile' END AS record_class
         FROM tactile.session_paths sp
         LEFT JOIN tactile.sessions s ON s.session_id = sp.session_id
         LEFT JOIN (
           SELECT
             st.session_id,
-            ARRAY_AGG(t.label_ja ORDER BY t.sort_order ASC, t.id ASC) AS tags
+            ARRAY_AGG(t.label_ja ORDER BY t.sort_order ASC, t.id ASC) AS tags,
+            ARRAY_AGG(t.code ORDER BY t.sort_order ASC, t.id ASC) AS tag_codes,
+            BOOL_OR(t.osm_exportable) AS has_public,
+            BOOL_OR(NOT t.osm_exportable) AS has_private
           FROM tactile.session_tags st
           JOIN tactile.tags t ON t.id = st.tag_id
           GROUP BY st.session_id
