@@ -274,7 +274,7 @@
           <article class="panel wide">
             <h3>1-3. 移動に追従してOSM地図データを補充</h3>
             <ul class="tasks">
-              <li class="done"><span class="box"></span><div><span class="task-title">現在地の移動に応じて次の範囲を先読みする</span><span class="note">完了。フィッティング用道路網は、GPS更新を止めず5秒間隔で取得範囲を確認し、既存中心から650m以上離れたらOverpass経由でオリジナルOSMの新しい半径1km圏をバックグラウンド取得する。表示専用のOSM点字ブロックはこのキャッシュから分離し、ブラウザへ永続保存せず半径10kmを都度表示する。取得中も既存データでフィッティングを継続する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">現在地の移動に応じて次の範囲を先読みする</span><span class="note">完了。フィッティング用道路網は、GPS更新を止めず5秒間隔で取得範囲を確認し、既存中心から650m以上離れたらオリジナルOSMの新しい半径1km圏をバックグラウンド取得する。Overpass複数系統が停止した場合はOSM本体の読取APIへ切り替え、過去キャッシュでも処理を継続する。表示専用のOSM点字ブロックはこのキャッシュから分離し、ブラウザへ永続保存せず半径10kmを都度表示する。取得中も既存データでフィッティングを継続する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">取得済み範囲を再利用し、差分だけ追加する</span><span class="note">完了。範囲・取得時刻・Way ID/Version・Node・形状をIndexedDBへ30分保存し、近い範囲は再利用する。新範囲は以前のWayを捨てず、Way IDごとに新しいVersionを優先して統合するため、長い記録の前半も最終経路計算に残る。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">通信失敗・高速移動・長時間記録を試験する</span><span class="note">完了。2つの取得範囲をまたぐ経路で、旧Wayと新Wayの統合、共有Node経路の確定、同一範囲の重複取得防止を自動試験した。追加取得失敗時は既存範囲を維持し、次のGPS更新で再試行する。実端末の電池・実通信量は後日の現地確認対象。</span></div></li>
             </ul>
