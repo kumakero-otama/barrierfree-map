@@ -79,6 +79,12 @@ const TABLES = Object.freeze({
     rows: `SELECT batch_id,source_session_digest,started_at,raw_point_count,status,browser_result,valhalla_result,error,created_at
              FROM experiment.production_fitting_batch_results ORDER BY created_at DESC LIMIT ?`,
   },
+  "experiment.fitting_outlier_maps": {
+    label: "フィッティング要確認経路",
+    rows: `SELECT batch_id,source_session_digest,started_at,raw_point_count,difference_m,connected,
+                  browser_way_ids,valhalla_way_ids,created_at
+             FROM experiment.fitting_outlier_maps ORDER BY difference_m DESC LIMIT ?`,
+  },
 });
 
 function readJson(req, maxBytes = 64 * 1024) {
@@ -176,6 +182,13 @@ function createAdminDatabaseHandler({ sendJson }) {
         const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit")) || 25));
         const [rows] = await pool.query(config.rows, [limit]);
         return sendJson(res, 200, { success: true, key, label: config.label, limit, rows });
+      }
+
+      if (url.pathname === "/api/admin/fitting-outliers" && req.method === "GET") {
+        const [rows] = await pool.query(`SELECT source_session_digest,started_at,raw_point_count,difference_m,connected,
+          browser_way_ids,valhalla_way_ids,raw_points,browser_paths,valhalla_paths
+          FROM experiment.fitting_outlier_maps ORDER BY difference_m DESC,started_at DESC`);
+        return sendJson(res, 200, { success: true, rows });
       }
 
       if (url.pathname === "/api/admin/experiments" && req.method === "GET") {
