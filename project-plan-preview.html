@@ -274,7 +274,7 @@
           <article class="panel wide">
             <h3>1-3. 移動に追従してOSM地図データを補充</h3>
             <ul class="tasks">
-              <li class="done"><span class="box"></span><div><span class="task-title">現在地の移動に応じて次の範囲を先読みする</span><span class="note">完了。フィッティング用道路網は、GPS更新を止めず5秒間隔で取得範囲を確認し、既存中心から650m以上離れたらオリジナルOSMの新しい半径1km圏をバックグラウンド取得する。Overpass複数系統が停止した場合はOSM本体の読取APIへ切り替え、過去キャッシュでも処理を継続する。表示専用のOSM点字ブロックはこのキャッシュから分離し、ブラウザへ永続保存せず半径10kmを都度表示する。取得中も既存データでフィッティングを継続する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">現在地の移動に応じて次の範囲を先読みする</span><span class="note">完了。フィッティング用道路網は、GPS更新を止めず5秒間隔で取得範囲を確認し、既存中心から650m以上離れたらOSM公式map読取APIから新しい半径1km圏をバックグラウンド取得する。公式APIが失敗した場合だけOverpass複数系統へ切り替え、過去キャッシュでも処理を継続する。表示専用のOSM点字ブロックはこのキャッシュから分離し、ブラウザへ永続保存せず半径10kmを都度表示する。取得中も既存データでフィッティングを継続する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">取得済み範囲を再利用し、差分だけ追加する</span><span class="note">完了。範囲・取得時刻・Way ID/Version・Node・形状をIndexedDBへ30分保存し、近い範囲は再利用する。新範囲は以前のWayを捨てず、Way IDごとに新しいVersionを優先して統合するため、長い記録の前半も最終経路計算に残る。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">通信失敗・高速移動・長時間記録を試験する</span><span class="note">完了。2つの取得範囲をまたぐ経路で、旧Wayと新Wayの統合、共有Node経路の確定、同一範囲の重複取得防止を自動試験した。追加取得失敗時は既存範囲を維持し、次のGPS更新で再試行する。実端末の電池・実通信量は後日の現地確認対象。</span></div></li>
             </ul>
@@ -334,7 +334,7 @@
             <h3>3-1. 記録対象と公開範囲</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">PROモードの記録項目を実装する</span><span class="note">完了。点字ブロック、JIS適合、JIS非適合の3項目だけをOSM変更案の対象にした。柵・塀・グレーチング・その他項目・ひとことメモはStepBy開発DBだけへ保存し、OSM連携も起動しない。JIS区分はStepBy側に保持し、OSM変更案では既存の標準タグ <code>tactile_paving=yes</code> だけを使用する。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">地図上の色分けを実装する</span><span class="note">完了。OSM由来でStepBy印なしは青、OSMまたはStepBy DBでStepBy由来の点字ブロックは緑、PROの非公開記録は赤で描画する。詳細を開閉した後も各線の元色を保持する。10km点字表示はOverpass検索を2 selectorへ軽量化し、複数接続先・5分サーバーキャッシュで一時障害へ対応する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">地図上の色分けを実装する</span><span class="note">完了。OSM由来でStepBy印なしは青、OSMまたはStepBy DBでStepBy由来の点字ブロックは緑、PROの非公開記録は赤で描画する。詳細を開閉した後も各線の元色を保持する。非PROでもPROバッジが出るCSS競合を修正。10km点字表示はAPIプロキシと複数の読取専用Overpassを並行し、最初に成功した結果と5分サーバーキャッシュで一時障害へ対応する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">PROモード中であることを明確に表示する</span><span class="note">完了。PRO利用者のマップ画面は地図全体を赤枠で囲み、上部のStepBy名の横へ赤いPROバッジを常時表示する。他の全画面の上部バーとプロフィールのヒーローエリアも同じ赤・白文字・丸型のPROバッジへ統一した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">公開・非公開データのAPI試験を行う</span><span class="note">完了。公開3種・非公開4種の固定分類を開発DBへ作成し、非公開項目だけのPRO記録はサーバー側でもOSM変更案作成を409で拒否する。公開・非公開が混在しても変更案へ非公開タグやメモを含めない。フロント5件・バック4件の自動試験に合格し、OSM書込フラグはfalse、送信0件。</span></div></li>
             </ul>
