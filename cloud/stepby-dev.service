@@ -1,0 +1,29 @@
+[Unit]
+Description=StepBy development API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stepby
+Group=stepby
+WorkingDirectory=/srv/stepby/current
+ExecStartPre=+/usr/local/sbin/stepby-fetch-runtime-secret
+EnvironmentFile=/run/stepby/runtime.env
+Environment=NODE_ENV=development
+Environment=HTTP_HOST=127.0.0.1
+Environment=HTTP_PORT=3100
+Environment=DB_CONFIG_PATH=/etc/stepby/config.dev.yaml
+Environment=EXPERIMENT_DB_CONFIG_PATH=/etc/stepby/config.dev.yaml
+Environment=CORS_ALLOWED_ORIGINS=https://kumakero-otama.github.io
+ExecStart=/usr/bin/node /srv/stepby/current/server.js
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/stepby/current/logs /srv/stepby/current/data /srv/stepby/current/uploads /run/stepby
+
+[Install]
+WantedBy=multi-user.target

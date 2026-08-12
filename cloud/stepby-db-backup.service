@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up the StepBy development database to Cloud Storage
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/local/sbin/stepby-fetch-runtime-secret
+ExecStart=/usr/local/sbin/stepby-backup-development-db
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+StateDirectory=stepby-backups
+StateDirectoryMode=0700
+ReadWritePaths=/run/stepby
