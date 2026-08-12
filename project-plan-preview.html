@@ -380,8 +380,8 @@
             <h3>5-2. Google Cloud開発環境を構築する</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">Cloud CLIと専用プロジェクトを準備する</span><span class="note">完了。必要API（Compute Engine、Secret Manager、Billing Budgets、IAM）だけを有効化し、リージョンus-west1、ゾーンus-west1-bを設定した。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">e2-micro VMと30GB以内のStandard Diskを作る</span><span class="note">Ubuntu LTS、OS Login、SSH鍵認証、パスワードSSH禁止、最小ファイアウォール（HTTP/HTTPSのみ）、自動セキュリティ更新を設定する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Node.js・PostgreSQL・Caddyを構築する</span><span class="note">開発APIは別ユーザーで実行し、DBは外部公開しない。GitHub PagesからHTTPS APIへ接続し、gzip、レート制限、CORS、ログローテーションを設定する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">e2-micro VMと30GB Standard Diskを作る</span><span class="note">完了。<code>stepby-dev-1</code>をus-west1-bに作成。Ubuntu 24.04 LTS、e2-micro、pd-standard 30GB、Shielded Secure Boot/vTPM/整合性監視、OS Login＋SSH公開鍵、VM専用サービスアカウントを設定。公開ファイアウォールはHTTP/HTTPSだけをStepByタグへ許可した。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Node.js・PostgreSQL・Caddyを構築する</span><span class="note">基盤導入済。Node.js 18.19.1、npm 9.2.0、PostgreSQL 16.14、Caddy 2.6.2、自動セキュリティ更新を稼働確認。PostgreSQLはlocalhost:5432だけで待受け、外部非公開。次にAPI専用OSユーザー、アプリ配置、Caddy HTTPS、gzip、レート制限、CORS、ログローテーションを設定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Secret Managerを設定する</span><span class="note">6有効Version以内に統合し、起動時だけVMサービスアカウントが取得する。Google認証、OSM OAuth、署名・暗号化鍵、DB/管理設定をログ・バックアップ・Gitへ含めない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">開発DBを暗号化して移行する</span><span class="note">現行開発DBを停止せず整合したdumpを作り、チェックサム確認後にクラウドの新規PostgreSQLへ復元。本番DBへは接続せず、件数・外部キー・主要API結果を比較する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Cloud Storageバックアップと復元試験を作る</span><span class="note">1日1回、世代管理・保存期間・暗号化・古い世代整理を設定し、別DBへ実際に復元して合格させる。秘密情報はバックアップ対象外。</span></div></li>

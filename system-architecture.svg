@@ -81,16 +81,16 @@
   <!-- approved cloud target: planned, not yet running -->
   <rect x="45" y="1320" width="1510" height="430" rx="22" fill="#fffbeb" stroke="#d97706" stroke-width="3" stroke-dasharray="10 7" filter="url(#shadow)"/>
   <text x="70" y="1358" class="section warnText">移行先として採用済みのGoogle Cloud構成（未構築）</text>
-  <text x="70" y="1384" class="small">Project: stepby-cloud-dev-202608／Oregon us-west1。プロジェクト・予算・OS Login構築済、VM等は未構築。</text>
+  <text x="70" y="1384" class="small">Project: stepby-cloud-dev-202608／Oregon us-west1。VM・OS Login・実行基盤構築済、アプリ/DBデータは未移行。</text>
 
   <rect x="75" y="1415" width="285" height="130" rx="16" class="prod"/>
   <text x="98" y="1447" class="boxTitle prodText">GitHub Pages</text><text x="98" y="1474" class="body">UI10フロントを継続配信</text><text x="98" y="1498" class="small">HTTPSでCloud APIへ接続</text><text x="98" y="1521" class="small">切戻し時は接続先設定を戻す</text>
 
   <rect x="410" y="1415" width="570" height="250" rx="18" class="dev"/>
   <text x="435" y="1447" class="boxTitle devText">Compute Engine e2-micro + Standard Persistent Disk</text>
-  <text x="435" y="1473" class="small">Ubuntu LTS／OS Login＋SSH公開鍵／外部公開はHTTPSのみ</text>
-  <rect x="435" y="1492" width="245" height="68" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1518" class="body">Caddy + Node.js API</text><text x="452" y="1541" class="small">gzip・CORS・レート制限</text>
-  <rect x="705" y="1492" width="245" height="68" rx="11" class="db"/><text x="722" y="1518" class="body">PostgreSQL</text><text x="722" y="1541" class="small">外部非公開・開発DBから移行</text>
+  <text x="435" y="1473" class="small">stepby-dev-1：Ubuntu 24.04／OS Login＋SSH公開鍵／Shielded VM</text>
+  <rect x="435" y="1492" width="245" height="68" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1518" class="body">Caddy 2.6 + Node.js 18</text><text x="452" y="1541" class="small">導入済／API・HTTPSは次工程</text>
+  <rect x="705" y="1492" width="245" height="68" rx="11" class="db"/><text x="722" y="1518" class="body">PostgreSQL 16</text><text x="722" y="1541" class="small">localhost:5432／データ未移行</text>
   <rect x="435" y="1580" width="515" height="58" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1605" class="body">ローカルログ・ローテーション・バックアップ処理</text><text x="452" y="1626" class="small">Valhalla、Cloud SQL、Cloud Run、Firestoreは置かない</text>
 
   <rect x="1030" y="1415" width="450" height="74" rx="14" class="external"/>
