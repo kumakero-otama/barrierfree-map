@@ -80,16 +80,16 @@
   <path d="M582 295 C582 355 275 360 275 425" class="lineProd"/><path d="M1050 295 C1050 355 725 360 725 425" class="lineDev"/><path d="M1250 295 C1250 350 1175 370 1175 425" class="lineDev"/><path d="M275 495 C275 570 290 585 290 650" class="lineProd"/><path d="M725 495 C725 570 790 585 790 650" class="lineDev"/><path d="M1175 495 C1175 535 1518 535 1518 640" class="lineDev"/>
   <!-- approved cloud target: foundation and internal API are running -->
   <rect x="45" y="1320" width="1510" height="430" rx="22" fill="#fffbeb" stroke="#d97706" stroke-width="3" stroke-dasharray="10 7" filter="url(#shadow)"/>
-  <text x="70" y="1358" class="section warnText">構築中のGoogle Cloud開発環境（内部稼働・外部HTTPS未公開）</text>
-  <text x="70" y="1384" class="small">Project: stepby-cloud-dev-202608／Oregon us-west1。ローカル本番とは分離し、クラウド開発API・開発DB・日次バックアップが稼働。</text>
+  <text x="70" y="1358" class="section warnText">公開中のGoogle Cloud開発環境（UI10の新API）</text>
+  <text x="70" y="1384" class="small">Project: stepby-cloud-dev-202608／Oregon us-west1。ローカル本番とは分離し、固定IP・クラウド開発API・開発DB・日次バックアップが稼働。</text>
 
   <rect x="75" y="1415" width="285" height="130" rx="16" class="prod"/>
-  <text x="98" y="1447" class="boxTitle prodText">GitHub Pages</text><text x="98" y="1474" class="body">UI10フロントを継続配信</text><text x="98" y="1498" class="small">HTTPSでCloud APIへ接続</text><text x="98" y="1521" class="small">切戻し時は接続先設定を戻す</text>
+  <text x="98" y="1447" class="boxTitle prodText">GitHub Pages</text><text x="98" y="1474" class="body">UI10フロントを継続配信</text><text x="98" y="1498" class="small">クラウドHTTPS APIへ接続済</text><text x="98" y="1521" class="small">UI0・現行版は変更なし</text>
 
   <rect x="410" y="1415" width="570" height="250" rx="18" class="dev"/>
   <text x="435" y="1447" class="boxTitle devText">Compute Engine e2-micro + Standard Persistent Disk</text>
   <text x="435" y="1473" class="small">stepby-dev-1：Ubuntu 24.04／OS Login＋SSH公開鍵／Shielded VM</text>
-  <rect x="435" y="1492" width="245" height="68" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1518" class="body">Node.js 18 API（systemd）</text><text x="452" y="1541" class="small">127.0.0.1:3100稼働／Caddy停止中</text>
+  <rect x="435" y="1492" width="245" height="68" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1518" class="body">Caddy HTTPS → Node API</text><text x="452" y="1541" class="small">公開443 → 127.0.0.1:3100</text>
   <rect x="705" y="1492" width="245" height="68" rx="11" class="db"/><text x="722" y="1518" class="body">PostgreSQL 16 + PostGIS</text><text x="722" y="1541" class="small">localhost:5432／開発DB 36表移行済</text>
   <rect x="435" y="1580" width="515" height="58" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1605" class="body">OSM書込ロック中／Valhalla依存なし</text><text x="452" y="1626" class="small">Cloud SQL、Cloud Run、Firestoreは置かない</text>
 
@@ -101,7 +101,7 @@
   <text x="1053" y="1631" class="body">標準Cloud Monitoring・予算通知</text><text x="1053" y="1652" class="small">高度なLogging、Cloud DNSは当面不使用</text>
 
   <path d="M360 1480 H410" class="lineDev"/><path d="M980 1460 H1030" class="lineExt"/><path d="M980 1548 H1030" class="lineExt"/>
-  <text x="75" y="1700" class="body warnText">認証：gcloud本人認証済／OS Login有効／共通SSH鍵禁止／VMサービスアカウント分離（鍵ファイルは発行しない）</text>
+  <text x="75" y="1700" class="body warnText">公開API：stepby-api-8-229-191-182.sslip.io／固定IP 8.229.191.182／Caddy自動TLS</text>
   <text x="75" y="1725" class="small">本番OSM書込みロック、追記型監査、本番・開発分離はクラウド移行後も同じ絶対ルールを維持する。</text>
   <text x="1270" y="1785" class="tiny">構成変更時は system-architecture.svg とタスクリストを同時更新する</text>
 </svg>
