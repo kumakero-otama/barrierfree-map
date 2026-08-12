@@ -1,23 +1,20 @@
 const { loadRoadInfoConfig } = require("../road_info_config");
 
-// クライアント起動時に参照する最小限の設定値を返す API ハンドラを生成する。
-function createConfigHandler({
-  MIN_INTERVAL_MS,
-  CLIENT_MIN_INTERVAL_MS,
-  sendJson,
-}) {
-  // クライアント初期化に必要な設定値をまとめて返す。
+function createConfigHandler({ MIN_INTERVAL_MS, CLIENT_MIN_INTERVAL_MS, sendJson }) {
   return function handleConfig(req, res) {
     if (req.method !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });
       return;
     }
-
     const roadInfoConfig = loadRoadInfoConfig();
     sendJson(res, 200, {
       serverMinIntervalMs: MIN_INTERVAL_MS,
       clientMinIntervalMs: CLIENT_MIN_INTERVAL_MS,
       roadInfoImageMaxBytes: roadInfoConfig.imageMaxBytes,
+      normalFittingEngine: "browser_osm",
+      normalFittingRadiusMeters: 1000,
+      fittingRefreshDistanceMeters: 650,
+      valhallaUsage: "developer_comparison_only",
     });
   };
 }
