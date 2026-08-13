@@ -159,24 +159,28 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 ### 未完了・要検証
 
 - 実端末での長距離移動、1km圏を越えた道路網追加取得、通信断、バックグラウンド復帰、電池消費の現地試験。
-- 本番OSMで、複数Way、Relationを含む経路、道路左右、独立歩道、Version競合の少数実地確認。
-- Wayが第三者により再分割・統合された後の、StepBy記録との再照合処理。
+- 実端末で、複数Way、道路左右、独立歩道の少数実地確認。
 - OSMコミュニティへ、道路左右タグ、Way分割、StepBy由来表現、継続的支援型編集の運用相談。
-- 既存点字ブロックデータの品質・重複・公開可否を確認する別移行計画。
+- 既存276経路の候補ごとの品質確認と、コミュニティ確認後の少量移行。
 - UI0からUI10を標準版へ昇格する判断。昇格前もUI0とValhallaは停止しません。
-- API一覧HTMLに残っていた「開発OSM」「書込みロック中」という旧説明は、本書作成時に実稼働状態へ更新しました。
-- タスクリストにも開発OSM試験当時の説明が履歴として混在します。完了実績として残す部分と、現在状態の説明をさらに明確に分ける必要があります。
+
+### 2026-08-13に追加確認・修正したこと
+
+- フロント9試験、バックエンド9試験に合格。
+- 既存の同等点字ブロックタグがあるWayでは、不要な分割・changesetを作らず正常完了するガードを追加。
+- 第三者編集でVersionが変わった場合、changeset作成・uploadより前に停止する試験に合格。
+- PROモードのグレーチング3件がクラウドDBだけに保存され、OSM変更案・changesetが作られないことを確認。
+- 現行DBを読み取り専用で棚卸し。328記録、raw 7,344点、経路276件、完全重複経路0件。rawなし6件、経路なし52件、孤立raw/matched各3点、旧accuracy全件未保存。
+- 既存データ移行監査とOSMコミュニティ相談文案を作成。
 
 ## 10. 次に行う順番
 
-1. 本番OSMの少数実地テスト結果を記録し、Way・タグ・changeset・監査を人とAIで確認する。
-2. 取消しが必要な実地記録だけ、本人の緑線から取消して表示消去まで確認する。
-3. 1km圏を越える移動、通信断、再起動、長時間記録を実端末で確認する。
-4. 判明した不具合を直し、回帰テストを追加する。
-5. OSMコミュニティへタグ・分割・運用方式を相談する。
-6. 限定利用者で運用し、誤送信率・競合率・処理時間・取消し件数を測定する。
-7. UI10の標準版昇格を判断する。
-8. 既存データのOSM移行計画を別途作り、少量から実施する。
+1. OSMコミュニティへタグ・分割・利用者保存時の自動反映方式を相談する。
+2. 1km圏を越える移動、通信断、画面ロック、長時間記録を実端末で確認する。
+3. 判明した不具合を直し、回帰テストを追加する。
+4. 限定利用者で運用し、誤送信率・競合率・処理時間・取消し件数を測定する。
+5. UI10の標準版昇格を判断する。
+6. 既存276経路を候補ごとに確認し、コミュニティ合意と個別許可後に少量ずつ扱う。
 
 ## 11. 絶対ルール
 
@@ -195,6 +199,8 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 - [システム構成図](https://barrierfree-map.tail5de5e1.ts.net/system-architecture.svg)
 - [API一覧](https://barrierfree-map.tail5de5e1.ts.net/api-catalog.html)
 - [クラウド移行案](https://barrierfree-map.tail5de5e1.ts.net/cloud-migration-options.html)
+- [既存データ移行監査](https://barrierfree-map.tail5de5e1.ts.net/existing-data-migration-audit.md)
+- [OSMコミュニティ相談文案](https://barrierfree-map.tail5de5e1.ts.net/osm-community-consultation-draft.md)
 - [Valhalla・ブラウザ版検証報告](https://barrierfree-map.tail5de5e1.ts.net/valhalla-browser-fitting-report.html)
 - [開発DB管理画面](https://barrierfree-map.tail5de5e1.ts.net/dev-api/admin/database.html)
 - [UI10](https://kumakero-otama.github.io/StepBy/UI10/map/Index.html)
