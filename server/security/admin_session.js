@@ -46,7 +46,9 @@ function createAdminSession({ sendJson }) {
     if (!secret || !safeEqual(req.headers["x-stepby-admin-key"], secret)) return sendJson(res, 403, { error: "admin_required" });
     const payload = Buffer.from(JSON.stringify({ scope: "dev-admin", exp: now + SESSION_TTL_MS, nonce: crypto.randomBytes(16).toString("base64url") })).toString("base64url");
     const token = `${payload}.${sign(payload, secret)}`;
-    res.setHeader("Set-Cookie", `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/dev-api; Max-Age=1800; HttpOnly; Secure; SameSite=Strict`);
+    // CloudではAPIがルート直下、旧Tailscale経路では /dev-api 配下になる。
+    // Path=/ にすると、どちらも同じHttpOnly管理セッションを安全に利用できる。
+    res.setHeader("Set-Cookie", `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=1800; HttpOnly; Secure; SameSite=Strict`);
     return sendJson(res, 200, { ok: true, expiresInSeconds: 1800 });
   }
 

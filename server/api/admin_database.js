@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const fs = require("fs");
+const os = require("os");
 const { createDbPool } = require("../db");
 
 const TABLES = Object.freeze({
@@ -116,6 +118,19 @@ function digest(payload) {
   return crypto.createHash("sha256").update(JSON.stringify(canonicalize(payload))).digest("hex");
 }
 
+function readLatestHealthObservation() {
+  const file = process.env.STEPBY_HEALTH_CSV || "/var/lib/stepby-health/hourly.csv";
+  try {
+    const lines = fs.readFileSync(file, "utf8").trim().split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return null;
+    const headers = lines[0].split(",");
+    const values = lines[lines.length - 1].split(",");
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] == null ? null : values[index]]));
+  } catch {
+    return null;
+  }
+}
+
 function createAdminDatabaseHandler({ sendJson }) {
   const { pool, error } = createDbPool();
   let schemaReady = null;
@@ -173,6 +188,67 @@ function createAdminDatabaseHandler({ sendJson }) {
           tables.push({ key, label: config.label, rowCount: Number(rows[0].row_count), bytes: Number(rows[0].bytes) });
         }
         return sendJson(res, 200, { success: true, environment: "development", database: databaseRows[0], tables });
+      }
+
+      if (url.pathname === "/api/admin/operations-overview" && req.method === "GET") {
+        const [databaseRows] = await pool.query("SELECT pg_database_size(current_database()) bytes,NOW() checked_at");
+        const [osmRows] = await pool.query(`SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW()-INTERVAL '24 hours')::bigint events_24h,
+          COUNT(*) FILTER (WHERE event_type='execution_succeeded' AND created_at >= NOW()-INTERVAL '24 hours')::bigint succeeded_24h,
+          COUNT(*) FILTER (WHERE event_type='execution_failed' AND created_at >= NOW()-INTERVAL '24 hours')::bigint failed_24h,
+          COUNT(*) FILTER (WHERE event_type='execution_blocked' AND created_at >= NOW()-INTERVAL '24 hours')::bigint blocked_24h,
+          MAX(created_at) FILTER (WHERE event_type='execution_succeeded') last_osm_success_at
+          FROM osmchange.audit_events`);
+        const [linkRows] = await pool.query(`SELECT
+          COUNT(*) FILTER (WHERE osm_status='merged')::bigint merged,
+          COUNT(*) FILTER (WHERE osm_status='reverted')::bigint reverted,
+          COUNT(*) FILTER (WHERE osm_status='conflict')::bigint conflicts,
+          COUNT(*) FILTER (WHERE osm_status='failed')::bigint failed,
+          COUNT(*) FILTER (WHERE osm_status='already_present')::bigint already_present
+          FROM osmchange.record_links`);
+        const [sessionRows] = await pool.query(`SELECT COUNT(*)::bigint total,
+          COUNT(*) FILTER (WHERE started_at >= NOW()-INTERVAL '24 hours')::bigint created_24h
+          FROM tactile.sessions`);
+        const health = readLatestHealthObservation();
+        const load = os.loadavg();
+        return sendJson(res, 200, {
+          success: true,
+          checkedAt: databaseRows[0].checked_at,
+          process: {
+            status: "active",
+            uptimeSeconds: Math.round(process.uptime()),
+            memoryRssBytes: process.memoryUsage().rss,
+            systemMemoryAvailableBytes: os.freemem(),
+            load1m: load[0],
+          },
+          database: { status: "ok", bytes: Number(databaseRows[0].bytes) },
+          services: health ? {
+            api: health.api_service,
+            postgres: health.postgres_service,
+            caddy: health.caddy_service,
+            backupLastResult: health.backup_last_result,
+            lastObservedAt: health.timestamp_utc,
+            apiHttpStatus: Number(health.api_http_status),
+            apiSeconds: Number(health.api_seconds),
+            diskUsedPercent: Number(health.disk_used_percent),
+            errorsLastHour: Number(health.errors_last_hour),
+            rxBytes: Number(health.rx_bytes),
+            txBytes: Number(health.tx_bytes),
+          } : null,
+          records: { total: Number(sessionRows[0].total), created24h: Number(sessionRows[0].created_24h) },
+          osm: {
+            events24h: Number(osmRows[0].events_24h),
+            succeeded24h: Number(osmRows[0].succeeded_24h),
+            failed24h: Number(osmRows[0].failed_24h),
+            blocked24h: Number(osmRows[0].blocked_24h),
+            lastSuccessAt: osmRows[0].last_osm_success_at,
+            merged: Number(linkRows[0].merged),
+            reverted: Number(linkRows[0].reverted),
+            conflicts: Number(linkRows[0].conflicts),
+            failed: Number(linkRows[0].failed),
+            alreadyPresent: Number(linkRows[0].already_present),
+          },
+        });
       }
 
       if (url.pathname.startsWith("/api/admin/tables/") && req.method === "GET") {
@@ -260,3 +336,4 @@ function createAdminDatabaseHandler({ sendJson }) {
 }
 
 module.exports = createAdminDatabaseHandler;
+module.exports.readLatestHealthObservation = readLatestHealthObservation;

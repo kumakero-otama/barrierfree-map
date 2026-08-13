@@ -56,6 +56,37 @@ async function run() {
     executeWithClient({ client: conflictClient, operations, summary: "test", planId: "plan-1", operationType: "merge" }),
     /osm_version_conflict/
   );
+
+  let auditFailureClosed = 0;
+  let auditFailureUploaded = 0;
+  const auditFailureClient = {
+    async fetchElementVersion(_type, id) { return id === 900 ? 4 : 7; },
+    async createChangeset() { return 777; },
+    async uploadChangeset() { auditFailureUploaded += 1; throw new Error("must_not_upload"); },
+    async closeChangeset(id) { assert.strictEqual(id, 777); auditFailureClosed += 1; },
+  };
+  await assert.rejects(executeWithClient({
+    client: auditFailureClient, operations, summary: "test", planId: "plan-audit-failure", operationType: "merge",
+    onChangesetCreated: async () => { throw new Error("audit_persistence_failed"); },
+  }), /audit_persistence_failed/);
+  assert.strictEqual(auditFailureUploaded, 0, "監査開始保存に失敗したらOSM uploadを呼ばない");
+  assert.strictEqual(auditFailureClosed, 1, "作成済みの空changesetは閉じる");
+
+  let uploadFailureClosed = 0;
+  const uploadFailureClient = {
+    async fetchElementVersion(_type, id) { return id === 900 ? 4 : 7; },
+    async createChangeset() { return 778; },
+    async uploadChangeset() { const error = new Error("osm_http_503"); error.status = 503; throw error; },
+    async closeChangeset(id) { assert.strictEqual(id, 778); uploadFailureClosed += 1; },
+  };
+  await assert.rejects(executeWithClient({
+    client: uploadFailureClient, operations, summary: "test", planId: "plan-upload-failure", operationType: "merge",
+    onChangesetCreated: async () => {},
+  }), /osm_http_503/);
+  assert.strictEqual(uploadFailureClosed, 1, "OSM API障害でもchangesetを閉じる");
+
+  assert.throws(() => createOsmApiClient({ baseUrl: "", accessToken: "" }), /osm_client_not_configured/,
+    "OAuth情報がなければクライアントを作らない");
   console.log("osm_api_client: mocked tests passed; no OSM network used");
 }
 

@@ -1,0 +1,2 @@
+timestamp_utc,uptime_seconds,load_1m,memory_available_mb,disk_used_percent,db_bytes,api_http_status,api_seconds,api_service,postgres_service,caddy_service,backup_last_result,errors_last_hour,rx_bytes,tx_bytes
+2026-08-13T03:00:00Z,3600,0.01,448,14,20512768,200,0.061,active,active,active,success,0,12345,67890

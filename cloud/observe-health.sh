@@ -3,11 +3,13 @@ set -eu
 
 OUTPUT_DIR="${STEPBY_HEALTH_DIR:-/var/lib/stepby-health}"
 OUTPUT_FILE="$OUTPUT_DIR/hourly.csv"
-install -d -m 0750 -o root -g root "$OUTPUT_DIR"
+install -d -m 0750 -o root -g stepby "$OUTPUT_DIR"
 
 if [ ! -e "$OUTPUT_FILE" ]; then
   printf '%s\n' 'timestamp_utc,uptime_seconds,load_1m,memory_available_mb,disk_used_percent,db_bytes,api_http_status,api_seconds,api_service,postgres_service,caddy_service,backup_last_result,errors_last_hour,rx_bytes,tx_bytes' > "$OUTPUT_FILE"
 fi
+chown root:stepby "$OUTPUT_FILE"
+chmod 0640 "$OUTPUT_FILE"
 
 timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 uptime_seconds="$(cut -d. -f1 /proc/uptime)"
@@ -37,4 +39,6 @@ printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
 if [ "$(wc -l < "$OUTPUT_FILE")" -gt 800 ]; then
   { head -n 1 "$OUTPUT_FILE"; tail -n 744 "$OUTPUT_FILE"; } > "$OUTPUT_FILE.tmp"
   mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
+  chown root:stepby "$OUTPUT_FILE"
+  chmod 0640 "$OUTPUT_FILE"
 fi

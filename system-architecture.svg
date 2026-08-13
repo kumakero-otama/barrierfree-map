@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1810" viewBox="0 0 1600 1810" role="img" aria-labelledby="title desc">
   <title id="title">StepBy / barrierfree-map 現在のシステム構成</title>
-  <desc id="desc">利用端末、GitHub Pages、Tailscale、ローカルサーバー内の本番・開発バックエンド、PostgreSQL、Valhalla、外部サービスの接続関係を示す図。</desc>
+  <desc id="desc">利用端末、GitHub Pages、Tailscale、ローカルサーバー、Google Cloud上のNode API、管理監視API、PostgreSQL、バックアップ、OSMなど外部サービスの接続関係を示す図。</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6f9ff"/><stop offset="1" stop-color="#eef8f4"/></linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#19324d" flood-opacity=".13"/></filter>
@@ -91,14 +91,14 @@
   <text x="435" y="1473" class="small">stepby-dev-1：Ubuntu 24.04／OS Login＋SSH公開鍵／Shielded VM</text>
   <rect x="435" y="1492" width="245" height="68" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1518" class="body">Caddy HTTPS → Node API</text><text x="452" y="1541" class="small">公開443 → 127.0.0.1:3100</text>
   <rect x="705" y="1492" width="245" height="68" rx="11" class="db"/><text x="722" y="1518" class="body">PostgreSQL 16 + PostGIS</text><text x="722" y="1541" class="small">localhost:5432／開発DB 36表移行済</text>
-  <rect x="435" y="1580" width="515" height="58" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1605" class="body">本番OSM書込みON／Valhalla依存なし</text><text x="452" y="1626" class="small">本人OAuth再連携必須。Cloud SQL、Cloud Run、Firestoreは置かない</text>
+  <rect x="435" y="1580" width="515" height="58" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1605" class="body">本番OSM連携＋管理監視API／Valhalla依存なし</text><text x="452" y="1626" class="small">監査・競合停止・稼働/容量/OSM結果表示。秘密情報は非表示</text>
 
   <rect x="1030" y="1415" width="450" height="74" rx="14" class="external"/>
   <text x="1053" y="1443" class="boxTitle">Secret Manager</text><text x="1053" y="1468" class="small">1有効Version／VMサービスアカウントだけ読取</text>
   <rect x="1030" y="1510" width="450" height="74" rx="14" class="external"/>
   <text x="1053" y="1538" class="boxTitle">Cloud Storage</text><text x="1053" y="1563" class="small">日次DB＋uploadsバックアップ／30日保持／復元試験済</text>
   <rect x="1030" y="1605" width="450" height="60" rx="14" class="external"/>
-  <text x="1053" y="1631" class="body">標準Monitoring・予算通知＋軽量観測</text><text x="1053" y="1652" class="small">1時間ごとにCPU・メモリ・容量・API・通信量を31日保持</text>
+  <text x="1053" y="1631" class="body">標準Monitoring・予算通知＋管理画面</text><text x="1053" y="1652" class="small">1時間ごとに稼働・容量・API・通信量を31日保持し画面表示</text>
 
   <path d="M360 1480 H410" class="lineDev"/><path d="M980 1460 H1030" class="lineExt"/><path d="M980 1548 H1030" class="lineExt"/>
   <text x="75" y="1700" class="body warnText">公開API：stepby-api-8-229-191-182.sslip.io／固定IP 8.229.191.182／Caddy自動TLS</text>
