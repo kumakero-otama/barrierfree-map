@@ -226,7 +226,7 @@
         <p class="sequence-label" id="sequence-title">Recommended order / 推奨する全体順序</p>
         <ol>
           <li><strong>フィッティング完成</strong><span>リアルタイムと記録終了後の経路を、OSMへ送らず検証</span></li>
-          <li><strong>OSM連携完成</strong><span>変更・取消し・監査を確認。実送信には毎回明示許可が必要</span></li>
+          <li><strong>OSM連携完成</strong><span>保存で本人の記録を公開、緑線の削除確定で取消し。監査・競合停止・二重送信防止を維持</span></li>
           <li><strong>PRO・表示完成</strong><span>公開対象を分離し、記録種別を色で判別できるようにする</span></li>
           <li><strong>クラウド・既存移行</strong><span>新バージョンのValhalla依存解消後にサーバーを移し、最後に既存データを扱う</span></li>
         </ol>
@@ -408,8 +408,9 @@
               <li><span class="box"></span><div><span class="task-title">通信の切断と復帰を確認する</span><span class="note">安全な場所で一時的に機内モード等を使い、記録が端末内に保持されること、通信復帰後に自動送信されること、同じ記録が二重登録されないことを確認する。サーバー処理エラーと通信切断が異なる表示になることも確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">画面ロック・アプリ復帰を確認する</span><span class="note">短時間の画面ロックまたは別画面への移動後に戻り、記録状態と送信待ちキューが失われないことを確認する。端末OSが位置情報取得を停止した場合は、その事実が分かる表示も確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">通常モードとPROモードを各1件確認する</span><span class="note">通常モードでは点字ブロックだけがOSM変更案対象、PROモードでは対象外情報がクラウドDBだけに保存されること、色・バッジ・詳細表示が正しいことを確認する。いずれも本番OSMへの実送信はしない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">保存操作からOSM公開完了までを実端末で確認する</span><span class="note">自動公開機能を正式に有効化した後の試験。通常モードで記録停止 → 保存を1回だけ押し、画面を待たせず次へ進むこと、裏側で同じ記録が1回だけOSMへ送信されること、changeset ID・対象Way・変更前後・成功結果が追記型監査履歴へ保存されることを確認する。通信切断時は端末内に保持し、復帰後に1回だけ再送されることも確認する。現行の絶対ルールでは操作直前の管理者確認が必要なため、ルール変更または個別許可が完了するまで本番OSM送信試験は実施しない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">保存操作からOSM公開完了までを実端末で確認する</span><span class="note">自動公開機能を正式に有効化した後の試験。通常モードで記録停止 → 保存を1回だけ押し、画面を待たせず次へ進むこと、裏側で同じ記録が1回だけOSMへ送信されること、changeset ID・対象Way・変更前後・成功結果が追記型監査履歴へ保存されることを確認する。通信切断時は端末内に保持し、復帰後に1回だけ再送されることも確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM自動公開に失敗した場合の表示と再送を確認する</span><span class="note">OAuth未連携・権限取消し・Version競合・監査履歴保存失敗・OSM API障害をそれぞれ確認し、StepBy側の記録は失われず、二重changesetを作らず、利用者には短く分かりやすい状態だけを表示する。競合時は自動上書きせず停止する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">緑線の削除からOSM取消し完了までを実端末で確認する</span><span class="note">本人が保存した緑線を選び「この記録を削除」→確認を行う。青線と他人の緑線には削除ボタンがないこと、取消changeset、元changesetとの対応、変更前後、成功結果が監査履歴へ残ること、処理後に線が消えることを確認する。現在は実OSM通信フラグOFFのため、有効化後に実施する。</span></div></li>
             </ul>
           </article>
         </div>
@@ -474,7 +475,7 @@
             <div class="spec-item"><b>StepBy由来の記録</b><span>変更セットへ created_by=StepBy、source=survey、説明用commentを付与。独自のオブジェクトタグはコミュニティ確認後に判断する。</span></div>
             <div class="spec-item"><b>StepByサーバー保存</b><span>内部ユーザーID・記録日時・確認日時・変更セットID・Way ID/Version・開始終了Node ID・順序・タグ・形状照合情報を保存する。</span></div>
             <div class="spec-item"><b>公開範囲と安全な移行</b><span>StepByユーザーIDはOSMへ公開しない。新旧同時計算、限定利用、自動フォールバックを経てValhallaを最後に停止する。</span></div>
-            <div class="spec-item"><b>OSM送信の禁止条件</b><span>プロジェクト管理者の明示的な許可があるまで、本番OSMへのマージ機能を有効化せず、実データを一切送信しない。</span></div>
+            <div class="spec-item"><b>OSM送信の許可と禁止条件</b><span>OSM連携済み本人の保存はその記録1件の公開許可、本人所有の緑線に対する削除確定はその1件の取消許可とする。機能フラグ、所有者、OAuth、監査、冪等性、Version確認のどれかを満たさない場合は送信しない。既存データ一括移行等は管理者の個別許可を必要とする。</span></div>
             <div class="spec-item"><b>マージ履歴と取消し</b><span>送信要求、確認者、対象、変更内容、結果、changeset ID、エラー、取消しまで全イベントを追記型で保存する。履歴は削除・上書きしない。取消しは元の編集を消すのではなく、反対変更を新しいchangesetとして送る方式にする。</span></div>
             <div class="spec-item"><b>開発リポジトリ・ブランチ</b><span>新しいリポジトリは作らない。フロントはStepBy内のUI10・UI11等、バックエンドはbarrierfree-mapの常設devブランチで開発する。</span></div>
             <div class="spec-item"><b>開発サーバーの分離</b><span>本番と別フォルダ・別プロセス・別ポート・別DBで稼働。最初はTailscale Serve、GitHub Pagesからの結合試験時はFunnelの10000番を利用する。</span></div>

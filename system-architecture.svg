@@ -26,7 +26,7 @@
   <rect x="390" y="175" width="385" height="120" rx="16" class="prod"/>
   <text x="414" y="205" class="boxTitle prodText">公開フロント UI0</text><text x="414" y="232" class="body">GitHub Pages / StepBy mainブランチ</text><text x="414" y="255" class="small">kumakero-otama.github.io/StepBy/UI0/</text><text x="414" y="277" class="small">API接続先：Tailscale Funnel 標準HTTPS</text>
   <rect x="845" y="175" width="650" height="120" rx="16" class="dev"/>
-  <text x="870" y="205" class="boxTitle devText">開発フロント UI10</text><text x="870" y="231" class="body">通常記録＝ブラウザフィット／Valhalla＝明示比較のみ</text><text x="870" y="254" class="small">確定後は画面先行・記録/道情報を永続キューから非同期保存</text><text x="870" y="276" class="small">GitHub Pages UI10／tailnet :10001 → localhost:3200</text>
+  <text x="870" y="205" class="boxTitle devText">開発フロント UI10</text><text x="870" y="231" class="body">通常記録＝ブラウザフィット／Valhalla＝明示比較のみ</text><text x="870" y="254" class="small">保存→OSM公開／本人の緑線削除→取消しを各永続キューで非同期実行</text><text x="870" y="276" class="small">GitHub Pages UI10／tailnet :10001 → localhost:3200</text>
   <path d="M320 220 H390" class="lineProd"/><path d="M320 265 C350 315 810 315 845 265" class="lineDev"/>
 
   <!-- tailscale -->
@@ -51,8 +51,8 @@
   <text x="578" y="682" class="boxTitle devText">開発バックエンド</text><text x="578" y="707" class="body">/home/otama/barrierfree-map-dev　dev</text><text x="578" y="730" class="body">PM2: barrierfree-map-dev　127.0.0.1:3100</text>
   <rect x="578" y="755" width="524" height="68" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="779" class="body">共通アプリAPI</text><text x="595" y="802" class="small">認証・記録・集計・PRO公開判定（公開3種／StepBy内限定）</text>
   <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">通常：ブラウザ記録API</text><text x="595" y="886" class="small">raw補間・Node接続拘束・道路左右の自動判定</text><text x="595" y="906" class="small">Valhalla非依存／比較は管理者画面だけ</text>
-  <rect x="850" y="838" width="252" height="86" rx="12" class="locked"/><text x="867" y="864" class="body warnText">OSM変更API（ロック中）</text><text x="867" y="886" class="small">Relation継承・1記録1変更案</text><text x="867" y="906" class="small">record_id取消案 / 実送信OFF</text>
-  <rect x="578" y="940" width="524" height="92" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="966" class="body">安全機構・開発DB管理API</text><text x="595" y="988" class="small">管理キー→30分HttpOnly session・許可テーブル限定・レート/本文上限</text><text x="595" y="1009" class="small">OSM監査は追記型。送信・取消しは明示許可がなければ実行不可</text>
+  <rect x="850" y="838" width="252" height="86" rx="12" class="locked"/><text x="867" y="864" class="body warnText">OSM公開・取消API（実通信OFF）</text><text x="867" y="886" class="small">保存＝本人OAuth公開／緑線削除＝取消し</text><text x="867" y="906" class="small">1記録1changeset・競合停止・冪等</text>
+  <rect x="578" y="940" width="524" height="92" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="966" class="body">安全機構・開発DB管理API</text><text x="595" y="988" class="small">所有者・OAuth・機能フラグ・Version・監査開始前保存を必須化</text><text x="595" y="1009" class="small">保存/本人緑線削除を1件の許可とし、青線・他人・対応不明は取消不可</text>
 
   <rect x="1160" y="650" width="355" height="190" rx="18" class="db"/>
   <text x="1183" y="682" class="boxTitle">PostgreSQL 16</text><text x="1183" y="706" class="body">同じDBサーバープロセス　:5432</text>
