@@ -114,6 +114,14 @@ function planWay(segment, counters, options) {
   let startIndex = 0;
   const baseTags = segment.tags && typeof segment.tags === "object" ? { ...segment.tags } : {};
   const tagStrategy = resolveTactileTagStrategy(segment, options.tactileValue);
+  const existingTactileValue = Object.keys(tagStrategy.tags).find((key) =>
+    String(baseTags[key] || "").toLowerCase() === String(tagStrategy.tags[key]).toLowerCase());
+  if (existingTactileValue) {
+    const error = new Error("tactile_tag_already_present");
+    error.wayId = wayId;
+    error.tagKey = existingTactileValue;
+    throw error;
+  }
   const sections = sectionEnds.map((endIndex) => {
     const refs = expandedRefs.slice(startIndex, endIndex + 1);
     const coords = expandedCoordinates.slice(startIndex, endIndex + 1);

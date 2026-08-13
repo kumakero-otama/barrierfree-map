@@ -24,5 +24,8 @@ assert.match(source, /requireOwnedRecord\(recordId, req\.authUserId\)/);
 assert.match(source, /pg_advisory_lock/);
 assert.match(source, /user_execution_requested/);
 assert.match(source, /osm_version_conflict/);
+assert.match(source, /publication_skipped_existing_tactile/);
+assert.match(source, /osm_status === "already_present"/);
+assert.match(source, /changesetId: null/);
 
 console.log("OSM user publication/revert policy tests passed; no OSM network used");

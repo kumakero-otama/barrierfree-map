@@ -94,6 +94,12 @@ function run() {
   assert.strictEqual(roadwayTactileSection.tags["sidewalk:left:tactile_paving"], "yes");
   assert.strictEqual(roadwayTactileSection.tags.tactile_paving, undefined);
   assert.throws(() => createSplitPlan({ segments: [way({ tags: { highway: "residential" } })] }), /missing_side_for_roadway/);
+  assert.throws(() => createSplitPlan({ segments: [way({
+    tags: { highway: "footway", tactile_paving: "yes" },
+  })] }), /tactile_tag_already_present/, "既存の点字ブロックへ重複タグや不要な分割を作らない");
+  assert.throws(() => createSplitPlan({ segments: [way({
+    tags: { highway: "residential", "sidewalk:left:tactile_paving": "yes" }, side: "left",
+  })] }), /tactile_tag_already_present/, "道路左右タグも重複登録を止める");
   console.log("osm_split_planner: all tests passed");
 }
 run();

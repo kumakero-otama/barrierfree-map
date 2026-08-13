@@ -206,7 +206,7 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true">S</span>STEPBY ROADMAP</div>
-      <div class="updated">2026年8月12日 実行順に再整理</div>
+      <div class="updated">2026年8月13日 AI実行可能項目を再検証</div>
     </header>
 
     <main>
@@ -240,6 +240,16 @@
       <a class="report-link" href="stepby-current-spec-and-tasks.md" download>
         <span>現在の確定仕様、稼働構成、既知の問題、残作業、安全ルール、主要リンクをまとめたMarkdown文書です。</span>
         <b>現行仕様MDをダウンロード ↓</b>
+      </a>
+
+      <a class="report-link" href="documents/existing-data-migration-audit.md" download>
+        <span>現行DBの328記録を読み取り専用で棚卸しし、既存データ移行の候補・除外条件・安全手順をまとめています。</span>
+        <b>既存データ移行監査MDをダウンロード ↓</b>
+      </a>
+
+      <a class="report-link" href="documents/osm-community-consultation-draft.md" download>
+        <span>StepByの編集方式をOSMコミュニティへ事前相談するための投稿前文案です。</span>
+        <b>コミュニティ相談文案MDをダウンロード ↓</b>
       </a>
 
       <a class="report-link" href="https://barrierfree-map.tail5de5e1.ts.net/dev-api/admin/database.html" target="_blank" rel="noopener">
@@ -397,15 +407,15 @@
           <article class="panel wide">
             <h3>5-3. 総合試験・段階切替え・切戻し</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">クラウドUI10を通し試験する</span><span class="note">AIで実行できる範囲は再確認済み。GitHub PagesとクラウドAPIはHTTP 200、認証済みのユーザー情報・記録一覧・1km道路網・10km OSM点字ブロックAPIもすべて成功（道路網2.46秒、点字ブロック9.88秒）。フロント8試験、バックエンド7試験、実OSM道路346 Wayを使う経路確定、記録キュー再送、左右自動判定に合格。DBの孤立経路・存在しないユーザー参照は0件。残りは本人の端末・実GPSで行う1kmフィッティング、650m移動更新、保存後画面遷移の最終確認だけ。OSM実送信はロックしたまま。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">クラウドUI10を通し試験する</span><span class="note">完了。GitHub PagesとクラウドAPI、Google/OSM認証、記録保存、1km道路網、10km点字表示、左右判定、Way分割、OSM追加・取消し、PRO非公開保存を確認した。フロント9試験・バックエンド9試験が合格し、実端末GPS固有の試験だけを5-4へ分離した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">性能・容量・費用を測る</span><span class="note">2026-08-13に観測を開始。初期値はCPU負荷ほぼ0、メモリ利用可能約448MB、ディスク4.0/29GB（14%）、DB約19MB、設定API 0.05〜0.08秒。API・DB・Caddy・バックアップ結果、CPU負荷、メモリ、ディスク、DB容量、応答時間、重大エラー、送受信量を1時間ごとに31日分CSVへ記録する軽量タイマーを稼働させた。7日経過後にe2-micro継続可否と費用を判定するため、期間未達の現在は未完了。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">日次バックアップの継続成功と保存物を再確認する</span><span class="note">完了。自動タイマーは有効で、2026-08-12夜の日次実行は成功。Cloud Storageの最新DB dump（225項目）とuploads圧縮（6項目）を実際に再取得し、両アーカイブが破損なく読めることを確認した。30日削除規則と既存の別DB復元試験も維持している。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">認証リダイレクト先を追加する</span><span class="note">完了。OSM開発環境のOAuthアプリとサーバー側を <code>https://stepby-api-8-229-191-182.sslip.io/auth/osm/callback</code> に変更。認可コード交換、OSM利用者情報取得、既存StepByユーザーへの再連携、追記型監査履歴を確認した。重複OSMアカウントを別ユーザーへ結び付けない制約も正常。Google認証はGitHub Pages上でクラウドAPIまで到達確認済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">GitHub Pages UI10のAPI接続先をクラウドへ切り替える</span><span class="note">完了。UI10の設定、認証、PWA、Service Worker、プロフィール画像、道情報、管理画面をクラウドHTTPS APIへ変更してdev/mainへ反映。UI0・現行API・現行Valhallaは変更も停止もしていない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">PROモードの点字ブロック以外がOSMへ送信されないことを確認する</span><span class="note">完了。2026-08-13にPROモードのグレーチングを3件保存し、クラウドDBには非公開タグとして3件とも記録された一方、OSM変更案との紐付け、changeset ID、OSM送信監査イベントが一切作られていないことを確認した。柵・塀・その他・ひとことメモも同じ <code>osm_exportable=false</code> の共通処理を通る。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Way境界・交差点・並行する歩道で経路確定を確認する</span><span class="note">記録の開始・終了がWay途中の場合、複数Wayをまたぐ場合、交差点を曲がる場合、道路と歩道が近接する場合を確認する。既存Way上の連続経路だけが選ばれ、歩道を優先し、必要な区間だけが矛盾なく分割されることを確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">重複操作と既存点字ブロックへの安全性を確認する</span><span class="note">保存ボタンの連打、通信復帰後の再送、同じ区間の再記録でも1記録につきchangesetが重複作成されないことを確認する。既に同等の点字ブロックタグがある区間では不要な分割やタグ上書きを行わず、安全に完了または停止することも確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM取消し前の第三者編集と部分競合を確認する</span><span class="note">マージ後に対象Wayが別の利用者から編集された想定を開発用の自動試験で再現し、取消しが第三者の変更を上書きせず停止すること、取消可能・不可能な内容と監査履歴が残ることを確認する。本番OSMで故意の競合テストは行わない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Way境界・交差点・並行する歩道で経路確定を確認する</span><span class="note">完了。Way途中の開始終了、正逆方向、既存Node境界、複数Way、共有Nodeを通る交差点、道路と近接する歩道の優先、未観測接続Wayの補完、接続不能時の停止を自動試験した。実OSMでの1件分割結果も3区間が連続していることを確認した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">重複操作と既存点字ブロックへの安全性を確認する</span><span class="note">完了。記録キュー再送とサーバーの記録単位ロック・冪等応答を再試験した。さらに既存の <code>tactile_paving=yes</code> または左右点字タグがあるWayでは、不要な分割案を作らず <code>tactile_tag_already_present</code> で停止するガードを追加し、クラウドへ反映した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM取消し前の第三者編集と部分競合を確認する</span><span class="note">完了。WayのVersionが8から9へ変わった第三者編集をモックで再現し、Version競合時はchangeset作成前に停止し、uploadを一度も呼ばず第三者変更を上書きしないことを確認した。本番OSMへのテスト送信は行っていない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">切戻し可能な並行稼働期間を完了する</span><span class="note">クラウド側の保存を正とする時点を明示し、旧開発環境を読み取り専用化。バックアップと復旧手順を再確認してから正式移行を判定する。</span></div></li>
             </ul>
           </article>
@@ -418,9 +428,9 @@
               <li><span class="box"></span><div><span class="task-title">GPS精度が低下する場所を通る</span><span class="note">建物際などで一時的に精度が落ちても、前後の点による補間または不良点の除外が働き、道路外へ不自然な直線が作られないことを確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">通信の切断と復帰を確認する</span><span class="note">安全な場所で一時的に機内モード等を使い、記録が端末内に保持されること、通信復帰後に自動送信されること、同じ記録が二重登録されないことを確認する。サーバー処理エラーと通信切断が異なる表示になることも確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">画面ロック・アプリ復帰を確認する</span><span class="note">短時間の画面ロックまたは別画面への移動後に戻り、記録状態と送信待ちキューが失われないことを確認する。端末OSが位置情報取得を停止した場合は、その事実が分かる表示も確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">通常モードとPROモードを各1件確認する</span><span class="note">通常モードでは点字ブロックだけがOSM公開対象、PROモードでは点字ブロック系だけがOSM対象で、それ以外の情報はクラウドDBだけに保存されること、色・バッジ・詳細表示が正しいことを確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">保存操作からOSM公開完了までを実端末で確認する</span><span class="note">自動公開機能を正式に有効化した後の試験。通常モードで記録停止 → 保存を1回だけ押し、画面を待たせず次へ進むこと、裏側で同じ記録が1回だけOSMへ送信されること、changeset ID・対象Way・変更前後・成功結果が追記型監査履歴へ保存されることを確認する。通信切断時は端末内に保持し、復帰後に1回だけ再送されることも確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">緑線の削除からOSM取消し完了までを実端末で確認する</span><span class="note">本人が保存した緑線を選び「この記録を削除」→確認を行う。青線と他人の緑線には削除ボタンがないこと、画面を待たせず取消処理が続くこと、新しい取消changeset、元changesetとの対応、変更前後、成功結果が監査履歴へ残ること、処理後に線が消えることを確認する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">通常モードとPROモードを各1件確認する</span><span class="note">完了。通常点字記録はOSM対象として保存され、PROモードのグレーチング3件はクラウドDBだけに保存され、OSM変更案・changeset・送信監査が作られないことを確認した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">保存操作からOSM公開完了までを実端末で確認する</span><span class="note">完了。本人の保存操作からchangeset 187383947が1件だけ作られ、元Way 196594575、点字区間Way 1549338736、隣接Way 1549338737へ矛盾なく分割され、変更前後とIDが監査履歴へ保存された。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">緑線の削除からOSM取消し完了までを実端末で確認する</span><span class="note">完了。本人の緑線削除から取消しchangeset 187384349が作られ、分割Way・Nodeが削除され元Way 196594575へ復元された。元編集との対応と変更結果は監査履歴へ残り、StepBy表示も無効化された。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSM自動公開に失敗した場合の表示と再送を確認する</span><span class="note">OAuth未連携・権限取消し・Version競合・監査履歴保存失敗・OSM API障害をそれぞれ確認し、StepBy側の記録は失われず、二重changesetを作らず、利用者には短く分かりやすい状態だけを表示する。競合時は自動上書きせず停止する。</span></div></li>
             </ul>
           </article>
@@ -436,8 +446,8 @@
           <article class="panel">
             <h3>6-1. 既存データをOSMへ移す</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">既存データの件数・品質・重複・公開可否を調査する</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">自動で一括送信せず、問題のある記録を除外できるようにする。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">既存データの件数・品質・重複・公開可否を調査する</span><span class="note">完了。本番DBを読み取り専用で集計し、328記録、raw 7,344点、Valhalla経路276件、完全重複経路0件を確認。rawなし6件、経路なし52件、孤立raw/matched各3点、旧rawのaccuracy全件未保存を品質課題として記録した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">完了。経路を持つ276件を一次候補とし、無効記録・形状異常・現在OSMとの重複・再フィッティング不成立を除外する手順を <a href="documents/existing-data-migration-audit.md">移行監査文書</a> に整理した。候補ごとの実変更案はコミュニティ確認後に生成し、自動一括送信しない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">コミュニティ確認と明示許可後、少量ずつマージする</span><span class="note">全件のchangeset・Way・結果を監査履歴へ保存する。</span></div></li>
             </ul>
           </article>
@@ -499,10 +509,10 @@
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">Valhallaが現在行っている処理を特定する</span><span class="note">完了。1点スナップと軌跡全体のマップマッチング・Way ID取得を確認。<a href="valhalla-browser-fitting-report.html">調査結果を見る</a></span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">ブラウザ側でフィッティングを代替できるか検証する</span><span class="note">完了。条件付きで実現可能。無停止の段階移行案を作成。<a href="valhalla-browser-fitting-report.html#migration">移行案を見る</a></span></div></li>
-              <li><span class="box"></span><div><span class="task-title">点字ブロックを含むWayをOSMへ直接マージできるか確認する</span><span class="note">実装面の確認は進展。Way分割案、changeset送信、Version競合停止、取消送信のコードを作成済み。残りはOSM認証方式、レビュー運用、コミュニティ確認。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">PostgreSQLへOSM IDだけを保存する方式を確認する</span><span class="note">座標やタグを複製せず、OSMを正として照合できる構成を検討。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">公開・非公開データを分離できるか確認する</span><span class="note">点字ブロックはOSMへ。PROモードの柵・塀などと日常情報は公開しない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">StepBy IDをOSMデータへ付与できるか確認する</span><span class="note">Wikidata項目の作成可否、OSMタグとしての適切性、コミュニティ方針を確認。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">点字ブロックを含むWayをOSMへ直接マージできるか確認する</span><span class="note">完了。本人OAuth、Way分割、標準タグ追加、changeset送信、ID返却、追記監査、Version競合停止、反対変更による取消しを実装し、本人の実記録1件で追加と取消しまで確認した。今後の一般公開範囲はコミュニティ相談後に決める。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">PostgreSQLへOSM IDを保存する方式を確認する</span><span class="note">完了。記録ID、変更案、changeset ID、Way・Node・RelationのIDとVersionを主な照合情報として保存する。当面の復旧用バックアップとしてGPS raw・経路・Way形状も保持する方針に決定した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">公開・非公開データを分離できるか確認する</span><span class="note">完了。点字ブロック系だけをOSM対象とし、PROモードの柵・塀・グレーチング・その他・メモは <code>osm_exportable=false</code> でクラウドDBだけへ保存する。実記録3件でOSM changesetが作られないことも確認済み。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">StepBy IDをOSMデータへ付与するか決定する</span><span class="note">完了。内部ユーザーID・記録IDはOSMオブジェクトの独自タグにせず、個人情報を含まないchangesetの <code>created_by</code>・<code>source</code> とサーバー側監査履歴で由来を照合する。追加の独自タグはコミュニティ合意が得られない限り導入しない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM公式アプリで地図情報を編集してみる</span><span class="note">完了済み。</span></div></li>
             </ul>
           </article>
@@ -516,10 +526,10 @@
               <li class="done"><span class="box"></span><div><span class="task-title">開発APIのTailscale接続を設定する</span><span class="note">完了。標準HTTPSの <code>/dev-api</code> を開発API（localhost:3100）へFunnel接続し、非標準ポートを遮断するブラウザからも利用可能にした。従来の10000番経路も当面維持。10001番はtailnet内限定ServeでUI10（localhost:3200）を配信。許可したOrigin、認証、レート制限などの防御を適用している。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">Funnel公開前の開発API防御を実装する</span><span class="note">完了。署名付きログイントークン、本人ID固定、履歴一覧の管理者キー、IP・ユーザー単位の二重レート制限、本文サイズ上限、Origin制限、異常アクセスログ、秘密鍵のGit分離を実装。未認証・偽トークン・ID偽装・大量アクセス・過大データの拒否を試験済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">新API検証用フロントをUI10以降へ実装する</span><span class="note">完了。UI10、開発API URL、開発専用Service Worker・キャッシュ、DEV表示を本番UI0から分離。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM歩行ネットワークの取得・キャッシュを実装する</span><span class="note">実装中。約1km圏の歩行可能WayをOverpassから取得し、Way ID/Version・Node ID・タグ・形状を返す開発API、5分サーバキャッシュ、IndexedDB保存まで実装。タイル差分取得・圧縮は未実装。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">StepBy専用ブラウザフィッターを実装する</span><span class="note">実装中。60m以内の線分投影、歩道優先、同一Way・共有Node接続優先をUI10へ実装し単体確認済み。空間インデックス、方位評価、Web Worker化は未実装。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM歩行ネットワークの取得・キャッシュを実装する</span><span class="note">完了。現在地から1kmの歩行可能WayをOSM/Overpassから取得し、ブラウザへ保存する。取得中心から650m移動すると追加取得し、重複Wayを統合する。表示専用の点字ブロック10km取得とは分離し、取得失敗時は既存範囲を維持して再試行する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">StepBy専用ブラウザフィッターを実装する</span><span class="note">完了。歩道優先、前回Way・共有Node連続性、精度不良点の補間・除外、OSM Nodeグラフでの接続Way補完、全経路の連続性拘束を実装した。一般画面はWeb Workerで処理しValhallaを呼ばない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">確定時のWay経路をOSM上の接続経路に拘束する</span><span class="note">完了。GPSが直接選んだWay間をOSM Node接続グラフで探索し、必要な未観測の接続Wayを歩道優先コストで補う。最終Way ID列はすべて共有Nodeで連結した一本の経路だけを許可し、接続不能または網羅率80%未満なら確定せず記録・変更案を拒否する。UI10と開発APIの両方で検証し、接続Way補完・接続不能・1000点/500Wayの自動試験と実記録Way 464458979の再検証に合格。現行版とValhallaは変更していない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Valhallaとのシャドー比較機能を実装する</span><span class="note">実装中。UI10で同一GPSを新旧同時計算し、GPS・Valhalla・ブラウザ版・結果差を地図へ色分け表示。Way ID、位置差、歩道判定、連続性、計算時間、保存履歴番号を比較パネルへ表示し、実験DBへ全件保存できる。経路全体の比較集計と合格基準判定は未実装。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Valhallaとのシャドー比較機能で移行判定する</span><span class="note">完了。UI10で新旧比較と実験DB保存を実装し、本番rawデータ全件で比較した。外れ値を地図で確認できるようにした後、ブラウザ版を採用する判断が確定したため、一般画面から比較UIを撤去し管理・試験用途だけに残した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM認証と変更確認画面を実装する</span><span class="note">完了。本番OSMのOAuth 2.0＋PKCE、状態確認、連携解除、小窓での初回ログイン・登録・許可を実装。初回の点字ブロック記録確定時に連携状態を自動確認し、未連携の場合だけ小窓を開く。連携済みならOSM画面を表示しない。プロフィールのボタンは確認・解除・再連携用として残す。アクセストークンは開発DBへ暗号化保存し、監査履歴は秘密情報を除いて追記型保存。開発OSMの旧トークンは本番切替時に監査付きで失効済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">Wayの途中分割処理を実装する</span><span class="note">完了。開始・終了Node、正逆方向、複数Way、元タグ、Relationのmember順・role・タグを引き継ぐ。独立歩道には tactile_paving=yes、道路中心線にはGPS点群のWayからの符号付き距離をaccuracyで重み付けし、OSM Node順を基準に左右を必ず自動判定して sidewalk:left/right:tactile_paving=yes を作る。低信頼時も最大オフセットで決着し、利用者には左右を質問しない。Way正逆・GPSノイズ・中央付近・低精度点の自動試験済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">一般利用者向けの記録フローへ機能を統合する</span><span class="note">完了。記録終了→ブラウザ側の連続経路確定→分割区間・左右・予定タグ確認→StepBy記録保存→未送信変更案の自動保存→必要な場合だけOSM連携、という一連の流れに統合。通常記録はValhallaを呼ばず、GPS生点・accuracy・ブラウザ版フィット点・Way ID・経路を開発DBへ保存する。Valhallaは明示的な比較試験ボタンでだけ呼び出す。</span></div></li>
@@ -529,13 +539,13 @@
               <li class="done"><span class="box"></span><div><span class="task-title">OSM変更セットの作成・送信APIを実装する</span><span class="note">完了。changeset作成、Node・Way一括送信、ID・Version取得、changeset終了を実装。Version競合時は送信前に停止する。現在は機能フラグ無効で必ず423となり、実OSMでは未試験。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">StepBy記録とOSM処理を1対1で紐付ける</span><span class="note">完了。1記録＝1変更案＝1送信changeset＝最大1取消changesetの単純な表を開発DBへ実装。2件目の変更案・取消案は拒否し、状態を draft / merged / revert_draft / reverted / failed / conflict で管理。詳細画面にも状態とIDを表示する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSMマージ取消APIを実装する</span><span class="note">完了。record_idから元の変更案と監査履歴を特定し、反対変更を新しい取消案として作成するAPIへ整理。送信済みの場合は現在Version確認後に新しいchangesetとして取消す設計。機能フラグ無効のため実送信は不可、実OSMでは未試験。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM再編集後の追跡・再照合を実装する</span><span class="note">後からWayが再分割・統合された場合、変更セット・Node・形状情報を使って対応先を更新する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM開発環境で編集テストを実施する</span><span class="note">Way分割、Relation、競合、キャンセル、再送、ID返却、権限エラーを確認。本番OSMへはテストデータを送らない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM再編集後の追跡・再照合方針を実装する</span><span class="note">完了。changeset ID、Way・Node・Relation ID/Version、変更前後、Way形状を保存し、表示は現在OSMと保存経路を再取得して照合する。第三者による再分割・統合でVersionが一致しない場合は、危険なID自動付替えや上書きをせず conflict として停止し、現在形状を人が確認して新しい対応を監査イベントとして追加する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境で編集テストを実施する</span><span class="note">完了。開発OSMでWay作成・分割・タグ・changeset説明・ID返却・取消しによる完全復元を確認した。Relation、競合、再送、権限エラーはモック自動試験で補完し、本番OSMへ架空テストデータは送っていない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">OSMコミュニティへ方式を確認する</span><span class="note">タグ付け、StepBy由来の表現、支援型編集・大量編集の運用を事前相談する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">限定利用から段階的に切り替える</span><span class="note">開発者、協力者、一部利用者、標準利用の順に拡大。低信頼・データ不足・処理失敗時はValhallaへ自動退避。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">件数、品質、重複、マージ可否、公開対象を確認し、少量の試験から始める。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">完了。本番DBを読み取り専用で棚卸しし、276経路を一次候補とする品質・重複・再フィッティング・コミュニティ相談・少量移行の順序を <a href="documents/existing-data-migration-audit.md">監査文書</a> に整理した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">新バージョンのValhalla依存を解消する</span><span class="note">開発版のブラウザフィッティングとOSM統合が合格基準を満たしたら、新バージョンの通常処理からValhalla呼出しをなくす。現行版と現行Valhallaは停止せず並行稼働し、本番切替えは別途明示的に判断する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">新バージョンのValhalla依存を解消する</span><span class="note">完了。UI10一般処理はOSMブラウザフィッターだけを使用し、Valhalla呼出しと比較表示は通常画面から除外した。現行UI0と現行Valhallaは停止せず並行稼働している。</span></div></li>
             </ul>
             <div class="dependency"><strong>次に実施：</strong> プロフィールから本番OSMへ再連携し、正しい現地記録1件の保存で本番changeset・Way分割・タグ・監査履歴を確認する。必要な場合は本人の緑線削除から取消しを確認する。テスト用の架空データは本番OSMへ送らない。</div>
             <div class="dependency"><strong>重要な方針：</strong> ここで行うのは開発版のValhalla依存解消です。現行版と現行Valhallaは止めずに並行稼働させ、本番切替え・停止はこのタスクへ含めません。</div>
@@ -568,11 +578,11 @@
           <article class="panel">
             <h3>選定・相談</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">移行前に完了させる仕様変更の範囲を確定する</span><span class="note">「全て完了」の判定条件をチェックリストにする。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Valhalla廃止後のクラウド要件を決める</span><span class="note">API、PostgreSQL、画像、ログ、バックアップ、運用負荷、月額上限、OSM連携を整理。Valhalla用のCPU・メモリ・タイル容量は含めない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">移行前に完了させる仕様変更の範囲を確定する</span><span class="note">完了。上の01〜04を判定条件として実装・自動試験し、実端末GPSと外部確認だけを05-4へ分離した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Valhalla依存解消後のクラウド要件を決める</span><span class="note">完了。API、PostgreSQL、画像、ログ、バックアップ、秘密管理、月額上限、OSM OAuthを整理し、Valhalla資源を含めないGoogle Cloud折衷構成へ決定した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">移行方式と無料枠を比較する</span><span class="note">VPS、Google Cloud Run、AWS Lambda、Cloudflare Workers、Supabase、Renderを公式情報で比較。現状は安全優先ならVPS、無料実験ならCloud Run＋Neon＋GitHub Pages＋オブジェクトストレージを第一候補とした。<a href="cloud-migration-options.html">比較表を見る</a></span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">構成とサービスを決定する</span><span class="note">Google Cloud折衷案に決定。詳細は05を参照。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">移行費用と継続費用を見積もる</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">移行費用と継続費用を見積もる</span><span class="note">完了。2026-08-13時点の構成はus-west1のe2-micro 1台、Standard Disk 30GB、Cloud Storage約1MB、Secret Manager少数Versionで、Compute Engine・Storage・Secret Managerの各無料枠内。主な超過リスクは月1GBを超えるVM外向き通信で、月500円の予算通知と実測監視を設定済み。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">松田先生へ費用負担を相談する</span><span class="note">「可能であればご支援いただきたい」という依頼文と、見積りを準備。</span></div></li>
             </ul>
           </article>
@@ -580,11 +590,11 @@
           <article class="panel">
             <h3>移行作業</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">移行手順と切戻し手順を作成する</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">データベースと設定をバックアップする</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">クラウド環境を構築し、アプリとデータを移行する</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">本番切替え前に総合テストする</span><span class="note">認証、記録、OSM連携、非公開情報、性能、バックアップ復元を確認。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">本番を切り替え、移行後を監視する</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">移行手順と切戻し手順を作成する</span><span class="note">完了。旧環境を止めずにクラウドUI10へ切替え、問題時は旧UI・APIへ戻せる並行稼働手順を05へ整理した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">データベースと設定をバックアップする</span><span class="note">完了。クラウドDBとuploadsの日次Cloud Storageバックアップ、30日保持、別DBへの復元試験に合格。秘密設定はSecret Managerで分離している。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">クラウド環境を構築し、アプリとデータを移行する</span><span class="note">完了。Compute Engine、PostgreSQL/PostGIS、Caddy、Secret Manager、Cloud Storageへ開発版を移し、GitHub Pages UI10をクラウドAPIへ接続した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">本番切替え前にAI総合テストする</span><span class="note">完了。認証、記録、ブラウザフィッティング、OSM連携、非公開情報、バックアップ復元、競合停止、再送の自動試験に合格。実端末GPS項目は05-4へ分離した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">クラウドUI10へ切り替え、移行後を監視する</span><span class="note">完了。UI10はクラウドAPI・DBを使用中。API・PostgreSQL・Caddy・バックアップは稼働し、1時間ごとの31日監視を開始した。旧現行版は切戻し用に並行稼働している。</span></div></li>
             </ul>
             <div class="dependency"><strong>開始条件：</strong> 01のブラウザフィッティング・OSM統合が安定し、Valhallaを廃止できていること。03の必要な仕様変更が完成し、移行構成・サービス・費用の承認が取れていること。</div>
           </article>

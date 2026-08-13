@@ -303,9 +303,56 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
           sendJson(res, 409, { error: "record_is_stepby_only", osmEligible: false });
           return;
         }
-        const splitPlan = createSplitPlan({ segments: body.segments }, { tactileValue: "yes" });
         const planId = crypto.randomUUID();
         const summary = String(body.summary || "UI10 tactile paving split dry-run").trim().slice(0, 500);
+        let splitPlan;
+        try {
+          splitPlan = createSplitPlan({ segments: body.segments }, { tactileValue: "yes" });
+        } catch (plannerError) {
+          if (plannerError.message !== "tactile_tag_already_present") throw plannerError;
+          const skippedContext = {
+            ...(body.clientContext && typeof body.clientContext === "object" ? body.clientContext : {}),
+            previewOnly: false,
+            osmWriteRequested: false,
+            planner: "split_planner_v2_relations",
+            recordId,
+            publication: { osmEligible: true, containsStepByOnlyData: publication.hasPrivateTag },
+            skipped: "tactile_tag_already_present",
+            existingWayId: plannerError.wayId || null,
+            existingTagKey: plannerError.tagKey || null,
+          };
+          const conn = await pool.getConnection();
+          try {
+            await conn.beginTransaction();
+            const [existing] = await conn.query("SELECT merge_plan_id FROM osmchange.record_links WHERE record_id=? LIMIT 1", [recordId]);
+            if (existing[0]) throw new Error("record_already_linked");
+            await conn.query(
+              `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
+               VALUES(?,?,?,?,?,'[]'::jsonb,?::jsonb) RETURNING plan_id`,
+              [planId, "merge", req.authUserId, null, summary, JSON.stringify(skippedContext)]
+            );
+            await conn.query(
+              `INSERT INTO osmchange.record_links(record_id,created_by,merge_plan_id,osm_status)
+               VALUES(?,?,?,'already_present') RETURNING record_id`, [recordId, req.authUserId, planId]
+            );
+            await conn.query(
+              `INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+               VALUES(?,?,?,?,?::jsonb) RETURNING event_id`,
+              [planId, "publication_skipped_existing_tactile", req.authUserId, req.securityRequestId || null,
+                JSON.stringify({ recordId, osmSent: false, reason: plannerError.message,
+                  wayId: plannerError.wayId || null, tagKey: plannerError.tagKey || null })]
+            );
+            await conn.commit();
+          } catch (transactionError) {
+            await conn.rollback();
+            throw transactionError;
+          } finally {
+            conn.release();
+          }
+          sendJson(res, 200, { success: true, recordId, planId, status: "already_present",
+            skipped: true, reason: plannerError.message, osmSent: false });
+          return;
+        }
         const clientContext = {
           ...(body.clientContext && typeof body.clientContext === "object" ? body.clientContext : {}),
           previewOnly: false,
@@ -385,6 +432,10 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
             );
             const freshLink = freshLinks[0];
             if (!freshLink) throw new Error("osm_record_link_not_found");
+            if (freshLink.osm_status === "already_present") {
+              return { success: true, recordId, planId: freshLink.merge_plan_id, changesetId: null,
+                osmSent: false, skipped: true, reason: "tactile_tag_already_present", idempotent: true };
+            }
             if (freshLink.osm_status === "merged" || freshLink.osm_status === "revert_draft" || freshLink.osm_status === "reverted") {
               return { success: true, recordId, planId: freshLink.merge_plan_id, changesetId: freshLink.merge_changeset_id, osmSent: true, idempotent: true };
             }
