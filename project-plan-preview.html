@@ -320,7 +320,7 @@
               <li class="done"><span class="box"></span><div><span class="task-title">OSM未連携時だけ小窓で連携・サインアップへ案内する</span><span class="note">完了。サーバー設定済みかつ未連携の場合だけOAuth小窓を開き、連携済みまたはサーバー未設定では開かない判定を独立実装して3分岐を自動試験した。小窓の拒否・中断・開始失敗は記録キューへ影響せず、記録と未送信案を失わない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">完了。開発DBにセッション終了日時、GPS raw 3点、フィット点3点、ブラウザ経路、Way ID/Version/Node/全座標/追加予定タグのスナップショット、未送信変更案、1記録1変更案リンク、<code>split_plan_created</code>監査イベントが揃うことを確認。送信・取消送信APIはいずれも423で停止し、OSM送信0件。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">保存操作をOSM公開へ接続する</span><span class="note">完了。OSM公開対象の記録は、利用者が保存を押すと永続キューがStepBy保存→変更案作成→本人のOSM OAuthで公開まで順番に実行する。クラウドAPIをOSM開発環境へ接続し、changeset 660298で公開、同じ記録の再要求で二重送信されないことを確認。本番OSMには未接続。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">本人の緑線からOSM取消しへ接続する</span><span class="note">完了。本人所有の緑線だけに「この記録を削除」を表示し、削除確定を永続キューから取消APIへ送る。OSM開発環境のchangeset 660299でタグが元へ戻り、二重取消しが発生しないこと、監査履歴、試験地物の削除まで確認。本番OSMには未接続。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">本人の緑線からOSM取消しへ接続する</span><span class="note">完了。本人所有の緑線だけに「この記録を削除」を表示し、削除確定を永続キューから取消APIへ送る。開発用OSMには公開Overpass相当の表示基盤がないため、送信成功・対象環境・確定経路を監査履歴と開発DBから照合して緑線を補完する。OSM開発環境のchangeset 660299でタグが元へ戻り、二重取消しが発生しないこと、監査履歴、試験地物の削除まで確認。本番OSMには未接続。</span></div></li>
             </ul>
           </article>
         </div>

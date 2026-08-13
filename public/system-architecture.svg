@@ -51,7 +51,7 @@
   <text x="578" y="682" class="boxTitle devText">開発バックエンド</text><text x="578" y="707" class="body">/home/otama/barrierfree-map-dev　dev</text><text x="578" y="730" class="body">PM2: barrierfree-map-dev　127.0.0.1:3100</text>
   <rect x="578" y="755" width="524" height="68" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="779" class="body">共通アプリAPI</text><text x="595" y="802" class="small">認証・記録・集計・PRO公開判定（公開3種／StepBy内限定）</text>
   <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">通常：ブラウザ記録API</text><text x="595" y="886" class="small">raw補間・Node接続拘束・道路左右の自動判定</text><text x="595" y="906" class="small">Valhalla非依存／比較は管理者画面だけ</text>
-  <rect x="850" y="838" width="252" height="86" rx="12" class="dev"/><text x="867" y="864" class="body devText">OSM公開・取消API（開発OSM接続）</text><text x="867" y="886" class="small">保存＝本人OAuth公開／緑線削除＝取消し</text><text x="867" y="906" class="small">1記録1changeset・競合停止・冪等</text>
+  <rect x="850" y="838" width="252" height="86" rx="12" class="dev"/><text x="867" y="864" class="body devText">OSM公開・取消API（開発OSM接続）</text><text x="867" y="886" class="small">保存＝本人OAuth公開／緑線削除＝取消し</text><text x="867" y="906" class="small">開発DB経路で緑線補完・競合停止・冪等</text>
   <rect x="578" y="940" width="524" height="92" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="966" class="body">安全機構・開発DB管理API</text><text x="595" y="988" class="small">所有者・OAuth・機能フラグ・Version・監査開始前保存を必須化</text><text x="595" y="1009" class="small">保存/本人緑線削除を1件の許可とし、青線・他人・対応不明は取消不可</text>
 
   <rect x="1160" y="650" width="355" height="190" rx="18" class="db"/>
