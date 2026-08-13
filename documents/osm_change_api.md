@@ -1,7 +1,7 @@
 
-### OSM変更API（開発版・送信ロック中）
+### OSM変更API（開発版・OSM開発環境へ接続中）
 
-変更案、送信、取消送信、監査履歴を扱う。送信コードは実装済みだが、開発サーバーでは `OSM_WRITES_ENABLED` を有効にしていないため、実行系APIはネットワーク処理へ入る前に `423 osm_write_locked` を返す。
+変更案、送信、取消送信、監査履歴を扱う。クラウド開発サーバーは `https://master.apis.dev.openstreetmap.org` だけを接続先として `OSM_WRITES_ENABLED=true` にしている。本番OSMには接続しない。
 
 - `GET /api/osm/status`: 安全装置の状態を取得する。
 - `POST /api/osm/plans`: `merge`、`delete`、`revert` の変更案を追記保存する。

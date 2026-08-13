@@ -319,8 +319,8 @@
               <li class="done"><span class="box"></span><div><span class="task-title">記録開始から変更内容の最終確認までを通して試験する</span><span class="note">完了。StepBy認証済み利用者のセッション開始 → GPS raw → ブラウザフィッティング → 共有Nodeで連続する経路確定 → セッション終了 → OSM連携状態確認 → Way分割・Relation引継ぎを含む未送信変更案 → 詳細画面、の順で結合試験に合格。確定後の保存は永続キューへ渡すため画面を待たせない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM未連携時だけ小窓で連携・サインアップへ案内する</span><span class="note">完了。サーバー設定済みかつ未連携の場合だけOAuth小窓を開き、連携済みまたはサーバー未設定では開かない判定を独立実装して3分岐を自動試験した。小窓の拒否・中断・開始失敗は記録キューへ影響せず、記録と未送信案を失わない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">完了。開発DBにセッション終了日時、GPS raw 3点、フィット点3点、ブラウザ経路、Way ID/Version/Node/全座標/追加予定タグのスナップショット、未送信変更案、1記録1変更案リンク、<code>split_plan_created</code>監査イベントが揃うことを確認。送信・取消送信APIはいずれも423で停止し、OSM送信0件。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">保存操作をOSM公開へ接続する</span><span class="note">実装完了。OSM公開対象の記録は、利用者が保存を押すと永続キューがStepBy保存→変更案作成→本人のOSM OAuthで公開まで順番に実行する。記録ID単位の冪等処理、追記型監査、Version競合停止を維持し、画面は通信完了を待たず次へ進む。実OSM通信は機能フラグを有効化するまで停止。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">本人の緑線からOSM取消しへ接続する</span><span class="note">実装完了。OSM表示APIがchangesetとStepBy記録を照合し、ログイン本人が所有する未取消しの緑線だけに「この記録を削除」を表示する。削除確定は専用の永続キューへ入り、現在Versionを確認して反対変更を新しいchangesetとして送る。青線・他人の記録・対応不明の地物は削除できない。実OSM通信は機能フラグを有効化するまで停止。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">保存操作をOSM公開へ接続する</span><span class="note">完了。OSM公開対象の記録は、利用者が保存を押すと永続キューがStepBy保存→変更案作成→本人のOSM OAuthで公開まで順番に実行する。クラウドAPIをOSM開発環境へ接続し、changeset 660298で公開、同じ記録の再要求で二重送信されないことを確認。本番OSMには未接続。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">本人の緑線からOSM取消しへ接続する</span><span class="note">完了。本人所有の緑線だけに「この記録を削除」を表示し、削除確定を永続キューから取消APIへ送る。OSM開発環境のchangeset 660299でタグが元へ戻り、二重取消しが発生しないこと、監査履歴、試験地物の削除まで確認。本番OSMには未接続。</span></div></li>
             </ul>
           </article>
         </div>
