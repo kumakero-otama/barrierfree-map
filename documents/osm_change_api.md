@@ -1,7 +1,7 @@
 
 ### OSM変更API（開発版・OSM開発環境へ接続中）
 
-変更案、送信、取消送信、監査履歴を扱う。クラウド開発サーバーは `https://master.apis.dev.openstreetmap.org` だけを接続先として `OSM_WRITES_ENABLED=true` にしている。本番OSMには接続しない。
+変更案、送信、取消送信、監査履歴を扱う。2026-08-13からクラウド開発サーバーの送信先は本番OSM API `https://api.openstreetmap.org`、OAuthは `https://www.openstreetmap.org` とし、`OSM_WRITES_ENABLED=true` にしている。切替時に開発OSMの既存トークンを監査付きで失効させたため、各利用者は本番OSMへ再連携する必要がある。切替確認ではOSM書込みを行っていない。
 
 - `GET /api/osm/status`: 安全装置の状態を取得する。
 - `POST /api/osm/plans`: `merge`、`delete`、`revert` の変更案を追記保存する。
