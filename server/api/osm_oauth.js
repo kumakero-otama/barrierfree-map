@@ -207,7 +207,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
         lastVerifiedAt: row.last_verified_at,
         revokedAt: row.revoked_at,
       } : null,
-      osmWritesEnabled: false,
+      osmWritesEnabled: process.env.OSM_WRITES_ENABLED === "true",
     });
   }
 

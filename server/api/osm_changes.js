@@ -5,6 +5,7 @@ const { createSplitPlan } = require("../osm/split_planner");
 const { executeWithClient, createConfiguredClient } = require("../osm/osm_executor");
 const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
+const { createUserOsmClient } = require("../osm/user_oauth_client");
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
@@ -66,7 +67,7 @@ function validateElements(value) {
   return elements;
 }
 
-function createOsmChangesHandler({ sendJson }) {
+function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmClient }) {
   const { pool, error: dbError } = createDbPool();
   let initialized = false;
 
@@ -159,6 +160,91 @@ function createOsmChangesHandler({ sendJson }) {
       }));
   }
 
+  async function withPlanLock(planId, operation) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query("SELECT pg_advisory_lock(hashtextextended(?,0))", [String(planId)]);
+      return await operation();
+    } finally {
+      try { await conn.query("SELECT pg_advisory_unlock(hashtextextended(?,0))", [String(planId)]); } catch (_) {}
+      conn.release();
+    }
+  }
+
+  async function executeUserPlan(req, plan, action) {
+    const planId = plan.plan_id;
+    if (!writesEnabled()) {
+      await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "server_feature_flag_disabled", authorization: "user_save_or_delete" });
+      const error = new Error("osm_write_locked");
+      error.status = 423;
+      throw error;
+    }
+    await appendAudit(planId, "user_execution_requested", req, {
+      requestedAction: action,
+      authorization: action === "execute" ? "record_save" : "owned_green_line_delete",
+      elementCount: plan.elements.length,
+    });
+    let client;
+    try {
+      client = await userClientFactory(pool, req.authUserId);
+    } catch (error) {
+      await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: error.message || "osm_connection_required" });
+      throw error;
+    }
+    const attemptId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO osmchange.execution_attempts(attempt_id,plan_id,action,actor_user_id,request_id)
+       VALUES(?,?,?,?,?) RETURNING attempt_id`,
+      [attemptId, planId, action, req.authUserId, req.securityRequestId || null]
+    );
+    await appendAudit(planId, "execution_authorized", req, {
+      attemptId, requestedAction: action, authorization: "user_save_or_delete", elementCount: plan.elements.length,
+    });
+    try {
+      const executionResult = await executeWithClient({
+        client,
+        operations: plan.elements,
+        summary: plan.summary,
+        planId,
+        operationType: plan.operation_type,
+        onChangesetCreated: async (changesetId) => {
+          await appendAudit(planId, "changeset_created", req, { attemptId, requestedAction: action, changesetId });
+        },
+      });
+      await appendAudit(planId, "execution_succeeded", req, { attemptId, requestedAction: action, executionResult });
+      if (plan.operation_type === "revert") {
+        await pool.query(
+          `UPDATE osmchange.record_links SET revert_changeset_id=?,osm_status='reverted',updated_at=NOW()
+           WHERE revert_plan_id=?`, [executionResult.changesetId, planId]
+        );
+      } else {
+        await pool.query(
+          `UPDATE osmchange.record_links SET merge_changeset_id=?,osm_status='merged',updated_at=NOW()
+           WHERE merge_plan_id=?`, [executionResult.changesetId, planId]
+        );
+      }
+      return { success: true, planId, attemptId, osmSent: true, executionResult };
+    } catch (executionError) {
+      await appendAudit(planId, "execution_failed", req, {
+        attemptId, requestedAction: action, error: executionError.message,
+        osmStatus: executionError.status || null,
+        changesetId: executionError.changesetId || null,
+        conflict: executionError.message === "osm_version_conflict" ? {
+          elementType: executionError.elementType,
+          osmId: executionError.osmId,
+          expectedVersion: executionError.expectedVersion,
+          currentVersion: executionError.currentVersion,
+        } : null,
+      });
+      await pool.query(
+        `UPDATE osmchange.record_links SET osm_status=?,updated_at=NOW()
+         WHERE merge_plan_id=? OR revert_plan_id=?`,
+        [executionError.message === "osm_version_conflict" ? "conflict" : "failed", planId, planId]
+      );
+      throw executionError;
+    }
+  }
+
   return async function handleOsmChanges(req, res) {
     if (process.env.NODE_ENV !== "development") {
       sendJson(res, 404, { error: "not_found" });
@@ -167,7 +253,7 @@ function createOsmChangesHandler({ sendJson }) {
     try {
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       // HTTP body may start streaming immediately, so capture it before awaiting DB initialization.
-      const isExecutionRequest = req.method === "POST" && /\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname);
+      const isExecutionRequest = req.method === "POST" && (/\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname) || /\/api\/osm\/records\/[^/]+\/(publish|revert)$/.test(url.pathname));
       const pendingBody = (["/api/osm/plans", "/api/osm/split-plan"].includes(url.pathname) || isExecutionRequest) && req.method === "POST"
         ? readJson(req)
         : null;
@@ -181,8 +267,8 @@ function createOsmChangesHandler({ sendJson }) {
           proposalApiEnabled: true,
           osmNetworkCodePresent: true,
           osmWritesEnabled: writesEnabled(),
-          requiredSafeguards: ["server_feature_flag", "admin_key", "per_request_plan_confirmation", "append_only_audit"],
-          reason: writesEnabled() ? "OSM write code is enabled but still requires per-request safeguards" : "OSM write code is installed and locked by the server feature flag",
+          requiredSafeguards: ["server_feature_flag", "record_ownership", "user_osm_oauth", "user_save_or_delete_confirmation", "idempotency", "append_only_audit"],
+          reason: writesEnabled() ? "Owned records can be published by Save and reverted by confirmed green-line deletion" : "OSM write code is installed and locked by the server feature flag",
         });
         return;
       }
@@ -200,8 +286,8 @@ function createOsmChangesHandler({ sendJson }) {
         const summary = String(body.summary || "UI10 tactile paving split dry-run").trim().slice(0, 500);
         const clientContext = {
           ...(body.clientContext && typeof body.clientContext === "object" ? body.clientContext : {}),
-          previewOnly: true,
-          osmWriteRequested: false,
+          previewOnly: false,
+          osmWriteRequested: true,
           planner: "split_planner_v2_relations",
           recordId,
           publication: {
@@ -256,6 +342,130 @@ function createOsmChangesHandler({ sendJson }) {
         }
         if (req.method === "GET" && parts.length === 4) {
           sendJson(res, 200, { success: true, record: link, osmSent: ["merged", "revert_draft", "reverted"].includes(link.osm_status) });
+          return;
+        }
+        if (req.method === "POST" && parts[4] === "publish") {
+          const body = await pendingBody;
+          if (!body || body.authorization !== "record_save") {
+            await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute", reason: "record_save_confirmation_required" });
+            sendJson(res, 409, { error: "record_save_confirmation_required", osmSent: false });
+            return;
+          }
+          if (!writesEnabled()) {
+            await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute", reason: "server_feature_flag_disabled", authorization: "record_save" });
+            sendJson(res, 423, { error: "osm_write_locked", osmSent: false });
+            return;
+          }
+          const result = await withPlanLock(link.merge_plan_id, async () => {
+            const [freshLinks] = await pool.query(
+              `SELECT merge_plan_id,merge_changeset_id,osm_status FROM osmchange.record_links
+               WHERE record_id=? AND created_by=? LIMIT 1`, [recordId, req.authUserId]
+            );
+            const freshLink = freshLinks[0];
+            if (!freshLink) throw new Error("osm_record_link_not_found");
+            if (freshLink.osm_status === "merged" || freshLink.osm_status === "revert_draft" || freshLink.osm_status === "reverted") {
+              return { success: true, recordId, planId: freshLink.merge_plan_id, changesetId: freshLink.merge_changeset_id, osmSent: true, idempotent: true };
+            }
+            if (freshLink.osm_status === "conflict") {
+              const error = new Error("osm_version_conflict");
+              error.status = 409;
+              throw error;
+            }
+            const [plans] = await pool.query(
+              `SELECT plan_id,operation_type,created_by,summary,elements,client_context
+               FROM osmchange.change_plans WHERE plan_id=? AND created_by=? LIMIT 1`,
+              [freshLink.merge_plan_id, req.authUserId]
+            );
+            if (!plans[0] || plans[0].operation_type !== "merge") throw new Error("linked_plan_not_found");
+            return executeUserPlan(req, plans[0], "execute");
+          });
+          sendJson(res, 200, { ...result, recordId });
+          return;
+        }
+        if (req.method === "POST" && parts[4] === "revert") {
+          const body = await pendingBody;
+          if (!body || body.authorization !== "owned_green_line_delete") {
+            await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute-revert", reason: "green_line_delete_confirmation_required" });
+            sendJson(res, 409, { error: "green_line_delete_confirmation_required", osmSent: false });
+            return;
+          }
+          if (!writesEnabled()) {
+            await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute-revert", reason: "server_feature_flag_disabled", authorization: "owned_green_line_delete" });
+            sendJson(res, 423, { error: "osm_write_locked", osmSent: false });
+            return;
+          }
+          const result = await withPlanLock(link.merge_plan_id, async () => {
+            const [freshLinks] = await pool.query(
+              `SELECT record_id,merge_plan_id,merge_changeset_id,revert_plan_id,revert_changeset_id,osm_status
+                 FROM osmchange.record_links WHERE record_id=? AND created_by=? LIMIT 1`,
+              [recordId, req.authUserId]
+            );
+            const freshLink = freshLinks[0];
+            if (!freshLink) throw new Error("osm_record_link_not_found");
+            if (freshLink.osm_status === "reverted") {
+              return { success: true, recordId, planId: freshLink.revert_plan_id, changesetId: freshLink.revert_changeset_id, osmSent: true, idempotent: true };
+            }
+            if (freshLink.osm_status !== "merged" && freshLink.osm_status !== "revert_draft" && freshLink.osm_status !== "failed") {
+              const error = new Error(freshLink.osm_status === "conflict" ? "osm_version_conflict" : "record_not_merged");
+              error.status = 409;
+              throw error;
+            }
+            let revertPlanId = freshLink.revert_plan_id;
+            if (!revertPlanId) {
+              const [mergePlans] = await pool.query(
+                `SELECT plan_id,summary,elements FROM osmchange.change_plans WHERE plan_id=? AND created_by=? LIMIT 1`,
+                [freshLink.merge_plan_id, req.authUserId]
+              );
+              const mergePlan = mergePlans[0];
+              if (!mergePlan) throw new Error("linked_plan_not_found");
+              const [successEvents] = await pool.query(
+                `SELECT details FROM osmchange.audit_events
+                 WHERE plan_id=? AND event_type='execution_succeeded' ORDER BY event_id DESC LIMIT 1`, [freshLink.merge_plan_id]
+              );
+              const executionResult = successEvents[0] && successEvents[0].details && successEvents[0].details.executionResult;
+              if (!executionResult) throw new Error("revert_not_executable");
+              revertPlanId = crypto.randomUUID();
+              const reverseElements = buildReverseElements(mergePlan, executionResult);
+              const conn = await pool.getConnection();
+              try {
+                await conn.beginTransaction();
+                await conn.query(
+                  `INSERT INTO osmchange.change_plans(plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
+                   VALUES(?,?,?,?,?,?::jsonb,?::jsonb) RETURNING plan_id`,
+                  [revertPlanId, "revert", req.authUserId, freshLink.merge_plan_id,
+                    `StepBy記録 ${recordId} の取消し`.slice(0, 500), JSON.stringify(reverseElements),
+                    JSON.stringify({ recordId, executable: true, sourceChangesetId: executionResult.changesetId })]
+                );
+                await conn.query(
+                  `UPDATE osmchange.record_links SET revert_plan_id=?,osm_status='revert_draft',updated_at=NOW()
+                   WHERE record_id=? AND created_by=? AND revert_plan_id IS NULL`,
+                  [revertPlanId, recordId, req.authUserId]
+                );
+                await conn.query(
+                  `INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+                   VALUES(?,?,?,?,?::jsonb) RETURNING event_id`,
+                  [revertPlanId, "revert_plan_created", req.authUserId, req.securityRequestId || null,
+                    JSON.stringify({ recordId, sourcePlanId: freshLink.merge_plan_id, executable: true, authorization: "owned_green_line_delete", osmSent: false })]
+                );
+                await conn.commit();
+              } catch (error) {
+                await conn.rollback();
+                throw error;
+              } finally {
+                conn.release();
+              }
+            }
+            const [revertPlans] = await pool.query(
+              `SELECT plan_id,operation_type,created_by,summary,elements,client_context
+               FROM osmchange.change_plans WHERE plan_id=? AND created_by=? LIMIT 1`, [revertPlanId, req.authUserId]
+            );
+            const revertPlan = revertPlans[0];
+            if (!revertPlan || revertPlan.operation_type !== "revert" || !revertPlan.client_context || !revertPlan.client_context.executable) {
+              throw new Error("revert_not_executable");
+            }
+            return executeUserPlan(req, revertPlan, "execute-revert");
+          });
+          sendJson(res, 200, { ...result, recordId });
           return;
         }
         if (req.method === "POST" && parts[4] === "revert-plan") {
@@ -501,12 +711,15 @@ function createOsmChangesHandler({ sendJson }) {
         "invalid_relation", "inconsistent_relation", "invalid_record_id", "record_not_found_or_forbidden", "record_already_linked",
         "missing_highway_tag", "missing_side_for_roadway",
       ]);
-      const status = error.message === "record_not_found_or_forbidden" ? 404
+      const status = Number.isInteger(error.status) ? error.status
+        : error.message === "record_not_found_or_forbidden" ? 404
         : error.message === "record_already_linked" ? 409
+        : ["osm_connection_required", "record_not_merged", "revert_not_executable", "osm_version_conflict"].includes(error.message) ? 409
+        : error.message === "osm_write_locked" ? 423
         : error.message === "invalid_json" || clientErrors.has(error.message) ? 400
         : error.message === "body_too_large" ? 413 : 500;
       console.error("[osm_changes] request failed:", error.message);
-      sendJson(res, status, { error: status === 500 ? "osm_change_api_failed" : error.message });
+      sendJson(res, status, { error: status === 500 ? "osm_change_api_failed" : error.message, osmSent: false });
     }
   };
 }

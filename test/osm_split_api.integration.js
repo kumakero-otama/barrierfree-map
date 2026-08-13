@@ -165,6 +165,18 @@ async function run() {
   assert.strictEqual(linked.body.record.merge_plan_id, created.body.planId);
   assert.strictEqual(linked.body.record.osm_status, "draft");
 
+  const publishWithoutSaveAuthorization = await request(`/api/osm/records/${encodeURIComponent(recordId)}/publish`, {
+    method: "POST", headers, body: JSON.stringify({}),
+  });
+  assert.strictEqual(publishWithoutSaveAuthorization.status, 409);
+  assert.strictEqual(publishWithoutSaveAuthorization.body.error, "record_save_confirmation_required");
+  const publishLocked = await request(`/api/osm/records/${encodeURIComponent(recordId)}/publish`, {
+    method: "POST", headers, body: JSON.stringify({ authorization: "record_save" }),
+  });
+  assert.strictEqual(publishLocked.status, 423);
+  assert.strictEqual(publishLocked.body.error, "osm_write_locked");
+  assert.strictEqual(publishLocked.body.osmSent, false);
+
   const duplicate = await request("/api/osm/split-plan", {
     method: "POST", headers,
     body: JSON.stringify({ recordId, summary: "duplicate must fail", segments: [{
@@ -214,6 +226,18 @@ async function run() {
     `UPDATE osmchange.record_links SET merge_changeset_id=?,osm_status='merged',updated_at=NOW()
      WHERE record_id=?`, [fakeChangesetId, recordId]
   );
+
+  const revertWithoutDeleteAuthorization = await request(`/api/osm/records/${encodeURIComponent(recordId)}/revert`, {
+    method: "POST", headers, body: JSON.stringify({}),
+  });
+  assert.strictEqual(revertWithoutDeleteAuthorization.status, 409);
+  assert.strictEqual(revertWithoutDeleteAuthorization.body.error, "green_line_delete_confirmation_required");
+  const revertLocked = await request(`/api/osm/records/${encodeURIComponent(recordId)}/revert`, {
+    method: "POST", headers, body: JSON.stringify({ authorization: "owned_green_line_delete" }),
+  });
+  assert.strictEqual(revertLocked.status, 423);
+  assert.strictEqual(revertLocked.body.error, "osm_write_locked");
+  assert.strictEqual(revertLocked.body.osmSent, false);
 
   const reverted = await request(`/api/osm/records/${encodeURIComponent(recordId)}/revert-plan`, { method: "POST", headers });
   assert.strictEqual(reverted.status, 201);

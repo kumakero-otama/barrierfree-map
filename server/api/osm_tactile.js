@@ -216,6 +216,32 @@ function createOsmTactileWaysHandler({ sendJson }) {
     rules = null;
   }
 
+  async function addStepByOwnership(basePayload, userId) {
+    const payload = JSON.parse(JSON.stringify(basePayload));
+    if (!pool || !Array.isArray(payload.features) || !payload.features.length) return payload;
+    const changesetIds = [...new Set(payload.features
+      .map((feature) => feature.properties && feature.properties.osm_changeset_id)
+      .filter(Number.isFinite))];
+    if (!changesetIds.length) return payload;
+    const placeholders = changesetIds.map(() => "?").join(",");
+    const [rows] = await pool.query(
+      `SELECT record_id,created_by,merge_changeset_id,osm_status FROM osmchange.record_links
+       WHERE merge_changeset_id IN (${placeholders})`, changesetIds
+    );
+    const recordsByChangeset = new Map(rows.map((row) => [Number(row.merge_changeset_id), row]));
+    payload.features.forEach((feature) => {
+      const properties = feature.properties || (feature.properties = {});
+      const record = recordsByChangeset.get(Number(properties.osm_changeset_id));
+      if (!record) return;
+      properties.stepby_recorded = true;
+      if (["merged", "revert_draft", "failed"].includes(record.osm_status) && String(record.created_by) === String(userId)) {
+        properties.stepby_owned_record_id = String(record.record_id);
+        properties.stepby_can_revert = true;
+      }
+    });
+    return payload;
+  }
+
   // 指定範囲の点字ブロック関連データをOverpass経由で返す。
   return function handleOsmTactileWays(req, res) {
     if (req.method !== "GET") {
@@ -246,7 +272,12 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const cacheKey = `${centerLat.toFixed(2)}:${centerLng.toFixed(2)}:${radiusMeters}`;
       const cached = responseCache.get(cacheKey);
       if (cached && Date.now() - cached.savedAt < 5 * 60 * 1000) {
-        sendJson(res, 200, { ...cached.payload, cached: true });
+        addStepByOwnership({ ...cached.payload, cached: true }, req.authUserId)
+          .then((payload) => sendJson(res, 200, payload))
+          .catch((dbError) => {
+            console.warn("[osm_tactile] StepBy ownership lookup skipped:", dbError.message);
+            sendJson(res, 200, { ...cached.payload, cached: true });
+          });
         return;
       }
       const tryHost = (index) => {
@@ -262,28 +293,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
         }
         // レスポンスは FeatureCollection ではなく features 配列中心で返し、既存フロント構造に合わせる。
         const featureCollection = toFeatureCollection(overpassJson, rules);
-        if (pool && featureCollection.features.length) {
-          const changesetIds = [...new Set(featureCollection.features
-            .map((feature) => feature.properties.osm_changeset_id)
-            .filter(Number.isFinite))];
-          if (changesetIds.length) {
-            try {
-              const placeholders = changesetIds.map(() => "?").join(",");
-              const [rows] = await pool.query(
-                `SELECT merge_changeset_id FROM osmchange.record_links
-                 WHERE osm_status='merged' AND merge_changeset_id IN (${placeholders})`,
-                changesetIds
-              );
-              const known = new Set(rows.map((row) => Number(row.merge_changeset_id)));
-              featureCollection.features.forEach((feature) => {
-                if (known.has(feature.properties.osm_changeset_id)) feature.properties.stepby_recorded = true;
-              });
-            } catch (dbError) {
-              console.warn("[osm_tactile] StepBy changeset lookup skipped:", dbError.message);
-            }
-          }
-        }
-        const responsePayload = {
+        const basePayload = {
           success: true,
           centerLat,
           centerLng,
@@ -292,8 +302,13 @@ function createOsmTactileWaysHandler({ sendJson }) {
           features: featureCollection.features,
           cached: false,
         };
-        responseCache.set(cacheKey, { savedAt: Date.now(), payload: responsePayload });
-        sendJson(res, 200, responsePayload);
+        responseCache.set(cacheKey, { savedAt: Date.now(), payload: basePayload });
+        try {
+          sendJson(res, 200, await addStepByOwnership(basePayload, req.authUserId));
+        } catch (dbError) {
+          console.warn("[osm_tactile] StepBy ownership lookup skipped:", dbError.message);
+          sendJson(res, 200, basePayload);
+        }
       });
       };
       tryHost(0);
