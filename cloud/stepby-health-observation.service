@@ -1,0 +1,14 @@
+[Unit]
+Description=Record lightweight StepBy cloud health metrics
+After=network-online.target postgresql.service stepby-dev.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/stepby-observe-health
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+StateDirectory=stepby-health
+StateDirectoryMode=0750
+
