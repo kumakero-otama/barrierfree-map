@@ -53,10 +53,12 @@ function createRecordsHandler({ sendJson }) {
           ST_AsGeoJSON(sp.geom) AS geom_geojson,
           COALESCE(tag_info.tags, ARRAY[]::text[]) AS tags,
           COALESCE(tag_info.tag_codes, ARRAY[]::text[]) AS tag_codes,
+          osm_link.osm_status,
           CASE WHEN COALESCE(tag_info.has_private,FALSE) AND NOT COALESCE(tag_info.has_public,FALSE)
             THEN 'pro_private' ELSE 'stepby_tactile' END AS record_class
         FROM tactile.session_paths sp
         LEFT JOIN tactile.sessions s ON s.session_id = sp.session_id
+        LEFT JOIN osmchange.record_links osm_link ON osm_link.record_id = sp.session_id
         LEFT JOIN (
           SELECT
             st.session_id,

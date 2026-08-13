@@ -171,6 +171,21 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
     }
   }
 
+  async function deactivateRevertedRecord(recordId, planId, req) {
+    const [updated] = await pool.query(
+      `UPDATE tactile.sessions SET is_active=FALSE
+        WHERE session_id=? AND user_id=? AND is_active=TRUE
+        RETURNING session_id`,
+      [recordId, req.authUserId]
+    );
+    if (updated[0]) {
+      await appendAudit(planId, "stepby_record_deactivated", req, {
+        recordId,
+        reason: "osm_revert_succeeded",
+      });
+    }
+  }
+
   async function executeUserPlan(req, plan, action) {
     const planId = plan.plan_id;
     if (!writesEnabled()) {
@@ -410,6 +425,7 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
             const freshLink = freshLinks[0];
             if (!freshLink) throw new Error("osm_record_link_not_found");
             if (freshLink.osm_status === "reverted") {
+              await deactivateRevertedRecord(recordId, freshLink.revert_plan_id || freshLink.merge_plan_id, req);
               return { success: true, recordId, planId: freshLink.revert_plan_id, changesetId: freshLink.revert_changeset_id, osmSent: true, idempotent: true };
             }
             if (freshLink.osm_status !== "merged" && freshLink.osm_status !== "revert_draft" && freshLink.osm_status !== "failed") {
@@ -470,7 +486,9 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
             if (!revertPlan || revertPlan.operation_type !== "revert" || !revertPlan.client_context || !revertPlan.client_context.executable) {
               throw new Error("revert_not_executable");
             }
-            return executeUserPlan(req, revertPlan, "execute-revert");
+            const execution = await executeUserPlan(req, revertPlan, "execute-revert");
+            await deactivateRevertedRecord(recordId, revertPlanId, req);
+            return execution;
           });
           sendJson(res, 200, { ...result, recordId });
           return;
