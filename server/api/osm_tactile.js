@@ -216,18 +216,26 @@ function createOsmTactileWaysHandler({ sendJson }) {
     rules = null;
   }
 
-  async function addStepByOwnership(basePayload, userId) {
+  async function addStepByOwnership(basePayload, userId, searchArea = {}) {
     const payload = JSON.parse(JSON.stringify(basePayload));
-    if (!pool || !Array.isArray(payload.features) || !payload.features.length) return payload;
+    if (!pool || !Array.isArray(payload.features)) return payload;
     const changesetIds = [...new Set(payload.features
       .map((feature) => feature.properties && feature.properties.osm_changeset_id)
       .filter(Number.isFinite))];
-    if (!changesetIds.length) return payload;
-    const placeholders = changesetIds.map(() => "?").join(",");
-    const [rows] = await pool.query(
-      `SELECT record_id,created_by,merge_changeset_id,osm_status FROM osmchange.record_links
-       WHERE merge_changeset_id IN (${placeholders})`, changesetIds
-    );
+    let rows = [];
+    if (changesetIds.length) {
+      const placeholders = changesetIds.map(() => "?").join(",");
+      [rows] = await pool.query(
+        `SELECT record_id,created_by,merge_changeset_id,osm_status FROM osmchange.record_links
+         WHERE merge_changeset_id IN (${placeholders})
+           AND EXISTS (
+             SELECT 1 FROM osmchange.audit_events ae
+              WHERE ae.plan_id=osmchange.record_links.merge_plan_id
+                AND ae.event_type='execution_succeeded'
+                AND ae.details->>'osmApiBaseUrl'=?
+           )`, [...changesetIds, process.env.OSM_API_BASE_URL || ""]
+      );
+    }
     const recordsByChangeset = new Map(rows.map((row) => [Number(row.merge_changeset_id), row]));
     payload.features.forEach((feature) => {
       const properties = feature.properties || (feature.properties = {});
@@ -239,6 +247,68 @@ function createOsmTactileWaysHandler({ sendJson }) {
         properties.stepby_can_revert = true;
       }
     });
+
+    // OSM開発環境には公開Overpassと同等の読取基盤がないため、送信済みの
+    // StepBy記録を開発DBの確定経路から補完する。これにより、保存後に緑線を
+    // 選択して、同じUIから取り消し操作まで行える。
+    const centerLat = Number(searchArea.centerLat);
+    const centerLng = Number(searchArea.centerLng);
+    const radiusMeters = Number(searchArea.radiusMeters);
+    if (Number.isFinite(centerLat) && Number.isFinite(centerLng) && Number.isFinite(radiusMeters) && radiusMeters > 0) {
+      const [linkedPaths] = await pool.query(
+        `SELECT l.record_id,l.created_by,l.merge_changeset_id,l.osm_status,
+                ST_AsGeoJSON(sp.geom) AS geom_geojson
+           FROM osmchange.record_links l
+           JOIN tactile.session_paths sp ON sp.session_id=l.record_id
+           JOIN tactile.sessions s ON s.session_id=l.record_id
+          WHERE l.osm_status IN ('merged','revert_draft')
+            AND s.is_active=TRUE
+            AND EXISTS (
+              SELECT 1 FROM osmchange.audit_events ae
+               WHERE ae.plan_id=l.merge_plan_id
+                 AND ae.event_type='execution_succeeded'
+                 AND ae.details->>'osmApiBaseUrl'=?
+            )
+            AND ST_DWithin(
+              sp.geom,
+              ST_SetSRID(ST_MakePoint(?, ?),4326)::geography,
+              ?
+            )`,
+        [process.env.OSM_API_BASE_URL || "", centerLng, centerLat, radiusMeters]
+      );
+      const representedChangesets = new Set(payload.features
+        .map((feature) => Number(feature.properties && feature.properties.osm_changeset_id))
+        .filter(Number.isFinite));
+      linkedPaths.forEach((record) => {
+        const changesetId = Number(record.merge_changeset_id);
+        if (representedChangesets.has(changesetId)) return;
+        let geometry;
+        try {
+          geometry = typeof record.geom_geojson === "string"
+            ? JSON.parse(record.geom_geojson)
+            : record.geom_geojson;
+        } catch (_) {
+          return;
+        }
+        if (!geometry) return;
+        const owned = String(record.created_by) === String(userId);
+        payload.features.push({
+          type: "Feature",
+          properties: {
+            osm_type: "stepby_record",
+            osm_id: null,
+            osm_changeset_id: changesetId,
+            stepby_recorded: true,
+            stepby_record_id: String(record.record_id),
+            stepby_owned_record_id: owned ? String(record.record_id) : undefined,
+            stepby_can_revert: owned,
+            source: "stepby_development_record",
+          },
+          geometry,
+        });
+      });
+    }
+    payload.count = payload.features.length;
     return payload;
   }
 
@@ -272,7 +342,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const cacheKey = `${centerLat.toFixed(2)}:${centerLng.toFixed(2)}:${radiusMeters}`;
       const cached = responseCache.get(cacheKey);
       if (cached && Date.now() - cached.savedAt < 5 * 60 * 1000) {
-        addStepByOwnership({ ...cached.payload, cached: true }, req.authUserId)
+        addStepByOwnership({ ...cached.payload, cached: true }, req.authUserId, { centerLat, centerLng, radiusMeters })
           .then((payload) => sendJson(res, 200, payload))
           .catch((dbError) => {
             console.warn("[osm_tactile] StepBy ownership lookup skipped:", dbError.message);
@@ -287,6 +357,25 @@ function createOsmTactileWaysHandler({ sendJson }) {
           if (index + 1 < OVERPASS_HOSTS.length) {
             tryHost(index + 1);
             return;
+          }
+          try {
+            const fallbackPayload = await addStepByOwnership({
+              success: true,
+              centerLat,
+              centerLng,
+              radiusKm: radiusMeters / 1000,
+              count: 0,
+              features: [],
+              cached: false,
+              osmUpstreamUnavailable: true,
+            }, req.authUserId, { centerLat, centerLng, radiusMeters });
+            // StepByの送信済み経路だけでも返せる場合は、取消し操作を継続可能にする。
+            if (fallbackPayload.features.length) {
+              sendJson(res, 200, fallbackPayload);
+              return;
+            }
+          } catch (dbError) {
+            console.warn("[osm_tactile] StepBy fallback lookup failed:", dbError.message);
           }
           sendJson(res, 502, { error: "osm_upstream_error", message: "all_overpass_hosts_failed" });
           return;
@@ -304,7 +393,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
         };
         responseCache.set(cacheKey, { savedAt: Date.now(), payload: basePayload });
         try {
-          sendJson(res, 200, await addStepByOwnership(basePayload, req.authUserId));
+          sendJson(res, 200, await addStepByOwnership(basePayload, req.authUserId, { centerLat, centerLng, radiusMeters }));
         } catch (dbError) {
           console.warn("[osm_tactile] StepBy ownership lookup skipped:", dbError.message);
           sendJson(res, 200, basePayload);

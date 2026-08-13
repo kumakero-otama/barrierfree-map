@@ -183,6 +183,7 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
       requestedAction: action,
       authorization: action === "execute" ? "record_save" : "owned_green_line_delete",
       elementCount: plan.elements.length,
+      osmApiBaseUrl: process.env.OSM_API_BASE_URL || null,
     });
     let client;
     try {
@@ -199,6 +200,7 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
     );
     await appendAudit(planId, "execution_authorized", req, {
       attemptId, requestedAction: action, authorization: "user_save_or_delete", elementCount: plan.elements.length,
+      osmApiBaseUrl: process.env.OSM_API_BASE_URL || null,
     });
     try {
       const executionResult = await executeWithClient({
@@ -211,7 +213,12 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
           await appendAudit(planId, "changeset_created", req, { attemptId, requestedAction: action, changesetId });
         },
       });
-      await appendAudit(planId, "execution_succeeded", req, { attemptId, requestedAction: action, executionResult });
+      await appendAudit(planId, "execution_succeeded", req, {
+        attemptId,
+        requestedAction: action,
+        executionResult,
+        osmApiBaseUrl: process.env.OSM_API_BASE_URL || null,
+      });
       if (plan.operation_type === "revert") {
         await pool.query(
           `UPDATE osmchange.record_links SET revert_changeset_id=?,osm_status='reverted',updated_at=NOW()

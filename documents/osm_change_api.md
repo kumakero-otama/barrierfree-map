@@ -8,6 +8,7 @@
 - `POST /api/osm/split-plan`: Way途中の開始・終了位置から、Node作成、Way分割、`tactile_paving=yes` の変更案を作る。
 - `POST /api/osm/records/:recordId/publish`: 記録所有者が保存を確定した1件を、本人のOSM OAuthトークンで送信する。本文は `authorization: record_save`。同じ記録の再要求は既存changesetを返し、二重送信しない。
 - `POST /api/osm/records/:recordId/revert`: 記録所有者がStepBy由来の緑線の削除を確定した1件について、反対変更案の作成と取消changeset送信を行う。本文は `authorization: owned_green_line_delete`。青線・他人の記録・対応不明の地物にはフロントから操作を出さず、APIも所有者確認で拒否する。
+- `GET /api/osm-tactile-ways`: 公開OSMの点字ブロック表示に加え、現在接続中のOSM環境への送信成功を追記型監査履歴で確認できるStepBy記録を、開発DBの確定経路から緑線として補完する。本人の線にだけ取消対象の記録IDを付与する。
 - `GET /api/osm/plans/:planId`: 変更案と監査イベントを取得する。作成者または管理者のみ。
 - `POST /api/osm/plans/:planId/revert-plan`: 送信結果のOSM ID・Versionを使い、反対変更を新規作成する。元プランが未送信なら、実行不能の確認用テンプレートだけを作る。
 - `POST /api/osm/plans/:planId/approve`: 現在は必ず `423`。
