@@ -75,7 +75,15 @@ function run() {
   const backwardOperation = backward.operations.find((operation) => operation.elementType === "relation");
   assert.deepStrictEqual(backwardOperation.after.members.map((member) => member.ref), ["new-way-2", "new-way-1", 100]);
 
-  assert.throws(() => createSplitPlan({ segments: [way(), way()] }), /duplicate_way_in_route/);
+  const repeatedWay = createSplitPlan({ segments: [
+    way({ from: { kind: "projection", segmentIndex: 0, fraction: 0.25 }, to: { kind: "node", index: 1 } }),
+    way({ from: { kind: "node", index: 2 }, to: { kind: "projection", segmentIndex: 2, fraction: 0.75 } }),
+  ] });
+  assert.strictEqual(repeatedWay.summary.sourceWays, 1, "the same OSM Way must be planned once");
+  assert.strictEqual(repeatedWay.ways[0].ranges.length, 2, "separate traversed ranges must be preserved");
+  assert.strictEqual(repeatedWay.ways[0].sections.filter((section) => section.tactile).length, 2,
+    "both recorded ranges on the repeated Way must receive tactile tags");
+  assert.throws(() => createSplitPlan({ segments: [way(), way({ wayVersion: 8 })] }), /inconsistent_duplicate_way/);
   assert.strictEqual(middle.osmSent, false);
   const roadwayLeft = createSplitPlan({ segments: [way({
     tags: { highway: "residential", sidewalk: "both" },

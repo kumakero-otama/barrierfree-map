@@ -495,7 +495,7 @@ function createOsmChangesHandler({ sendJson }) {
       sendJson(res, 404, { error: "not_found" });
     } catch (error) {
       const clientErrors = new Set([
-        "invalid_segments", "duplicate_way_in_route", "invalid_way_identity", "invalid_way_geometry",
+        "invalid_segments", "inconsistent_duplicate_way", "invalid_way_identity", "invalid_way_geometry",
         "invalid_boundary", "invalid_node_boundary", "invalid_projection_boundary",
         "invalid_boundary_fraction", "invalid_boundary_lng", "invalid_boundary_lat", "zero_length_tactile_segment",
         "invalid_relation", "inconsistent_relation", "invalid_record_id", "record_not_found_or_forbidden", "record_already_linked",

@@ -60,11 +60,19 @@ function planWay(segment, counters, options) {
   if (nodes.length < 2 || nodes.length !== coordinates.length || coordinates.some((c) => !Number.isFinite(c[0]) || !Number.isFinite(c[1]))) {
     throw new Error("invalid_way_geometry");
   }
-  const from = normalizeBoundary(segment.from, nodes, coordinates, options.nodeSnapFraction);
-  const to = normalizeBoundary(segment.to, nodes, coordinates, options.nodeSnapFraction);
-  if (Math.abs(from.position - to.position) < options.nodeSnapFraction) throw new Error("zero_length_tactile_segment");
+  const rawRanges = Array.isArray(segment.ranges) && segment.ranges.length
+    ? segment.ranges
+    : [{ from: segment.from, to: segment.to }];
+  const ranges = rawRanges.map((range) => {
+    const from = normalizeBoundary(range.from, nodes, coordinates, options.nodeSnapFraction);
+    const to = normalizeBoundary(range.to, nodes, coordinates, options.nodeSnapFraction);
+    if (Math.abs(from.position - to.position) < options.nodeSnapFraction) throw new Error("zero_length_tactile_segment");
+    return { from, to, low: Math.min(from.position, to.position), high: Math.max(from.position, to.position) };
+  });
+  const from = ranges[0].from;
+  const to = ranges[ranges.length - 1].to;
 
-  const rawBoundaries = [from, to].sort((a, b) => a.position - b.position);
+  const rawBoundaries = ranges.flatMap((range) => [range.from, range.to]).sort((a, b) => a.position - b.position);
   const boundaries = [];
   rawBoundaries.forEach((boundary) => {
     const existing = boundaries.find((item) => Math.abs(item.position - boundary.position) < options.nodeSnapFraction);
@@ -104,8 +112,6 @@ function planWay(segment, counters, options) {
   const uniqueSplitIndexes = [...new Set(splitIndexes)];
   const sectionEnds = [...uniqueSplitIndexes, expandedRefs.length - 1];
   let startIndex = 0;
-  const low = Math.min(from.position, to.position);
-  const high = Math.max(from.position, to.position);
   const baseTags = segment.tags && typeof segment.tags === "object" ? { ...segment.tags } : {};
   const tagStrategy = resolveTactileTagStrategy(segment, options.tactileValue);
   const sections = sectionEnds.map((endIndex) => {
@@ -114,7 +120,7 @@ function planWay(segment, counters, options) {
     const startPosition = expandedPositions[startIndex];
     const endPosition = expandedPositions[endIndex];
     const midpoint = (startPosition + endPosition) / 2;
-    const tactile = midpoint > low && midpoint < high;
+    const tactile = ranges.some((range) => midpoint > range.low && midpoint < range.high);
     startIndex = endIndex;
     return { refs, coordinates: coords, tactile, tags: tactile ? { ...baseTags, ...tagStrategy.tags } : { ...baseTags } };
   }).filter((section) => section.refs.length >= 2);
@@ -146,7 +152,32 @@ function planWay(segment, counters, options) {
       });
     }
   });
-  return { wayId, version, from, to, sections, relationRefs, operations, tagStrategy };
+  return { wayId, version, from, to, ranges, sections, relationRefs, operations, tagStrategy };
+}
+
+function mergeRepeatedWaySegments(segments) {
+  const grouped = new Map();
+  segments.forEach((segment) => {
+    const key = String(segment && segment.wayId);
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...segment, ranges: [{ from: segment.from, to: segment.to }] });
+      return;
+    }
+    const comparable = (value) => JSON.stringify(value == null ? null : value);
+    if (Number(existing.wayVersion) !== Number(segment.wayVersion) ||
+        comparable(existing.nodes) !== comparable(segment.nodes) ||
+        comparable(existing.fullCoordinates) !== comparable(segment.fullCoordinates) ||
+        comparable(existing.tags || {}) !== comparable(segment.tags || {}) ||
+        String(existing.side || existing.tactileSide || "") !== String(segment.side || segment.tactileSide || "")) {
+      throw new Error("inconsistent_duplicate_way");
+    }
+    existing.ranges.push({ from: segment.from, to: segment.to });
+    const relationById = new Map((existing.relations || []).map((relation) => [Number(relation.id), relation]));
+    (segment.relations || []).forEach((relation) => relationById.set(Number(relation.id), relation));
+    existing.relations = [...relationById.values()];
+  });
+  return [...grouped.values()];
 }
 
 function normalizeRelations(segments) {
@@ -199,18 +230,14 @@ function planRelationUpdates(relations, ways) {
 function createSplitPlan(input, options = {}) {
   const segments = Array.isArray(input && input.segments) ? input.segments : [];
   if (!segments.length || segments.length > 100) throw new Error("invalid_segments");
-  const duplicateCheck = new Set();
-  segments.forEach((segment) => {
-    if (duplicateCheck.has(String(segment.wayId))) throw new Error("duplicate_way_in_route");
-    duplicateCheck.add(String(segment.wayId));
-  });
+  const mergedSegments = mergeRepeatedWaySegments(segments);
   const settings = {
     tactileValue: String(options.tactileValue || "yes"),
     nodeSnapFraction: Number(options.nodeSnapFraction) || DEFAULT_NODE_SNAP_FRACTION,
   };
   const counters = { node: 0, way: 0 };
-  const ways = segments.map((segment) => planWay(segment, counters, settings));
-  const relationOperations = planRelationUpdates(normalizeRelations(segments), ways);
+  const ways = mergedSegments.map((segment) => planWay(segment, counters, settings));
+  const relationOperations = planRelationUpdates(normalizeRelations(mergedSegments), ways);
   const operations = [...ways.flatMap((way) => way.operations), ...relationOperations];
   return {
     kind: "osm_split_dry_run",
@@ -229,4 +256,4 @@ function createSplitPlan(input, options = {}) {
   };
 }
 
-module.exports = { createSplitPlan, normalizeBoundary, normalizeRelations, planRelationUpdates, resolveTactileTagStrategy };
+module.exports = { createSplitPlan, mergeRepeatedWaySegments, normalizeBoundary, normalizeRelations, planRelationUpdates, resolveTactileTagStrategy };
