@@ -398,6 +398,18 @@
               <li><span class="box"></span><div><span class="task-title">切戻し可能な並行稼働期間を完了する</span><span class="note">クラウド側の保存を正とする時点を明示し、旧開発環境を読み取り専用化。バックアップと復旧手順を再確認してから正式移行を判定する。</span></div></li>
             </ul>
           </article>
+          <article class="panel wide">
+            <h3>5-4. 管理者が実端末で行う最終GPS試験</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">短い通常記録を保存する</span><span class="note">近所の1ブロック程度を歩き、記録開始・一時停止・再開・終了を確認する。終了後すぐ次画面へ進み、詳細画面とクラウドDBへ1件だけ保存されること、OSMへ送信されないことを確認する。AIがその直後にDBとログを照合する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">周回して同じOSM Wayへ戻る経路を確認する</span><span class="note">記録本体は正常保存され、「通信できない」と誤表示されないことを確認する。同じWayの複数区間を含むOSM変更案は、現在は「要確認」と明示して永久再試行しない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">開始地点から650m以上移動する</span><span class="note">フィッティング用道路網が自動更新され、現在地ピンと記録が途切れないことを確認する。可能なら開始地点から1km以上移動し、最初の1km圏外でも新しい道路上へフィッティングできることを確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">GPS精度が低下する場所を通る</span><span class="note">建物際などで一時的に精度が落ちても、前後の点による補間または不良点の除外が働き、道路外へ不自然な直線が作られないことを確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">通信の切断と復帰を確認する</span><span class="note">安全な場所で一時的に機内モード等を使い、記録が端末内に保持されること、通信復帰後に自動送信されること、同じ記録が二重登録されないことを確認する。サーバー処理エラーと通信切断が異なる表示になることも確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">画面ロック・アプリ復帰を確認する</span><span class="note">短時間の画面ロックまたは別画面への移動後に戻り、記録状態と送信待ちキューが失われないことを確認する。端末OSが位置情報取得を停止した場合は、その事実が分かる表示も確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">通常モードとPROモードを各1件確認する</span><span class="note">通常モードでは点字ブロックだけがOSM変更案対象、PROモードでは対象外情報がクラウドDBだけに保存されること、色・バッジ・詳細表示が正しいことを確認する。いずれも本番OSMへの実送信はしない。</span></div></li>
+            </ul>
+          </article>
         </div>
       </section>
 
