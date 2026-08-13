@@ -206,7 +206,7 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true">S</span>STEPBY ROADMAP</div>
-      <div class="updated">2026年8月13日 AI実行可能項目を再検証</div>
+      <div class="updated">2026年8月13日 障害対応・監視を整備</div>
     </header>
 
     <main>
@@ -242,19 +242,24 @@
         <b>現行仕様MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="existing-data-migration-audit.md" download>
+      <a class="report-link" href="documents/existing-data-migration-audit.md" download>
         <span>現行DBの328記録を読み取り専用で棚卸しし、既存データ移行の候補・除外条件・安全手順をまとめています。</span>
         <b>既存データ移行監査MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="osm-community-consultation-draft.md" download>
-        <span>StepByの編集方式をOSMコミュニティへ事前相談するための投稿前文案です。</span>
+      <a class="report-link" href="documents/osm-community-consultation-draft.md" download>
+        <span>相談済みのStepBy編集方式と、相談時に用いた内容を保存した文書です。</span>
         <b>コミュニティ相談文案MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="https://barrierfree-map.tail5de5e1.ts.net/dev-api/admin/database.html" target="_blank" rel="noopener">
-        <span>開発DBのテーブル構成・件数・最新レコードと、API実験データを確認する管理者専用画面です。開発管理者キーを30分間有効なHttpOnlyセッションへ交換し、同一ドメイン内だけで通信します。</span>
-        <b>開発DB管理画面を開く →</b>
+      <a class="report-link" href="https://stepby-api-8-229-191-182.sslip.io/admin/database.html" target="_blank" rel="noopener">
+        <span>クラウドのAPI・DB・HTTPS・バックアップ・容量・OSM処理結果と、開発DBの内容を確認する管理者専用画面です。</span>
+        <b>クラウド管理・監視画面を開く →</b>
+      </a>
+
+      <a class="report-link" href="documents/cloud-incident-and-rollback-runbook.md" download>
+        <span>API、DB、HTTPS、OSM連携などの障害切り分けと、安全な切戻し・復旧確認をまとめています。</span>
+        <b>障害対応・切戻し手順MDをダウンロード ↓</b>
       </a>
 
       <a class="report-link" href="cloud-migration-options.html">
@@ -388,7 +393,7 @@
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">実利用量と無料枠を確認する</span><span class="note">完了。開発DB約19.8MB、APIログ約7MB/10日、Node開発API約113MB、通常CPU 1%未満。無料対象地域のe2-micro、Standard Persistent Disk 30GB、Cloud Storage 5GB、Secret Manager 6有効Versionを基本上限にする。外向き通信は計測と予算通知を追加する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">折衷案の構成を決定する</span><span class="note">完了。Compute Engine e2-micro（Oregon us-west1）1台にNode.js API・PostgreSQL・Caddyを同居。Persistent Disk、Cloud Storageバックアップ、Secret Manager、標準Monitoringを利用し、GitHub Pagesを継続する。Cloud SQL、Cloud Run、Firestore、Cloud DNSは使用しない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">Google Cloud管理アカウントを保護する</span><span class="note">管理者は yamashita.3154@gmail.com。MacのGoogle Cloud CLIブラウザ認証、プロジェクトOS Login、プロジェクト共通SSH鍵の禁止まで完了。Googleアカウント側の2段階認証・復旧手段は本人設定画面で最終確認する。パスワード・秘密鍵はAIやGitへ渡さない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Google Cloud管理アカウントを保護する</span><span class="note">完了。管理者は yamashita.3154@gmail.com。Googleアカウントの保護、MacのGoogle Cloud CLIブラウザ認証、プロジェクトOS Login、プロジェクト共通SSH鍵の禁止まで設定済み。パスワード・秘密鍵はAIやGitへ渡さない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">専用プロジェクトと請求通知を設定する</span><span class="note">完了。プロジェクト <code>stepby-cloud-dev-202608</code>、us-west1/us-west1-b、有効な請求先を設定。月500円の予算に50%・80%・100%通知を作成した。予算は警告であり自動停止ではないため、リソース作成後に利用量監視と停止手順を追加する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">クラウド操作とVM接続の認証基盤を作る</span><span class="note">完了。Google Cloud CLI 580.0.0を導入し管理者本人で認証。OS Loginを有効化、プロジェクト共通SSH鍵を禁止し、VM実行用サービスアカウント <code>stepby-vm-dev</code> を人の管理アカウントから分離した。サービスアカウント鍵ファイルは発行しない。</span></div></li>
             </ul>
@@ -416,6 +421,8 @@
               <li class="done"><span class="box"></span><div><span class="task-title">Way境界・交差点・並行する歩道で経路確定を確認する</span><span class="note">完了。Way途中の開始終了、正逆方向、既存Node境界、複数Way、共有Nodeを通る交差点、道路と近接する歩道の優先、未観測接続Wayの補完、接続不能時の停止を自動試験した。実OSMでの1件分割結果も3区間が連続していることを確認した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">重複操作と既存点字ブロックへの安全性を確認する</span><span class="note">完了。記録キュー再送とサーバーの記録単位ロック・冪等応答を再試験した。さらに既存の <code>tactile_paving=yes</code> または左右点字タグがあるWayでは、不要な分割案を作らず <code>tactile_tag_already_present</code> で停止するガードを追加し、クラウドへ反映した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM取消し前の第三者編集と部分競合を確認する</span><span class="note">完了。WayのVersionが8から9へ変わった第三者編集をモックで再現し、Version競合時はchangeset作成前に停止し、uploadを一度も呼ばず第三者変更を上書きしないことを確認した。本番OSMへのテスト送信は行っていない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">クラウドの管理・監視画面を整備する</span><span class="note">完了。API・PostgreSQL・Caddy・バックアップ、ディスク、メモリ、API応答、重大エラー、記録件数、OSM成功・失敗・競合・取消しを1画面で確認できる管理APIと画面を追加した。管理者セッションが必要で、秘密情報は表示しない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">障害対応と切戻し手順を文書化する</span><span class="note">完了。API・DB・HTTPS・容量・OSM OAuth/API・Overpass障害の切り分け、OSM送信停止、アプリ版切戻し、DB復元、復旧完了条件を <a href="documents/cloud-incident-and-rollback-runbook.md">障害対応・切戻し手順</a> に整理した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">切戻し可能な並行稼働期間を完了する</span><span class="note">クラウド側の保存を正とする時点を明示し、旧開発環境を読み取り専用化。バックアップと復旧手順を再確認してから正式移行を判定する。</span></div></li>
             </ul>
           </article>
@@ -431,7 +438,7 @@
               <li class="done"><span class="box"></span><div><span class="task-title">通常モードとPROモードを各1件確認する</span><span class="note">完了。通常点字記録はOSM対象として保存され、PROモードのグレーチング3件はクラウドDBだけに保存され、OSM変更案・changeset・送信監査が作られないことを確認した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">保存操作からOSM公開完了までを実端末で確認する</span><span class="note">完了。本人の保存操作からchangeset 187383947が1件だけ作られ、元Way 196594575、点字区間Way 1549338736、隣接Way 1549338737へ矛盾なく分割され、変更前後とIDが監査履歴へ保存された。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">緑線の削除からOSM取消し完了までを実端末で確認する</span><span class="note">完了。本人の緑線削除から取消しchangeset 187384349が作られ、分割Way・Nodeが削除され元Way 196594575へ復元された。元編集との対応と変更結果は監査履歴へ残り、StepBy表示も無効化された。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSM自動公開に失敗した場合の表示と再送を確認する</span><span class="note">OAuth未連携・権限取消し・Version競合・監査履歴保存失敗・OSM API障害をそれぞれ確認し、StepBy側の記録は失われず、二重changesetを作らず、利用者には短く分かりやすい状態だけを表示する。競合時は自動上書きせず停止する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM自動公開に失敗した場合の表示と再送を確認する</span><span class="note">完了。本番OSMへ送らないモック試験で、OAuth未設定・権限エラー、Version競合、監査開始保存失敗、OSM API 503を再現した。StepBy記録を残し、認証・競合などは再送停止、408・429・5xx・通信断だけ待機再送、監査失敗はchangeset作成前停止、upload失敗時は空changesetを閉じる。二重changesetを作らないことを確認した。</span></div></li>
             </ul>
           </article>
         </div>
@@ -447,14 +454,14 @@
             <h3>6-1. 既存データをOSMへ移す</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">既存データの件数・品質・重複・公開可否を調査する</span><span class="note">完了。本番DBを読み取り専用で集計し、328記録、raw 7,344点、Valhalla経路276件、完全重複経路0件を確認。rawなし6件、経路なし52件、孤立raw/matched各3点、旧rawのaccuracy全件未保存を品質課題として記録した。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">完了。経路を持つ276件を一次候補とし、無効記録・形状異常・現在OSMとの重複・再フィッティング不成立を除外する手順を <a href="existing-data-migration-audit.md">移行監査文書</a> に整理した。候補ごとの実変更案はコミュニティ確認後に生成し、自動一括送信しない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">完了。経路を持つ276件を一次候補とし、無効記録・形状異常・現在OSMとの重複・再フィッティング不成立を除外する手順を <a href="documents/existing-data-migration-audit.md">移行監査文書</a> に整理した。候補ごとの実変更案はコミュニティ確認後に生成し、自動一括送信しない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">コミュニティ確認と明示許可後、少量ずつマージする</span><span class="note">全件のchangeset・Way・結果を監査履歴へ保存する。</span></div></li>
             </ul>
           </article>
           <article class="panel">
             <h3>6-2. 公開前の残作業</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">利用規約・プライバシーポリシーを本番用に確定する</span><span class="note">問い合わせ先、運営者表示、保存期間、法務確認を完了する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">利用規約・プライバシーポリシーを本番用に確定する</span><span class="note">現時点はアプリ内表示と同意導線まで実装済み。内容の本番確定は後回しにし、問い合わせ先、運営者表示、保存期間、法務確認を公開前に行う。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">UI1移行の範囲を決める</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡し、可能ならデバッグを依頼する</span></div></li>
             </ul>
@@ -541,9 +548,9 @@
               <li class="done"><span class="box"></span><div><span class="task-title">OSMマージ取消APIを実装する</span><span class="note">完了。record_idから元の変更案と監査履歴を特定し、反対変更を新しい取消案として作成するAPIへ整理。送信済みの場合は現在Version確認後に新しいchangesetとして取消す設計。機能フラグ無効のため実送信は不可、実OSMでは未試験。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM再編集後の追跡・再照合方針を実装する</span><span class="note">完了。changeset ID、Way・Node・Relation ID/Version、変更前後、Way形状を保存し、表示は現在OSMと保存経路を再取得して照合する。第三者による再分割・統合でVersionが一致しない場合は、危険なID自動付替えや上書きをせず conflict として停止し、現在形状を人が確認して新しい対応を監査イベントとして追加する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境で編集テストを実施する</span><span class="note">完了。開発OSMでWay作成・分割・タグ・changeset説明・ID返却・取消しによる完全復元を確認した。Relation、競合、再送、権限エラーはモック自動試験で補完し、本番OSMへ架空テストデータは送っていない。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">OSMコミュニティへ方式を確認する</span><span class="note">タグ付け、StepBy由来の表現、支援型編集・大量編集の運用を事前相談する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSMコミュニティへ方式を確認する</span><span class="note">完了。タグ付け、StepBy由来の表現、支援型編集・大量編集の運用について相談済み。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">限定利用から段階的に切り替える</span><span class="note">開発者、協力者、一部利用者、標準利用の順に拡大。低信頼・データ不足・処理失敗時はValhallaへ自動退避。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">完了。本番DBを読み取り専用で棚卸しし、276経路を一次候補とする品質・重複・再フィッティング・コミュニティ相談・少量移行の順序を <a href="existing-data-migration-audit.md">監査文書</a> に整理した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">完了。本番DBを読み取り専用で棚卸しし、276経路を一次候補とする品質・重複・再フィッティング・コミュニティ相談・少量移行の順序を <a href="documents/existing-data-migration-audit.md">監査文書</a> に整理した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">新バージョンのValhalla依存を解消する</span><span class="note">完了。UI10一般処理はOSMブラウザフィッターだけを使用し、Valhalla呼出しと比較表示は通常画面から除外した。現行UI0と現行Valhallaは停止せず並行稼働している。</span></div></li>
             </ul>
