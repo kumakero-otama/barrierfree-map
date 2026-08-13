@@ -218,8 +218,8 @@
 
       <nav class="summary" aria-label="現在の3段階">
         <a href="#valhalla-stop"><span class="summary-number">DONE</span><strong>ブラウザ版へ切替済み</strong><small>一般画面はValhalla非依存・比較は管理画面のみ</small></a>
-        <a href="#osm-test"><span class="summary-number">NEXT</span><strong>OSM連携を検証</strong><small>開発環境 → 許可後に本番1件 → 取消し</small></a>
-        <a href="#cloud"><span class="summary-number">LATER</span><strong>クラウドへ移行</strong><small>新バージョンのValhalla依存解消後にGoogle系を第一候補として実施</small></a>
+        <a href="#osm-test"><span class="summary-number">NEXT</span><strong>本番OSM連携を確認</strong><small>本人OAuth再連携 → 実記録1件 → 必要なら取消し</small></a>
+        <a href="#cloud"><span class="summary-number">DONE</span><strong>クラウドへ移行済み</strong><small>Google Cloudの開発API・DBをUI10から利用</small></a>
       </nav>
 
       <section class="sequence" aria-labelledby="sequence-title">
@@ -319,8 +319,8 @@
               <li class="done"><span class="box"></span><div><span class="task-title">記録開始から変更内容の最終確認までを通して試験する</span><span class="note">完了。StepBy認証済み利用者のセッション開始 → GPS raw → ブラウザフィッティング → 共有Nodeで連続する経路確定 → セッション終了 → OSM連携状態確認 → Way分割・Relation引継ぎを含む未送信変更案 → 詳細画面、の順で結合試験に合格。確定後の保存は永続キューへ渡すため画面を待たせない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM未連携時だけ小窓で連携・サインアップへ案内する</span><span class="note">完了。サーバー設定済みかつ未連携の場合だけOAuth小窓を開き、連携済みまたはサーバー未設定では開かない判定を独立実装して3分岐を自動試験した。小窓の拒否・中断・開始失敗は記録キューへ影響せず、記録と未送信案を失わない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">完了。開発DBにセッション終了日時、GPS raw 3点、フィット点3点、ブラウザ経路、Way ID/Version/Node/全座標/追加予定タグのスナップショット、未送信変更案、1記録1変更案リンク、<code>split_plan_created</code>監査イベントが揃うことを確認。送信・取消送信APIはいずれも423で停止し、OSM送信0件。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">保存操作をOSM公開へ接続する</span><span class="note">完了。OSM公開対象の記録は、利用者が保存を押すと永続キューがStepBy保存→変更案作成→本人のOSM OAuthで公開まで順番に実行する。クラウドAPIをOSM開発環境へ接続し、changeset 660298で公開、同じ記録の再要求で二重送信されないことを確認。本番OSMには未接続。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">本人の緑線からOSM取消しへ接続する</span><span class="note">完了。本人所有の緑線だけに「この記録を削除」を表示し、削除確定を永続キューから取消APIへ送る。開発用OSMには公開Overpass相当の表示基盤がないため、送信成功・対象環境・確定経路を監査履歴と開発DBから照合して緑線を補完する。OSM開発環境のchangeset 660299でタグが元へ戻り、二重取消しが発生しないこと、監査履歴、試験地物の削除まで確認。本番OSMには未接続。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">保存操作をOSM公開へ接続する</span><span class="note">完了。OSM公開対象の記録は、利用者が保存を押すと永続キューがStepBy保存→変更案作成→本人のOSM OAuthで公開まで順番に実行する。開発OSMのchangeset 660298で公開と冪等性を確認後、2026-08-13にAPI・OAuthを本番OSMへ切替えた。切替作業では本番OSMへ書き込んでいない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">本人の緑線からOSM取消しへ接続する</span><span class="note">完了。本人所有の緑線だけに「この記録を削除」を表示し、削除確定を永続キューから取消APIへ送る。開発OSMのchangeset 660299で取消し・冪等性・監査・試験地物削除を確認済み。現在は本番OSMへ接続し、本番Wayの現在Versionを再取得して競合時は停止する。</span></div></li>
             </ul>
           </article>
         </div>
@@ -511,7 +511,7 @@
               <li><span class="box"></span><div><span class="task-title">StepBy専用ブラウザフィッターを実装する</span><span class="note">実装中。60m以内の線分投影、歩道優先、同一Way・共有Node接続優先をUI10へ実装し単体確認済み。空間インデックス、方位評価、Web Worker化は未実装。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">確定時のWay経路をOSM上の接続経路に拘束する</span><span class="note">完了。GPSが直接選んだWay間をOSM Node接続グラフで探索し、必要な未観測の接続Wayを歩道優先コストで補う。最終Way ID列はすべて共有Nodeで連結した一本の経路だけを許可し、接続不能または網羅率80%未満なら確定せず記録・変更案を拒否する。UI10と開発APIの両方で検証し、接続Way補完・接続不能・1000点/500Wayの自動試験と実記録Way 464458979の再検証に合格。現行版とValhallaは変更していない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Valhallaとのシャドー比較機能を実装する</span><span class="note">実装中。UI10で同一GPSを新旧同時計算し、GPS・Valhalla・ブラウザ版・結果差を地図へ色分け表示。Way ID、位置差、歩道判定、連続性、計算時間、保存履歴番号を比較パネルへ表示し、実験DBへ全件保存できる。経路全体の比較集計と合格基準判定は未実装。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">OSM認証と変更確認画面を実装する</span><span class="note">完了。OSM開発環境のOAuth 2.0＋PKCE、状態確認、連携解除、小窓での初回ログイン・登録・許可を実装。初回の点字ブロック記録確定時に連携状態を自動確認し、未連携の場合だけ小窓を開く。連携済みならOSM画面を表示しない。プロフィールのボタンは確認・解除・再連携用として残す。アクセストークンは開発DBへ暗号化保存し、監査履歴は秘密情報を除いて追記型保存。実送信は引き続きロック中。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">OSM認証と変更確認画面を実装する</span><span class="note">完了。本番OSMのOAuth 2.0＋PKCE、状態確認、連携解除、小窓での初回ログイン・登録・許可を実装。初回の点字ブロック記録確定時に連携状態を自動確認し、未連携の場合だけ小窓を開く。連携済みならOSM画面を表示しない。プロフィールのボタンは確認・解除・再連携用として残す。アクセストークンは開発DBへ暗号化保存し、監査履歴は秘密情報を除いて追記型保存。開発OSMの旧トークンは本番切替時に監査付きで失効済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">Wayの途中分割処理を実装する</span><span class="note">完了。開始・終了Node、正逆方向、複数Way、元タグ、Relationのmember順・role・タグを引き継ぐ。独立歩道には tactile_paving=yes、道路中心線にはGPS点群のWayからの符号付き距離をaccuracyで重み付けし、OSM Node順を基準に左右を必ず自動判定して sidewalk:left/right:tactile_paving=yes を作る。低信頼時も最大オフセットで決着し、利用者には左右を質問しない。Way正逆・GPSノイズ・中央付近・低精度点の自動試験済み。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">一般利用者向けの記録フローへ機能を統合する</span><span class="note">完了。記録終了→ブラウザ側の連続経路確定→分割区間・左右・予定タグ確認→StepBy記録保存→未送信変更案の自動保存→必要な場合だけOSM連携、という一連の流れに統合。通常記録はValhallaを呼ばず、GPS生点・accuracy・ブラウザ版フィット点・Way ID・経路を開発DBへ保存する。Valhallaは明示的な比較試験ボタンでだけ呼び出す。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">フィッティング時のWay座標を開発DBへバックアップする</span><span class="note">完了。記録ごとにWay ID・Version・Node ID列・全座標・開始終了位置・元タグ・Relation・左右・追加予定タグを <code>tactile.way_snapshots</code> へ同一トランザクションで保存する。OSM IDを主な照合キーとしつつ、当面の復旧・比較用に形状を保持する。</span></div></li>
@@ -528,7 +528,7 @@
               <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">新バージョンのValhalla依存を解消する</span><span class="note">開発版のブラウザフィッティングとOSM統合が合格基準を満たしたら、新バージョンの通常処理からValhalla呼出しをなくす。現行版と現行Valhallaは停止せず並行稼働し、本番切替えは別途明示的に判断する。</span></div></li>
             </ul>
-            <div class="dependency"><strong>次に実施：</strong> 保存済みの実験データと今後の現地記録を使い、ブラウザ版の経路連続性・歩道優先・左右判定・長時間記録時の速度について合格基準を決めて集計する。低信頼時の案内と再試行を整え、UI10の通常操作が安定した段階でValhalla比較を終了できるか判定する。OSMへの実送信は行わない。</div>
+            <div class="dependency"><strong>次に実施：</strong> プロフィールから本番OSMへ再連携し、正しい現地記録1件の保存で本番changeset・Way分割・タグ・監査履歴を確認する。必要な場合は本人の緑線削除から取消しを確認する。テスト用の架空データは本番OSMへ送らない。</div>
             <div class="dependency"><strong>重要な方針：</strong> ここで行うのは開発版のValhalla依存解消です。現行版と現行Valhallaは止めずに並行稼働させ、本番切替え・停止はこのタスクへ含めません。</div>
           </article>
         </div>
