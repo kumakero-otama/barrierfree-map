@@ -98,7 +98,7 @@
   <rect x="1030" y="1510" width="450" height="74" rx="14" class="external"/>
   <text x="1053" y="1538" class="boxTitle">Cloud Storage</text><text x="1053" y="1563" class="small">日次DB＋uploadsバックアップ／30日保持／復元試験済</text>
   <rect x="1030" y="1605" width="450" height="60" rx="14" class="external"/>
-  <text x="1053" y="1631" class="body">標準Cloud Monitoring・予算通知</text><text x="1053" y="1652" class="small">高度なLogging、Cloud DNSは当面不使用</text>
+  <text x="1053" y="1631" class="body">標準Monitoring・予算通知＋軽量観測</text><text x="1053" y="1652" class="small">1時間ごとにCPU・メモリ・容量・API・通信量を31日保持</text>
 
   <path d="M360 1480 H410" class="lineDev"/><path d="M980 1460 H1030" class="lineExt"/><path d="M980 1548 H1030" class="lineExt"/>
   <text x="75" y="1700" class="body warnText">公開API：stepby-api-8-229-191-182.sslip.io／固定IP 8.229.191.182／Caddy自動TLS</text>
