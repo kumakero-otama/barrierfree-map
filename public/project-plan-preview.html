@@ -274,7 +274,7 @@
           <article class="panel wide">
             <h3>1-3. 移動に追従してOSM地図データを補充</h3>
             <ul class="tasks">
-              <li class="done"><span class="box"></span><div><span class="task-title">現在地の移動に応じて次の範囲を先読みする</span><span class="note">完了。フィッティング用道路網は、GPS更新を止めず5秒間隔で取得範囲を確認し、既存中心から650m以上離れたらOverpass経由でオリジナルOSMの新しい半径1km圏をバックグラウンド取得する。表示専用のOSM点字ブロックはこのキャッシュから分離し、ブラウザへ永続保存せず半径10kmを都度表示する。取得中も既存データでフィッティングを継続する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">現在地の移動に応じて次の範囲を先読みする</span><span class="note">完了。フィッティング用道路網は、GPS更新を止めず5秒間隔で取得範囲を確認し、既存中心から650m以上離れたらOSM公式map読取APIから新しい半径1km圏をバックグラウンド取得する。公式APIが失敗した場合だけOverpass複数系統へ切り替え、過去キャッシュでも処理を継続する。表示専用のOSM点字ブロックはこのキャッシュから分離し、ブラウザへ永続保存せず半径10kmを都度表示する。取得中も既存データでフィッティングを継続する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">取得済み範囲を再利用し、差分だけ追加する</span><span class="note">完了。範囲・取得時刻・Way ID/Version・Node・形状をIndexedDBへ30分保存し、近い範囲は再利用する。新範囲は以前のWayを捨てず、Way IDごとに新しいVersionを優先して統合するため、長い記録の前半も最終経路計算に残る。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">通信失敗・高速移動・長時間記録を試験する</span><span class="note">完了。2つの取得範囲をまたぐ経路で、旧Wayと新Wayの統合、共有Node経路の確定、同一範囲の重複取得防止を自動試験した。追加取得失敗時は既存範囲を維持し、次のGPS更新で再試行する。実端末の電池・実通信量は後日の現地確認対象。</span></div></li>
             </ul>
@@ -334,7 +334,7 @@
             <h3>3-1. 記録対象と公開範囲</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">PROモードの記録項目を実装する</span><span class="note">完了。点字ブロック、JIS適合、JIS非適合の3項目だけをOSM変更案の対象にした。柵・塀・グレーチング・その他項目・ひとことメモはStepBy開発DBだけへ保存し、OSM連携も起動しない。JIS区分はStepBy側に保持し、OSM変更案では既存の標準タグ <code>tactile_paving=yes</code> だけを使用する。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">地図上の色分けを実装する</span><span class="note">完了。OSM由来でStepBy印なしは青、OSMまたはStepBy DBでStepBy由来の点字ブロックは緑、PROの非公開記録は赤で描画する。詳細を開閉した後も各線の元色を保持する。10km点字表示はOverpass検索を2 selectorへ軽量化し、複数接続先・5分サーバーキャッシュで一時障害へ対応する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">地図上の色分けを実装する</span><span class="note">完了。OSM由来でStepBy印なしは青、OSMまたはStepBy DBでStepBy由来の点字ブロックは緑、PROの非公開記録は赤で描画する。詳細を開閉した後も各線の元色を保持する。非PROでもPROバッジが出るCSS競合を修正。10km点字表示はAPIプロキシと複数の読取専用Overpassを並行し、最初に成功した結果と5分サーバーキャッシュで一時障害へ対応する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">PROモード中であることを明確に表示する</span><span class="note">完了。PRO利用者のマップ画面は地図全体を赤枠で囲み、上部のStepBy名の横へ赤いPROバッジを常時表示する。他の全画面の上部バーとプロフィールのヒーローエリアも同じ赤・白文字・丸型のPROバッジへ統一した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">公開・非公開データのAPI試験を行う</span><span class="note">完了。公開3種・非公開4種の固定分類を開発DBへ作成し、非公開項目だけのPRO記録はサーバー側でもOSM変更案作成を409で拒否する。公開・非公開が混在しても変更案へ非公開タグやメモを含めない。フロント5件・バック4件の自動試験に合格し、OSM書込フラグはfalse、送信0件。</span></div></li>
             </ul>
@@ -363,23 +363,54 @@
       <section class="track track-cloud" id="cloud">
         <div class="track-head">
           <div class="track-number">05</div>
-          <div><h2>クラウドサーバーへ移行する</h2><p>新バージョンがValhallaへ依存しない軽い構成を前提に、Google系サービスを第一候補として費用と運用を確認します。現行版は切替え完了まで並行稼働します。</p></div>
+          <div><h2>クラウドサーバーへ移行する</h2><p>採用構成は Google Cloud の折衷案に決定しました。現行ローカル版・UI0・Valhallaは切替え完了まで停止せず、新しいUI10環境だけを先に構築します。</p></div>
         </div>
         <div class="columns">
           <article class="panel">
-            <h3>5-1. 移行先を決める</h3>
+            <h3>5-1. 構成決定とアカウント保護</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">必要なAPI・DB・画像・ログ容量を測る</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">VPS一式移行とクラウド分割構成を比較する</span><span class="note">候補はVPS、Cloud Run＋マネージドPostgreSQL、AWS系、Cloudflare系など。無料枠終了後の費用も確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">構成・費用を決定し、松田先生へ相談する</span><span class="note">可能であれば費用をご支援いただきたい、という依頼文と見積りを用意する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">実利用量と無料枠を確認する</span><span class="note">完了。開発DB約19.8MB、APIログ約7MB/10日、Node開発API約113MB、通常CPU 1%未満。無料対象地域のe2-micro、Standard Persistent Disk 30GB、Cloud Storage 5GB、Secret Manager 6有効Versionを基本上限にする。外向き通信は計測と予算通知を追加する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">折衷案の構成を決定する</span><span class="note">完了。Compute Engine e2-micro（Oregon us-west1）1台にNode.js API・PostgreSQL・Caddyを同居。Persistent Disk、Cloud Storageバックアップ、Secret Manager、標準Monitoringを利用し、GitHub Pagesを継続する。Cloud SQL、Cloud Run、Firestore、Cloud DNSは使用しない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Google Cloud管理アカウントを保護する</span><span class="note">管理者は yamashita.3154@gmail.com。MacのGoogle Cloud CLIブラウザ認証、プロジェクトOS Login、プロジェクト共通SSH鍵の禁止まで完了。Googleアカウント側の2段階認証・復旧手段は本人設定画面で最終確認する。パスワード・秘密鍵はAIやGitへ渡さない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">専用プロジェクトと請求通知を設定する</span><span class="note">完了。プロジェクト <code>stepby-cloud-dev-202608</code>、us-west1/us-west1-b、有効な請求先を設定。月500円の予算に50%・80%・100%通知を作成した。予算は警告であり自動停止ではないため、リソース作成後に利用量監視と停止手順を追加する。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">クラウド操作とVM接続の認証基盤を作る</span><span class="note">完了。Google Cloud CLI 580.0.0を導入し管理者本人で認証。OS Loginを有効化、プロジェクト共通SSH鍵を禁止し、VM実行用サービスアカウント <code>stepby-vm-dev</code> を人の管理アカウントから分離した。サービスアカウント鍵ファイルは発行しない。</span></div></li>
             </ul>
           </article>
           <article class="panel">
-            <h3>5-2. 安全に移行する</h3>
+            <h3>5-2. Google Cloud開発環境を構築する</h3>
             <ul class="tasks">
-              <li><span class="box"></span><div><span class="task-title">バックアップ・復元・切戻し手順を作る</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">クラウドへ開発環境を作り、総合試験する</span><span class="note">認証、記録、DB、OSM OAuth、非公開情報、監査、性能、バックアップ復元を確認する。</span></div></li>
-              <li><span class="box"></span><div><span class="task-title">本番を切り替え、監視する</span><span class="note">旧サーバーはすぐ停止せず、切戻し可能な期間を設ける。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Cloud CLIと専用プロジェクトを準備する</span><span class="note">完了。必要API（Compute Engine、Secret Manager、Billing Budgets、IAM）だけを有効化し、リージョンus-west1、ゾーンus-west1-bを設定した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">e2-micro VMと30GB Standard Diskを作る</span><span class="note">完了。<code>stepby-dev-1</code>をus-west1-bに作成。Ubuntu 24.04 LTS、e2-micro、pd-standard 30GB、Shielded Secure Boot/vTPM/整合性監視、OS Login＋SSH公開鍵、VM専用サービスアカウントを設定。公開ファイアウォールはHTTP/HTTPSだけをStepByタグへ許可した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Node.js・PostgreSQL・Caddyを構築する</span><span class="note">完了。Node.js 18.19.1、PostgreSQL 16.14＋PostGIS、Caddy 2.6.2、自動セキュリティ更新を導入。専用OSユーザーのAPIをsystemdで常時起動し、固定IPとHTTPSホスト <code>stepby-api-8-229-191-182.sslip.io</code> から公開。API・DB正常、CORS、TLS、OSM書込みロックを確認した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Secret Managerを設定する</span><span class="note">完了。Google認証、OSM開発OAuth、署名・暗号化鍵、DB/管理設定を1つのSecret Versionへ統合。VMサービスアカウントがメタデータ認証で起動時に直接取得し、サービスアカウント鍵ファイル、Git、DBバックアップには含めない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">開発DBを暗号化して移行する</span><span class="note">完了。現行の開発DBだけを整合dumpで複製し、クラウド専用 <code>stepby_app_dev</code> へ復元。PostGISを含む36テーブル、約19.6MB、全テーブルの件数一致を確認し、一時dumpを両サーバーとMacから削除した。本番DBには接続していない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">Cloud Storageバックアップと復元試験を作る</span><span class="note">完了。日次タイマーと30日後の自動削除を設定し、開発DBとプロフィール画像等のuploadsをバックアップ。DBは別の一時DBへ復元し、36テーブル・推定総行数10,768の一致を確認後、一時DBと復元ファイルを削除した。秘密情報はバックアップ対象外。</span></div></li>
+            </ul>
+          </article>
+          <article class="panel wide">
+            <h3>5-3. 総合試験・段階切替え・切戻し</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">クラウドUI10を通し試験する</span><span class="note">AIで実行できる範囲は再確認済み。GitHub PagesとクラウドAPIはHTTP 200、認証済みのユーザー情報・記録一覧・1km道路網・10km OSM点字ブロックAPIもすべて成功（道路網2.46秒、点字ブロック9.88秒）。フロント8試験、バックエンド7試験、実OSM道路346 Wayを使う経路確定、記録キュー再送、左右自動判定に合格。DBの孤立経路・存在しないユーザー参照は0件。残りは本人の端末・実GPSで行う1kmフィッティング、650m移動更新、保存後画面遷移の最終確認だけ。OSM実送信はロックしたまま。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">性能・容量・費用を測る</span><span class="note">2026-08-13に観測を開始。初期値はCPU負荷ほぼ0、メモリ利用可能約448MB、ディスク4.0/29GB（14%）、DB約19MB、設定API 0.05〜0.08秒。API・DB・Caddy・バックアップ結果、CPU負荷、メモリ、ディスク、DB容量、応答時間、重大エラー、送受信量を1時間ごとに31日分CSVへ記録する軽量タイマーを稼働させた。7日経過後にe2-micro継続可否と費用を判定するため、期間未達の現在は未完了。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">日次バックアップの継続成功と保存物を再確認する</span><span class="note">完了。自動タイマーは有効で、2026-08-12夜の日次実行は成功。Cloud Storageの最新DB dump（225項目）とuploads圧縮（6項目）を実際に再取得し、両アーカイブが破損なく読めることを確認した。30日削除規則と既存の別DB復元試験も維持している。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">認証リダイレクト先を追加する</span><span class="note">完了。OSM開発環境のOAuthアプリとサーバー側を <code>https://stepby-api-8-229-191-182.sslip.io/auth/osm/callback</code> に変更。認可コード交換、OSM利用者情報取得、既存StepByユーザーへの再連携、追記型監査履歴を確認した。重複OSMアカウントを別ユーザーへ結び付けない制約も正常。Google認証はGitHub Pages上でクラウドAPIまで到達確認済み。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">GitHub Pages UI10のAPI接続先をクラウドへ切り替える</span><span class="note">完了。UI10の設定、認証、PWA、Service Worker、プロフィール画像、道情報、管理画面をクラウドHTTPS APIへ変更してdev/mainへ反映。UI0・現行API・現行Valhallaは変更も停止もしていない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">切戻し可能な並行稼働期間を完了する</span><span class="note">クラウド側の保存を正とする時点を明示し、旧開発環境を読み取り専用化。バックアップと復旧手順を再確認してから正式移行を判定する。</span></div></li>
+            </ul>
+          </article>
+          <article class="panel wide">
+            <h3>5-4. 管理者が実端末で行う最終GPS試験</h3>
+            <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">短い通常記録を保存する</span><span class="note">近所の1ブロック程度を歩き、記録開始・一時停止・再開・終了を確認する。終了後すぐ次画面へ進み、詳細画面とクラウドDBへ1件だけ保存されること、OSMへ送信されないことを確認する。AIがその直後にDBとログを照合する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">周回して同じOSM Wayへ戻る経路を確認する</span><span class="note">同じWayを複数回通っても、アプリが通過区間を自動統合して記録とOSM変更案を保存し、利用者へ経路確認を求めないことを確認する。利用者の操作は記録開始・停止・保存だけとする。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">開始地点から650m以上移動する</span><span class="note">フィッティング用道路網が自動更新され、現在地ピンと記録が途切れないことを確認する。可能なら開始地点から1km以上移動し、最初の1km圏外でも新しい道路上へフィッティングできることを確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">GPS精度が低下する場所を通る</span><span class="note">建物際などで一時的に精度が落ちても、前後の点による補間または不良点の除外が働き、道路外へ不自然な直線が作られないことを確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">通信の切断と復帰を確認する</span><span class="note">安全な場所で一時的に機内モード等を使い、記録が端末内に保持されること、通信復帰後に自動送信されること、同じ記録が二重登録されないことを確認する。サーバー処理エラーと通信切断が異なる表示になることも確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">画面ロック・アプリ復帰を確認する</span><span class="note">短時間の画面ロックまたは別画面への移動後に戻り、記録状態と送信待ちキューが失われないことを確認する。端末OSが位置情報取得を停止した場合は、その事実が分かる表示も確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">通常モードとPROモードを各1件確認する</span><span class="note">通常モードでは点字ブロックだけがOSM変更案対象、PROモードでは対象外情報がクラウドDBだけに保存されること、色・バッジ・詳細表示が正しいことを確認する。いずれも本番OSMへの実送信はしない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">保存操作からOSM公開完了までを実端末で確認する</span><span class="note">自動公開機能を正式に有効化した後の試験。通常モードで記録停止 → 保存を1回だけ押し、画面を待たせず次へ進むこと、裏側で同じ記録が1回だけOSMへ送信されること、changeset ID・対象Way・変更前後・成功結果が追記型監査履歴へ保存されることを確認する。通信切断時は端末内に保持し、復帰後に1回だけ再送されることも確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">OSM自動公開に失敗した場合の表示と再送を確認する</span><span class="note">OAuth未連携・権限取消し・Version競合・監査履歴保存失敗・OSM API障害をそれぞれ確認し、StepBy側の記録は失われず、二重changesetを作らず、利用者には短く分かりやすい状態だけを表示する。競合時は自動上書きせず停止する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">緑線の削除からOSM取消し完了までを実端末で確認する</span><span class="note">本人が保存した緑線を選び「この記録を削除」→確認を行う。青線と他人の緑線には削除ボタンがないこと、取消changeset、元changesetとの対応、変更前後、成功結果が監査履歴へ残ること、処理後に線が消えることを確認する。現在は実OSM通信フラグOFFのため、有効化後に実施する。</span></div></li>
             </ul>
           </article>
         </div>
@@ -504,7 +535,7 @@
       <section class="track track-cloud" id="legacy-cloud">
         <div class="track-head">
           <div class="track-number">02</div>
-          <div><h2>クラウドサーバー移行</h2><p>新バージョンのブラウザフィッティングを完成させ、Valhallaへ依存しない構成を前提に検討します。現時点では移行先・構成とも未定で、現行版と現行Valhallaは並行稼働します。</p></div>
+          <div><h2>クラウドサーバー移行（旧検討メモ）</h2><p>以下は比較検討時の履歴です。採用構成と実行順は上の「05 クラウドサーバーへ移行する」を正とします。現行版と現行Valhallaは並行稼働します。</p></div>
         </div>
 
         <div class="cloud-options" aria-label="クラウド移行の2つの候補">
@@ -529,7 +560,7 @@
               <li><span class="box"></span><div><span class="task-title">移行前に完了させる仕様変更の範囲を確定する</span><span class="note">「全て完了」の判定条件をチェックリストにする。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Valhalla廃止後のクラウド要件を決める</span><span class="note">API、PostgreSQL、画像、ログ、バックアップ、運用負荷、月額上限、OSM連携を整理。Valhalla用のCPU・メモリ・タイル容量は含めない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">移行方式と無料枠を比較する</span><span class="note">VPS、Google Cloud Run、AWS Lambda、Cloudflare Workers、Supabase、Renderを公式情報で比較。現状は安全優先ならVPS、無料実験ならCloud Run＋Neon＋GitHub Pages＋オブジェクトストレージを第一候補とした。<a href="cloud-migration-options.html">比較表を見る</a></span></div></li>
-              <li><span class="box"></span><div><span class="task-title">構成とサービスを決定する</span><span class="pill wait">移行先・構成未定</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">構成とサービスを決定する</span><span class="note">Google Cloud折衷案に決定。詳細は05を参照。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">移行費用と継続費用を見積もる</span></div></li>
               <li><span class="box"></span><div><span class="task-title">松田先生へ費用負担を相談する</span><span class="note">「可能であればご支援いただきたい」という依頼文と、見積りを準備。</span></div></li>
             </ul>
