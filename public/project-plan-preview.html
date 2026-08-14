@@ -428,7 +428,11 @@
           </article>
           <article class="panel wide">
             <h3>5-4. 管理者が実端末で行う最終GPS試験</h3>
+            <p class="note"><strong>屋内・歩行なしで先にできる確認：</strong>次の3項目と、下にある「通信の切断と復帰」「画面ロック・アプリ復帰」は、歩行試験より先に実施できる。</p>
             <ul class="tasks">
+              <li><span class="box"></span><div><span class="task-title">短い緑線の中心・両端でタップ判定を確認する</span><span class="note">地図情報表示をONにし、本人の短い緑線の真上・両端をタップして「この記録を削除」が表示されることを確認する。当たり判定だけの確認では削除確認を確定せず、OSM取消しを実行しない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">Googleログイン後に白画面にならないことを反復確認する</span><span class="note">一度ログアウトし、Googleアカウント選択から地図表示までを通常ブラウザとホーム画面版で各3回程度確認する。認証中表示のまま停止せず、白画面にもならず、既存アカウントがサインアップ画面へ誤遷移しないことを確認する。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">キャッシュ更新後の各画面を確認する</span><span class="note">UI10を閉じて開き直し、ログイン・地図・プロフィールを順に表示する。新しいService Workerへ更新後も白画面にならず、地図やボタンが表示され、古い表示や修正前の挙動が復活しないことを確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">短い通常記録を保存する</span><span class="note">近所の1ブロック程度を歩き、記録開始・一時停止・再開・終了を確認する。終了後すぐ次画面へ進み、詳細画面とクラウドDBへ1件だけ保存されることを確認する。OSM自動公開を正式に有効化した後は、同じ保存操作からchangesetが1件だけ作られることも確認する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">周回して同じOSM Wayへ戻る経路を確認する</span><span class="note">同じWayを複数回通っても、アプリが通過区間を自動統合して記録とOSM変更案を保存し、利用者へ経路確認を求めないことを確認する。利用者の操作は記録開始・停止・保存だけとする。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">開始地点から650m以上移動する</span><span class="note">フィッティング用道路網が自動更新され、現在地ピンと記録が途切れないことを確認する。可能なら開始地点から1km以上移動し、最初の1km圏外でも新しい道路上へフィッティングできることを確認する。</span></div></li>
