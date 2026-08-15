@@ -47,7 +47,7 @@
   <!-- cloud current development -->
   <rect x="55" y="345" width="1490" height="555" rx="24" class="cloud" filter="url(#shadow)"/>
   <text x="85" y="382" class="section">Google Cloud 開発環境（UI10接続先）</text>
-  <rect x="1248" y="359" width="265" height="34" rx="17" class="pill"/><text x="1380" y="381" text-anchor="middle" class="label">Valhalla依存なし・稼働中</text>
+  <rect x="1248" y="359" width="265" height="34" rx="17" class="pill"/><text x="1380" y="381" text-anchor="middle" class="label">ブラウザフィッティング・稼働中</text>
   <text x="85" y="408" class="small">Compute Engine: stepby-dev-1／固定IP／us-west1　公開HTTPS: stepby-api-8-229-191-182.sslip.io</text>
 
   <rect x="95" y="445" width="240" height="105" rx="18" class="inner"/>
