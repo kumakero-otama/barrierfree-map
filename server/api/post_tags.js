@@ -1,4 +1,5 @@
 const { createDbPool } = require("../db");
+const { ensureCurrentRoadTags } = require("../road_tag_policy");
 
 // 小さな JSON ボディを安全に受け取り、エラー処理を 1 箇所に寄せる。
 function parseJsonBody(req, callback) {
@@ -173,7 +174,8 @@ function createPostTagsHandler({ sendJson }) {
         return;
       }
 
-      fetchActiveTags(pool)
+      ensureCurrentRoadTags(pool)
+        .then(() => fetchActiveTags(pool))
         .then((tags) => {
           sendJson(res, 200, {
             success: true,
@@ -209,6 +211,7 @@ function createPostTagsHandler({ sendJson }) {
         }
 
         try {
+          await ensureCurrentRoadTags(pool);
           const existing = await findTagByLabel(pool, label);
           if (existing) {
             // 既存ラベルなら新規作成せず、一覧件数だけ最新化して返す。

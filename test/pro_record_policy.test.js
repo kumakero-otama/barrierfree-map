@@ -2,6 +2,8 @@ const assert = require("assert");
 const { PUBLIC_TAG_CODES, SYSTEM_TAGS, getRecordPublication } = require("../server/pro_record_policy");
 
 assert.deepStrictEqual([...PUBLIC_TAG_CODES], ["tactile_paving", "tactile_paving_jis", "tactile_paving_non_jis"]);
+assert.ok(SYSTEM_TAGS.some((tag) => tag[1] === "JISの点字ブロック" && tag[2] === true));
+assert.ok(SYSTEM_TAGS.some((tag) => tag[1] === "用水路の蓋" && tag[2] === false));
 assert.strictEqual(SYSTEM_TAGS.filter((tag) => tag[2]).length, 3);
 assert.ok(SYSTEM_TAGS.filter((tag) => !tag[2]).every((tag) => tag[3] === "red"));
 

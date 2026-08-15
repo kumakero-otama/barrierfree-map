@@ -6,11 +6,14 @@ const PUBLIC_TAG_CODES = new Set([
 
 const SYSTEM_TAGS = [
   ["tactile_paving", "点字ブロック", true, "green", 10],
-  ["tactile_paving_jis", "JIS適合の点字ブロック", true, "green", 20],
-  ["tactile_paving_non_jis", "JIS非適合の点字ブロック", true, "green", 30],
+  ["tactile_paving_jis", "JISの点字ブロック", true, "green", 20],
+  ["tactile_paving_non_jis", "JISではない点字ブロック", true, "green", 30],
   ["fence", "柵", false, "red", 100],
   ["wall", "塀", false, "red", 110],
   ["grating", "グレーチング", false, "red", 120],
+  ["waterway_cover", "用水路の蓋", false, "red", 130],
+  ["legacy_test", "テスト用", false, "red", 800],
+  ["legacy_test_2", "テスト用2", false, "red", 810],
   ["pro_note", "その他の歩行支援情報", false, "red", 900],
 ];
 
