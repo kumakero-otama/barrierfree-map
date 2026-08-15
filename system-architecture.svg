@@ -1,107 +1,97 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1810" viewBox="0 0 1600 1810" role="img" aria-labelledby="title desc">
-  <title id="title">StepBy / barrierfree-map 現在のシステム構成</title>
-  <desc id="desc">利用端末、GitHub Pages、Tailscale、ローカルサーバー、Google Cloud上のNode API、管理監視API、PostgreSQL、バックアップ、OSMなど外部サービスの接続関係を示す図。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">StepBy 現在のシステム構成</title>
+  <desc id="desc">利用者端末、GitHub Pages、Google認証、OpenStreetMap、Google Cloud開発環境、ローカル現行環境の接続を示す構成図。</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6f9ff"/><stop offset="1" stop-color="#eef8f4"/></linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#19324d" flood-opacity=".13"/></filter>
-    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/></marker>
-    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#059669"/></marker>
-    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#d97706"/></marker>
-    <marker id="arrowGray" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#64748b"/></marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity=".14"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0v6l9-3z" fill="#475569"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0v6l9-3z" fill="#0f9f8f"/></marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0v6l9-3z" fill="#e07a22"/></marker>
     <style>
-      text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;fill:#16263a}
-      .title{font-size:34px;font-weight:800}.subtitle{font-size:16px;fill:#516477}.section{font-size:20px;font-weight:800}.boxTitle{font-size:18px;font-weight:800}.body{font-size:14px}.small{font-size:12px;fill:#53677c}.tiny{font-size:11px;fill:#53677c}.white{fill:#fff}.prodText{fill:#1d4ed8}.devText{fill:#047857}.warnText{fill:#b45309}.muted{fill:#64748b}
-      .outer{fill:#fff;stroke:#cbd5e1;stroke-width:2}.prod{fill:#eff6ff;stroke:#60a5fa;stroke-width:2}.dev{fill:#ecfdf5;stroke:#34d399;stroke-width:2}.db{fill:#f5f3ff;stroke:#a78bfa;stroke-width:2}.external{fill:#fff7ed;stroke:#fb923c;stroke-width:2}.infra{fill:#f8fafc;stroke:#94a3b8;stroke-width:2}.locked{fill:#fff7ed;stroke:#f59e0b;stroke-width:2;stroke-dasharray:7 5}.lineProd{fill:none;stroke:#2563eb;stroke-width:3;marker-end:url(#arrowBlue)}.lineDev{fill:none;stroke:#059669;stroke-width:3;marker-end:url(#arrowGreen)}.lineExt{fill:none;stroke:#d97706;stroke-width:2.5;marker-end:url(#arrowOrange)}.lineGray{fill:none;stroke:#64748b;stroke-width:2.5;marker-end:url(#arrowGray)}.dash{stroke-dasharray:8 6}.pill{rx:12;ry:12}
+      text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;fill:#18212d}
+      .title{font-size:34px;font-weight:800}.subtitle{font-size:15px;fill:#64748b}.section{font-size:21px;font-weight:800}.boxTitle{font-size:22px;font-weight:800}.body{font-size:15px}.small{font-size:13px;fill:#536173}.tiny{font-size:12px;fill:#64748b}.label{font-size:12px;font-weight:700;fill:#334155}
+      .card{fill:#fff;stroke:#667085;stroke-width:1.6}.cloud{fill:#edfdf9;stroke:#0f9f8f;stroke-width:2.4}.legacy{fill:#f8fafc;stroke:#64748b;stroke-width:2.2}.external{fill:#fff8ed;stroke:#e07a22;stroke-width:1.8}.db{fill:#f5f3ff;stroke:#8b5cf6;stroke-width:1.8}.inner{fill:#fff;stroke:#9aa8b8;stroke-width:1.3}.line{fill:none;stroke:#475569;stroke-width:2.5;marker-end:url(#arrow)}.lineGreen{fill:none;stroke:#0f9f8f;stroke-width:3;marker-end:url(#arrowGreen)}.lineOrange{fill:none;stroke:#e07a22;stroke-width:2.7;marker-end:url(#arrowOrange)}.dash{stroke-dasharray:7 6}.pill{fill:#dcfce7;stroke:#22c55e}.legacyPill{fill:#e2e8f0;stroke:#94a3b8}
     </style>
   </defs>
-  <rect width="1600" height="1810" fill="url(#bg)"/>
-  <text x="60" y="58" class="title">StepBy / barrierfree-map 現在のシステム構成</text>
-  <text x="60" y="88" class="subtitle">2026年8月13日時点　青＝公開版　緑＝開発版　橙＝外部サービス　破線＝制限・未稼働経路</text>
+  <rect width="1600" height="1000" fill="#fff"/>
+  <text x="55" y="55" class="title">StepBy 現在のシステム構成</text>
+  <text x="55" y="83" class="subtitle">2026年8月15日時点　緑＝UI10・クラウド開発版　灰＝UI0・ローカル現行版　橙＝外部サービス</text>
 
-  <!-- clients and frontend -->
-  <rect x="45" y="120" width="1510" height="215" rx="22" class="outer" filter="url(#shadow)"/>
-  <text x="70" y="153" class="section">利用端末とフロントエンド</text>
-  <rect x="75" y="175" width="245" height="120" rx="16" class="infra"/>
-  <text x="98" y="207" class="boxTitle">利用者の端末</text><text x="98" y="233" class="body">スマートフォン / PCブラウザ</text><text x="98" y="256" class="small">フィット用OSM 1km保存／表示用点字10kmは非保存</text><text x="98" y="277" class="small">650m移動更新・永続送信キュー・二重投稿防止ID</text>
-  <rect x="390" y="175" width="385" height="120" rx="16" class="prod"/>
-  <text x="414" y="205" class="boxTitle prodText">公開フロント UI0</text><text x="414" y="232" class="body">GitHub Pages / StepBy mainブランチ</text><text x="414" y="255" class="small">kumakero-otama.github.io/StepBy/UI0/</text><text x="414" y="277" class="small">API接続先：Tailscale Funnel 標準HTTPS</text>
-  <rect x="845" y="175" width="650" height="120" rx="16" class="dev"/>
-  <text x="870" y="205" class="boxTitle devText">開発フロント UI10</text><text x="870" y="231" class="body">通常記録＝ブラウザフィット／Valhalla＝明示比較のみ</text><text x="870" y="254" class="small">保存→OSM公開／本人の緑線削除→取消しを各永続キューで非同期実行</text><text x="870" y="276" class="small">GitHub Pages UI10／tailnet :10001 → localhost:3200</text>
-  <path d="M320 220 H390" class="lineProd"/><path d="M320 265 C350 315 810 315 845 265" class="lineDev"/>
+  <!-- top services -->
+  <rect x="55" y="125" width="300" height="130" rx="20" class="card" filter="url(#shadow)"/>
+  <text x="205" y="173" text-anchor="middle" class="boxTitle">GitHub Pages</text>
+  <text x="205" y="202" text-anchor="middle" class="body">フロントエンド配信</text>
+  <text x="205" y="226" text-anchor="middle" class="small">UI10（開発版）／UI0（現行版）</text>
 
-  <!-- tailscale -->
-  <rect x="45" y="370" width="1510" height="155" rx="22" class="outer" filter="url(#shadow)"/>
-  <text x="70" y="403" class="section">公開・トンネリング層：Tailscale Serve / Funnel</text>
-  <rect x="75" y="425" width="400" height="70" rx="14" class="prod"/><text x="96" y="452" class="boxTitle prodText">Funnel :443</text><text x="96" y="477" class="small">公開URL → 本番バックエンド localhost:3000</text>
-  <rect x="525" y="425" width="400" height="70" rx="14" class="dev"/><text x="546" y="452" class="boxTitle devText">Funnel :443 /dev-api</text><text x="546" y="477" class="small">公開開発API → localhost:3100（従来:10000も維持）</text>
-  <rect x="975" y="425" width="400" height="70" rx="14" class="dev"/><text x="996" y="452" class="boxTitle devText">Serve :10001</text><text x="996" y="477" class="small">tailnet内限定 → UI10 localhost:3200</text>
-  <rect x="1400" y="425" width="125" height="70" rx="14" class="infra"/><text x="1415" y="452" class="body">:8443</text><text x="1415" y="474" class="tiny">CCRT別系統</text>
+  <rect x="650" y="105" width="300" height="190" rx="34" class="card" filter="url(#shadow)"/>
+  <rect x="745" y="118" width="110" height="18" rx="9" fill="#374151"/><circle cx="800" cy="127" r="5" fill="#050505"/>
+  <text x="800" y="169" text-anchor="middle" class="boxTitle">利用者端末</text>
+  <text x="800" y="196" text-anchor="middle" class="body">スマートフォン／PC</text>
+  <text x="800" y="222" text-anchor="middle" class="small">画面表示・GPS生座標取得</text>
+  <text x="800" y="244" text-anchor="middle" class="small">1km OSMデータでブラウザフィット</text>
+  <text x="800" y="266" text-anchor="middle" class="small">送信待ちキュー・オフライン再送</text>
 
-  <!-- local server -->
-  <rect x="45" y="560" width="1510" height="570" rx="22" fill="#f8fafc" stroke="#64748b" stroke-width="3" filter="url(#shadow)"/>
-  <text x="70" y="596" class="section">ローカルLinuxサーバー「barrierfree-map」</text>
-  <text x="70" y="620" class="small">本番と開発は同じ物理サーバー上。ただしGit worktree・ブランチ・PM2プロセス・ポート・DB・設定を分離。Nodeバックエンドは仮想環境ではなくPM2管理。</text>
+  <rect x="1050" y="125" width="235" height="130" rx="20" class="external" filter="url(#shadow)"/>
+  <text x="1167" y="169" text-anchor="middle" class="boxTitle">Google Identity</text>
+  <text x="1167" y="198" text-anchor="middle" class="body">StepByログイン</text>
+  <text x="1167" y="224" text-anchor="middle" class="small">OpenID Connect</text>
 
-  <rect x="75" y="650" width="445" height="290" rx="18" class="prod"/>
-  <text x="98" y="682" class="boxTitle prodText">公開バックエンド</text><text x="98" y="707" class="body">/home/otama/barrierfree-map　main</text><text x="98" y="730" class="body">PM2: barrierfree-map-server　*:3000</text>
-  <rect x="98" y="755" width="399" height="70" rx="12" fill="#fff" stroke="#93c5fd"/><text x="115" y="779" class="body">認証・プロフィール・記録・集計・タグ API</text><text x="115" y="802" class="small">Google認証 / session / records / stats / road info</text>
-  <rect x="98" y="842" width="399" height="70" rx="12" fill="#fff" stroke="#93c5fd"/><text x="115" y="866" class="body">Valhallaフィッティング API</text><text x="115" y="889" class="small">/api/match・/api/trace → Valhalla :8002</text>
+  <rect x="1325" y="125" width="220" height="130" rx="20" class="external" filter="url(#shadow)"/>
+  <text x="1435" y="169" text-anchor="middle" class="boxTitle">OpenStreetMap</text>
+  <text x="1435" y="198" text-anchor="middle" class="body">地図・Way・点字データ</text>
+  <text x="1435" y="224" text-anchor="middle" class="small">OAuth／Changeset／Overpass</text>
 
-  <rect x="555" y="650" width="570" height="410" rx="18" class="dev"/>
-  <text x="578" y="682" class="boxTitle devText">開発バックエンド</text><text x="578" y="707" class="body">/home/otama/barrierfree-map-dev　dev</text><text x="578" y="730" class="body">PM2: barrierfree-map-dev　127.0.0.1:3100</text>
-  <rect x="578" y="755" width="524" height="68" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="779" class="body">共通アプリAPI</text><text x="595" y="802" class="small">認証・記録・集計・PRO公開判定（公開3種／StepBy内限定）</text>
-  <rect x="578" y="838" width="252" height="86" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="864" class="body">通常：ブラウザ記録API</text><text x="595" y="886" class="small">raw補間・Node接続拘束・道路左右の自動判定</text><text x="595" y="906" class="small">Valhalla非依存／比較は管理者画面だけ</text>
-  <rect x="850" y="838" width="252" height="86" rx="12" class="dev"/><text x="867" y="864" class="body devText">OSM公開・取消API（本番OSM接続）</text><text x="867" y="886" class="small">保存＝本人OAuth公開／緑線削除＝取消し</text><text x="867" y="906" class="small">本番Way・Version照合／競合停止・冪等</text>
-  <rect x="578" y="940" width="524" height="92" rx="12" fill="#fff" stroke="#6ee7b7"/><text x="595" y="966" class="body">安全機構・開発DB管理API</text><text x="595" y="988" class="small">所有者・OAuth・機能フラグ・Version・監査開始前保存を必須化</text><text x="595" y="1009" class="small">保存/本人緑線削除を1件の許可とし、青線・他人・対応不明は取消不可</text>
+  <path d="M355 190H650" class="line"/><path d="M950 180h100" class="lineOrange"/><path d="M950 230c170 55 260 55 375 0" class="lineOrange"/>
+  <text x="500" y="178" text-anchor="middle" class="label">HTML・CSS・JavaScript</text>
+  <text x="1000" y="168" text-anchor="middle" class="label">認証</text>
 
-  <rect x="1160" y="650" width="355" height="190" rx="18" class="db"/>
-  <text x="1183" y="682" class="boxTitle">PostgreSQL 16</text><text x="1183" y="706" class="body">同じDBサーバープロセス　:5432</text>
-  <rect x="1183" y="730" width="309" height="42" rx="10" fill="#fff" stroke="#818cf8"/><text x="1200" y="756" class="body prodText">公開DB：barrierfree_map</text>
-  <rect x="1183" y="783" width="309" height="42" rx="10" fill="#fff" stroke="#34d399"/><text x="1200" y="809" class="body devText">開発DB：stepby_app_dev</text>
-  <text x="1183" y="851" class="small">※構造は同系統、データは分離</text><text x="1183" y="870" class="tiny">開発DB：Way座標・全記録比較/要確認地図・READ ONLYコピー・変更案・監査</text>
+  <!-- cloud current development -->
+  <rect x="405" y="345" width="1140" height="555" rx="24" class="cloud" filter="url(#shadow)"/>
+  <text x="435" y="382" class="section">Google Cloud 開発環境（現在のUI10接続先）</text>
+  <rect x="1248" y="359" width="265" height="34" rx="17" class="pill"/><text x="1380" y="381" text-anchor="middle" class="label">Valhalla依存なし・稼働中</text>
+  <text x="435" y="408" class="small">Compute Engine: stepby-dev-1／固定IP／us-west1　公開HTTPS: stepby-api-8-229-191-182.sslip.io</text>
 
-  <rect x="1160" y="885" width="355" height="175" rx="18" class="infra"/>
-  <text x="1183" y="917" class="boxTitle">Docker / 同居サービス</text><text x="1183" y="944" class="body">Valhallaコンテナ　:8002</text><text x="1183" y="966" class="small">現行UI0のマップマッチングで使用</text><text x="1183" y="993" class="body">CCRTコンテナ　localhost:8080</text><text x="1183" y="1015" class="small">Funnel :8443（StepByとは別系統）</text><text x="1183" y="1042" class="small">Netdata等の運用コンテナも同居</text>
+  <rect x="445" y="445" width="240" height="105" rx="18" class="inner"/>
+  <text x="565" y="480" text-anchor="middle" class="boxTitle">Caddy</text><text x="565" y="508" text-anchor="middle" class="body">HTTPS・TLS</text><text x="565" y="532" text-anchor="middle" class="small">公開443 → localhost:3100</text>
 
-  <path d="M520 790 H1160" class="lineProd"/><path d="M1125 790 H1160" class="lineDev"/>
-  <path d="M497 877 C700 1110 1030 1090 1160 950" class="lineProd"/>
+  <rect x="745" y="435" width="455" height="265" rx="20" class="inner"/>
+  <text x="972" y="473" text-anchor="middle" class="boxTitle">Node.js バックエンド</text>
+  <text x="972" y="498" text-anchor="middle" class="small">systemd: stepby-dev.service／devブランチ</text>
+  <rect x="775" y="522" width="190" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="870" y="548" text-anchor="middle" class="body">認証・プロフィール</text><text x="870" y="570" text-anchor="middle" class="small">Google／OSM OAuth</text>
+  <rect x="980" y="522" width="190" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="1075" y="548" text-anchor="middle" class="body">記録・タグAPI</text><text x="1075" y="570" text-anchor="middle" class="small">raw・PRO・道情報</text>
+  <rect x="775" y="606" width="190" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="870" y="632" text-anchor="middle" class="body">OSM変更API</text><text x="870" y="654" text-anchor="middle" class="small">分割・公開・取消し</text>
+  <rect x="980" y="606" width="190" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="1075" y="632" text-anchor="middle" class="body">安全・管理API</text><text x="1075" y="654" text-anchor="middle" class="small">監査・競合停止・冪等</text>
 
-  <!-- external -->
-  <rect x="45" y="1165" width="1510" height="115" rx="22" class="outer" filter="url(#shadow)"/>
-  <text x="70" y="1198" class="section">外部サービス</text>
-  <rect x="75" y="1215" width="275" height="45" rx="12" class="external"/><text x="94" y="1243" class="body">Google Identity：StepByログイン</text>
-  <rect x="375" y="1215" width="275" height="45" rx="12" class="external"/><text x="394" y="1243" class="body">GitHub：ソース / Pages配信</text>
-  <rect x="675" y="1215" width="275" height="45" rx="12" class="external"/><text x="694" y="1235" class="body">OSM公式読取＋Overpass</text><text x="694" y="1253" class="small">1kmは公式優先／10kmは複数系統並行</text>
-  <rect x="975" y="1215" width="350" height="45" rx="12" class="external"/><text x="994" y="1243" class="body">本番OSM OAuth：Client ID設定済・小窓認証</text>
-  <rect x="1350" y="1215" width="175" height="45" rx="12" class="external"/><text x="1369" y="1243" class="body">地図タイル等</text>
-  <path d="M850 838 C850 1140 800 1140 800 1215" class="lineExt"/><path d="M976 924 C1080 1135 1150 1135 1150 1215" class="lineExt dash"/>
+  <rect x="1255" y="445" width="250" height="145" rx="18" class="db"/>
+  <text x="1380" y="480" text-anchor="middle" class="boxTitle">PostgreSQL 16</text>
+  <text x="1380" y="508" text-anchor="middle" class="body">stepby_app_dev</text>
+  <text x="1380" y="532" text-anchor="middle" class="small">記録・GPS raw・Way座標</text>
+  <text x="1380" y="554" text-anchor="middle" class="small">タグ・OSMリンク・追記監査</text>
+  <text x="1380" y="576" text-anchor="middle" class="tiny">開発専用DB／現行DBと分離</text>
 
-  <!-- flow arrows between layers -->
-  <path d="M582 295 C582 355 275 360 275 425" class="lineProd"/><path d="M1050 295 C1050 355 725 360 725 425" class="lineDev"/><path d="M1250 295 C1250 350 1175 370 1175 425" class="lineDev"/><path d="M275 495 C275 570 290 585 290 650" class="lineProd"/><path d="M725 495 C725 570 790 585 790 650" class="lineDev"/><path d="M1175 495 C1175 535 1518 535 1518 640" class="lineDev"/>
-  <!-- approved cloud target: foundation and internal API are running -->
-  <rect x="45" y="1320" width="1510" height="430" rx="22" fill="#fffbeb" stroke="#d97706" stroke-width="3" stroke-dasharray="10 7" filter="url(#shadow)"/>
-  <text x="70" y="1358" class="section warnText">公開中のGoogle Cloud開発環境（UI10の新API）</text>
-  <text x="70" y="1384" class="small">Project: stepby-cloud-dev-202608／Oregon us-west1。ローカル本番とは分離し、固定IP・クラウド開発API・開発DB・日次バックアップが稼働。</text>
+  <rect x="445" y="625" width="240" height="105" rx="18" class="external"/>
+  <text x="565" y="660" text-anchor="middle" class="boxTitle">Secret Manager</text><text x="565" y="687" text-anchor="middle" class="body">認証・暗号鍵を保管</text><text x="565" y="711" text-anchor="middle" class="small">VMサービスアカウントだけ読取</text>
+  <rect x="445" y="755" width="240" height="105" rx="18" class="external"/>
+  <text x="565" y="790" text-anchor="middle" class="boxTitle">Cloud Storage</text><text x="565" y="817" text-anchor="middle" class="body">日次バックアップ</text><text x="565" y="841" text-anchor="middle" class="small">DB＋uploads／30日保持</text>
+  <rect x="745" y="735" width="455" height="125" rx="18" class="inner"/>
+  <text x="972" y="770" text-anchor="middle" class="boxTitle">OSMデータ処理</text><text x="972" y="798" text-anchor="middle" class="body">公式OSM／Overpassから読取</text><text x="972" y="823" text-anchor="middle" class="small">端末で連続Way経路を確定・左右を自動判定</text><text x="972" y="846" text-anchor="middle" class="small">本人の保存・削除確定時だけ本番OSMへ送信</text>
+  <rect x="1255" y="625" width="250" height="105" rx="18" class="inner"/>
+  <text x="1380" y="660" text-anchor="middle" class="boxTitle">監視・管理画面</text><text x="1380" y="687" text-anchor="middle" class="body">稼働・容量・API履歴</text><text x="1380" y="711" text-anchor="middle" class="small">秘密情報は表示しない</text>
 
-  <rect x="75" y="1415" width="285" height="130" rx="16" class="prod"/>
-  <text x="98" y="1447" class="boxTitle prodText">GitHub Pages</text><text x="98" y="1474" class="body">UI10フロントを継続配信</text><text x="98" y="1498" class="small">クラウドHTTPS APIへ接続済</text><text x="98" y="1521" class="small">UI0・現行版は変更なし</text>
+  <path d="M685 497h60" class="lineGreen"/><path d="M1200 517h55" class="lineGreen"/><path d="M685 677c35 0 35-90 60-90" class="lineOrange"/><path d="M745 680c-35 30-35 127-60 127" class="lineOrange"/><path d="M1200 647h55" class="lineGreen"/>
+  <path d="M800 295v25H390v177h55" class="lineGreen"/><text x="560" y="310" class="label">UI10 API通信</text>
+  <path d="M1160 435c0-90 225-80 225-180" class="lineOrange"/><text x="1275" y="332" class="label">読取／OAuth／OSM編集</text>
 
-  <rect x="410" y="1415" width="570" height="250" rx="18" class="dev"/>
-  <text x="435" y="1447" class="boxTitle devText">Compute Engine e2-micro + Standard Persistent Disk</text>
-  <text x="435" y="1473" class="small">stepby-dev-1：Ubuntu 24.04／OS Login＋SSH公開鍵／Shielded VM</text>
-  <rect x="435" y="1492" width="245" height="68" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1518" class="body">Caddy HTTPS → Node API</text><text x="452" y="1541" class="small">公開443 → 127.0.0.1:3100</text>
-  <rect x="705" y="1492" width="245" height="68" rx="11" class="db"/><text x="722" y="1518" class="body">PostgreSQL 16 + PostGIS</text><text x="722" y="1541" class="small">localhost:5432／開発DB 36表移行済</text>
-  <rect x="435" y="1580" width="515" height="58" rx="11" fill="#fff" stroke="#6ee7b7"/><text x="452" y="1605" class="body">本番OSM連携＋管理監視API／Valhalla依存なし</text><text x="452" y="1626" class="small">監査・競合停止・稼働/容量/OSM結果表示。秘密情報は非表示</text>
+  <!-- legacy environment -->
+  <rect x="55" y="345" width="305" height="555" rx="24" class="legacy" filter="url(#shadow)"/>
+  <text x="80" y="382" class="section">ローカル現行環境</text>
+  <rect x="80" y="402" width="255" height="32" rx="16" class="legacyPill"/><text x="207" y="423" text-anchor="middle" class="label">UI0を止めずに並行稼働</text>
+  <rect x="80" y="460" width="255" height="82" rx="15" class="inner"/><text x="207" y="490" text-anchor="middle" class="boxTitle">Tailscale Funnel</text><text x="207" y="518" text-anchor="middle" class="small">公開HTTPS・トンネリング</text>
+  <rect x="80" y="565" width="255" height="110" rx="15" class="inner"/><text x="207" y="598" text-anchor="middle" class="boxTitle">Node.js API</text><text x="207" y="626" text-anchor="middle" class="body">main／PM2／:3000</text><text x="207" y="651" text-anchor="middle" class="small">現行の認証・記録・集計</text>
+  <rect x="80" y="700" width="120" height="110" rx="15" class="inner"/><text x="140" y="735" text-anchor="middle" class="boxTitle">Valhalla</text><text x="140" y="763" text-anchor="middle" class="body">:8002</text><text x="140" y="786" text-anchor="middle" class="small">UI0 fitting</text>
+  <rect x="215" y="700" width="120" height="110" rx="15" class="db"/><text x="275" y="735" text-anchor="middle" class="boxTitle">PostgreSQL</text><text x="275" y="763" text-anchor="middle" class="small">現行DB</text><text x="275" y="786" text-anchor="middle" class="small">クラウドと分離</text>
+  <path d="M207 542v23" class="line"/><path d="M180 675l-25 25" class="line"/><path d="M235 675l25 25" class="line"/>
+  <path d="M205 255v145" class="line dash"/><text x="215" y="326" class="label">UI0</text>
 
-  <rect x="1030" y="1415" width="450" height="74" rx="14" class="external"/>
-  <text x="1053" y="1443" class="boxTitle">Secret Manager</text><text x="1053" y="1468" class="small">1有効Version／VMサービスアカウントだけ読取</text>
-  <rect x="1030" y="1510" width="450" height="74" rx="14" class="external"/>
-  <text x="1053" y="1538" class="boxTitle">Cloud Storage</text><text x="1053" y="1563" class="small">日次DB＋uploadsバックアップ／30日保持／復元試験済</text>
-  <rect x="1030" y="1605" width="450" height="60" rx="14" class="external"/>
-  <text x="1053" y="1631" class="body">標準Monitoring・予算通知＋管理画面</text><text x="1053" y="1652" class="small">1時間ごとに稼働・容量・API・通信量を31日保持し画面表示</text>
-
-  <path d="M360 1480 H410" class="lineDev"/><path d="M980 1460 H1030" class="lineExt"/><path d="M980 1548 H1030" class="lineExt"/>
-  <text x="75" y="1700" class="body warnText">公開API：stepby-api-8-229-191-182.sslip.io／固定IP 8.229.191.182／Caddy自動TLS</text>
-  <text x="75" y="1725" class="small">本番OSM API・OAuthへ接続。旧開発OSMトークンは失効済み。追記型監査と開発DB分離を維持する。</text>
-  <text x="1270" y="1785" class="tiny">構成変更時は system-architecture.svg とタスクリストを同時更新する</text>
+  <text x="55" y="952" class="small">重要：UI10の通常フィッティングは端末内で行い、クラウドAPIは記録・認証・OSM変更・DB保存を担当。UI0のValhallaと現行DBは停止・変更していない。</text>
+  <text x="1545" y="978" text-anchor="end" class="tiny">構成変更時はこのSVGとタスクリストを同時更新する</text>
 </svg>
