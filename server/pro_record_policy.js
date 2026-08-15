@@ -17,20 +17,30 @@ const SYSTEM_TAGS = [
   ["pro_note", "その他の歩行支援情報", false, "red", 900],
 ];
 
+let proTagSchemaPromise = null;
+
 async function ensureProTagSchema(pool) {
-  await pool.query("ALTER TABLE tactile.tags ADD COLUMN IF NOT EXISTS osm_exportable BOOLEAN NOT NULL DEFAULT FALSE");
-  await pool.query("ALTER TABLE tactile.tags ADD COLUMN IF NOT EXISTS display_color TEXT NOT NULL DEFAULT 'red'");
-  await pool.query("ALTER TABLE tactile.tags ADD COLUMN IF NOT EXISTS system_defined BOOLEAN NOT NULL DEFAULT FALSE");
-  for (const [code, label, exportable, color, order] of SYSTEM_TAGS) {
-    await pool.query(
-      `INSERT INTO tactile.tags(code,label_ja,sort_order,is_active,osm_exportable,display_color,system_defined)
-       VALUES(?,?,?,TRUE,?,?,TRUE)
-       ON CONFLICT(code) DO UPDATE SET label_ja=EXCLUDED.label_ja, sort_order=EXCLUDED.sort_order,
-         is_active=TRUE, osm_exportable=EXCLUDED.osm_exportable,
-         display_color=EXCLUDED.display_color, system_defined=TRUE`,
-      [code, label, order, exportable, color]
-    );
+  if (!proTagSchemaPromise) {
+    proTagSchemaPromise = (async () => {
+      await pool.query("ALTER TABLE tactile.tags ADD COLUMN IF NOT EXISTS osm_exportable BOOLEAN NOT NULL DEFAULT FALSE");
+      await pool.query("ALTER TABLE tactile.tags ADD COLUMN IF NOT EXISTS display_color TEXT NOT NULL DEFAULT 'red'");
+      await pool.query("ALTER TABLE tactile.tags ADD COLUMN IF NOT EXISTS system_defined BOOLEAN NOT NULL DEFAULT FALSE");
+      for (const [code, label, exportable, color, order] of SYSTEM_TAGS) {
+        await pool.query(
+          `INSERT INTO tactile.tags(code,label_ja,sort_order,is_active,osm_exportable,display_color,system_defined)
+           VALUES(?,?,?,TRUE,?,?,TRUE)
+           ON CONFLICT(code) DO UPDATE SET label_ja=EXCLUDED.label_ja, sort_order=EXCLUDED.sort_order,
+             is_active=TRUE, osm_exportable=EXCLUDED.osm_exportable,
+             display_color=EXCLUDED.display_color, system_defined=TRUE`,
+          [code, label, order, exportable, color]
+        );
+      }
+    })().catch((error) => {
+      proTagSchemaPromise = null;
+      throw error;
+    });
   }
+  await proTagSchemaPromise;
 }
 
 async function getRecordPublication(pool, recordId, userId) {
