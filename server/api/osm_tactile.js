@@ -242,6 +242,8 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const record = recordsByChangeset.get(Number(properties.osm_changeset_id));
       if (!record) return;
       properties.stepby_recorded = true;
+      properties.stepby_record_id = String(record.record_id);
+      properties.stepby_owner_user_id = Number(record.created_by);
       if (["merged", "revert_draft", "failed"].includes(record.osm_status) && String(record.created_by) === String(userId)) {
         properties.stepby_owned_record_id = String(record.record_id);
         properties.stepby_can_revert = true;
@@ -300,6 +302,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
             osm_changeset_id: changesetId,
             stepby_recorded: true,
             stepby_record_id: String(record.record_id),
+            stepby_owner_user_id: Number(record.created_by),
             stepby_owned_record_id: owned ? String(record.record_id) : undefined,
             stepby_can_revert: owned,
             source: "stepby_development_record",

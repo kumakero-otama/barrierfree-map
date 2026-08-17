@@ -28,6 +28,33 @@ async function run() {
   );
   assert.strictEqual(changesetCalls, 0, "競合時はchangeset自体を作らない");
   assert.strictEqual(uploadCalls, 0, "競合時は第三者編集を上書きしない");
+
+  let rebasedAudit = null;
+  let uploadedVersion = null;
+  const restoredClient = {
+    async fetchElementSnapshot() {
+      return { version: 16, nodes: [1, 2], tags: { highway: "residential" }, members: [] };
+    },
+    async createChangeset() { return 456; },
+    async uploadChangeset(_changesetId, operations) {
+      uploadedVersion = operations[0].version;
+      return { temporaryIds: {}, diffResult: [{ elementType: "way", oldId: 100, newId: 100, newVersion: 17 }] };
+    },
+    async closeChangeset() {},
+  };
+  const rebased = await executeWithClient({
+    client: restoredClient,
+    operations: [{ elementType: "way", action: "modify", osmId: 100, version: 14,
+      before: { nodes: [1, 2], tags: { highway: "residential" } },
+      after: { nodes: [1, 2], tags: { highway: "residential", "sidewalk:right:tactile_paving": "yes" } } }],
+    summary: "same content after prior revert",
+    planId: "mock-rebase-plan",
+    operationType: "merge",
+    onVersionsRebased: async (items) => { rebasedAudit = items; },
+  });
+  assert.strictEqual(uploadedVersion, 16, "内容が同一ならOSMの最新Versionを使う");
+  assert.deepStrictEqual(rebasedAudit, [{ elementType: "way", osmId: 100, fromVersion: 14, toVersion: 16 }]);
+  assert.strictEqual(rebased.versionRebases.length, 1);
   console.log("osm_executor_conflict: mocked conflict stopped before changeset; no OSM network used");
 }
 

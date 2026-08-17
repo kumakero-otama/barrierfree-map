@@ -7,6 +7,44 @@ function escapeXml(value) {
     .replace(/'/g, "&apos;");
 }
 
+function unescapeXml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+
+function xmlAttributes(raw) {
+  return Object.fromEntries([...String(raw || "").matchAll(/([a-zA-Z_:][\w:.-]*)="([^"]*)"/g)]
+    .map((match) => [match[1], unescapeXml(match[2])]));
+}
+
+function parseElementSnapshot(xml, elementType, osmId) {
+  const paired = new RegExp(`<${elementType}\\s+([^>]*\\bid="${Number(osmId)}"[^>]*)>([\\s\\S]*?)<\\/${elementType}>`).exec(xml);
+  const single = new RegExp(`<${elementType}\\s+([^>]*\\bid="${Number(osmId)}"[^>]*)\\/>`).exec(xml);
+  const match = paired || single;
+  if (!match) throw new Error("invalid_osm_element_response");
+  const attrs = xmlAttributes(match[1]);
+  const inner = paired ? paired[2] : "";
+  const version = Number(attrs.version);
+  if (!Number.isInteger(version) || version <= 0) throw new Error("invalid_osm_element_response");
+  const tags = {};
+  for (const tagMatch of inner.matchAll(/<tag\s+([^>]*?)\/>/g)) {
+    const tag = xmlAttributes(tagMatch[1]);
+    if (tag.k != null) tags[tag.k] = tag.v || "";
+  }
+  return {
+    version,
+    tags,
+    nodes: [...inner.matchAll(/<nd\s+([^>]*?)\/>/g)].map((nodeMatch) => Number(xmlAttributes(nodeMatch[1]).ref)),
+    members: [...inner.matchAll(/<member\s+([^>]*?)\/>/g)].map((memberMatch) => {
+      const member = xmlAttributes(memberMatch[1]);
+      return { type: member.type, ref: Number(member.ref), role: member.role || "" };
+    }),
+    lat: attrs.lat == null ? null : Number(attrs.lat),
+    lng: attrs.lon == null ? null : Number(attrs.lon),
+  };
+}
+
 function tagsXml(tags) {
   return Object.entries(tags || {})
     .filter(([, value]) => value != null)
@@ -68,6 +106,13 @@ function buildOsmChangeXml(operations, changesetId) {
     .map((action) => `<${action}${action === "delete" ? ' if-unused="true"' : ""}>${groups[action].join("")}</${action}>`)
     .join("");
   return {
+    async fetchElementSnapshot(elementType, osmId) {
+      if (!['node', 'way', 'relation'].includes(elementType) || !Number.isSafeInteger(Number(osmId)) || Number(osmId) <= 0) {
+        throw new Error("invalid_element_identity");
+      }
+      const xml = await call(`/api/0.6/${elementType}/${osmId}`, { method: "GET" });
+      return parseElementSnapshot(xml, elementType, osmId);
+    },
     xml: `<?xml version="1.0" encoding="UTF-8"?><osmChange version="0.6" generator="StepBy">${sections}</osmChange>`,
     temporaryIds: Object.fromEntries(temporaryIds),
   };

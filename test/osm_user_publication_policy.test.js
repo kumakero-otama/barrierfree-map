@@ -16,9 +16,17 @@ if (originalSecret == null) delete process.env.OSM_TOKEN_ENCRYPTION_KEY;
 else process.env.OSM_TOKEN_ENCRYPTION_KEY = originalSecret;
 
 const source = fs.readFileSync(path.join(__dirname, "../server/api/osm_changes.js"), "utf8");
+const tactileSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_tactile.js"), "utf8");
+const tagSource = fs.readFileSync(path.join(__dirname, "../server/api/tactile_tags.js"), "utf8");
 assert.match(source, /parts\[4\] === "publish"/);
 assert.match(source, /body\.authorization !== "record_save"/);
 assert.match(source, /parts\[4\] === "revert"/);
+assert.match(tactileSource, /stepby_record_id = String\(record\.record_id\)/,
+  "all users need a record id for read-only detail display");
+assert.match(tactileSource, /stepby_owner_user_id = Number\(record\.created_by\)/,
+  "detail cards need the real owner while deletion remains owner-only");
+assert.match(tagSource, /ownerUserId: first\.user_id/,
+  "session details must identify the owner to the UI");
 assert.match(source, /body\.authorization !== "owned_green_line_delete"/);
 assert.match(source, /requireOwnedRecord\(recordId, req\.authUserId\)/);
 assert.match(source, /pg_advisory_lock/);

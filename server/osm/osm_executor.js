@@ -13,12 +13,50 @@ function changesetMetadata(summary) {
   };
 }
 
-function executeWithClient({ client, operations, summary, planId, operationType, onChangesetCreated }) {
+function normalizedObject(value) {
+  if (Array.isArray(value)) return value.map(normalizedObject);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, normalizedObject(value[key])]));
+}
+
+function equalJson(left, right) {
+  return JSON.stringify(normalizedObject(left)) === JSON.stringify(normalizedObject(right));
+}
+
+function unchangedExceptVersion(operation, snapshot) {
+  const before = operation.before || {};
+  if (operation.elementType === "way") {
+    return equalJson((before.nodes || []).map(Number), snapshot.nodes || []) && equalJson(before.tags || {}, snapshot.tags || {});
+  }
+  if (operation.elementType === "relation") {
+    return equalJson(before.members || [], snapshot.members || []) && equalJson(before.tags || {}, snapshot.tags || {});
+  }
+  if (operation.elementType === "node") {
+    const lat = Number(before.lat == null && Array.isArray(before.coordinate) ? before.coordinate[1] : before.lat);
+    const lng = Number(before.lng == null && Array.isArray(before.coordinate) ? before.coordinate[0] : before.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng)
+      && Math.abs(lat - Number(snapshot.lat)) < 1e-7 && Math.abs(lng - Number(snapshot.lng)) < 1e-7
+      && equalJson(before.tags || {}, snapshot.tags || {});
+  }
+  return false;
+}
+
+function executeWithClient({ client, operations, summary, planId, operationType, onChangesetCreated, onVersionsRebased }) {
   return (async () => {
-    for (const operation of operations) {
+    const executionOperations = operations.map((operation) => ({ ...operation }));
+    const versionRebases = [];
+    for (const operation of executionOperations) {
       if (operation.action === "create") continue;
-      const currentVersion = await client.fetchElementVersion(operation.elementType, operation.osmId);
+      const snapshot = typeof client.fetchElementSnapshot === "function"
+        ? await client.fetchElementSnapshot(operation.elementType, operation.osmId)
+        : null;
+      const currentVersion = snapshot ? snapshot.version : await client.fetchElementVersion(operation.elementType, operation.osmId);
       if (Number(currentVersion) !== Number(operation.version)) {
+        if (snapshot && unchangedExceptVersion(operation, snapshot)) {
+          versionRebases.push({ elementType: operation.elementType, osmId: operation.osmId, fromVersion: operation.version, toVersion: currentVersion });
+          operation.version = currentVersion;
+          continue;
+        }
         const error = new Error("osm_version_conflict");
         error.elementType = operation.elementType;
         error.osmId = operation.osmId;
@@ -27,6 +65,7 @@ function executeWithClient({ client, operations, summary, planId, operationType,
         throw error;
       }
     }
+    if (versionRebases.length && onVersionsRebased) await onVersionsRebased(versionRebases);
     const changesetId = await client.createChangeset(changesetMetadata(summary));
     if (onChangesetCreated) {
       try {
@@ -40,7 +79,7 @@ function executeWithClient({ client, operations, summary, planId, operationType,
     let upload;
     let closeError = null;
     try {
-      upload = await client.uploadChangeset(changesetId, operations);
+      upload = await client.uploadChangeset(changesetId, executionOperations);
     } catch (error) {
       error.changesetId = changesetId;
       throw error;
@@ -53,6 +92,7 @@ function executeWithClient({ client, operations, summary, planId, operationType,
       changesetId,
       temporaryIds: upload.temporaryIds,
       diffResult: upload.diffResult,
+      versionRebases,
       closeError: closeError ? closeError.message : null,
     };
   })();
@@ -65,4 +105,4 @@ function createConfiguredClient() {
   });
 }
 
-module.exports = { executeWithClient, createConfiguredClient, changesetMetadata };
+module.exports = { executeWithClient, createConfiguredClient, changesetMetadata, unchangedExceptVersion };

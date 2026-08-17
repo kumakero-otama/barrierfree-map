@@ -77,6 +77,7 @@ function buildSessionInfoPayload(rows, sessionId) {
     .filter(Boolean);
   return {
     sessionId,
+    ownerUserId: first.user_id == null ? null : Number(first.user_id),
     username: first.username || null,
     iconUrl: first.icon_url || null,
     createdAt: first.created_at || null,
@@ -468,6 +469,7 @@ function createTactileTagsHandler({ sendJson }) {
     try {
       const [rows] = await pool.query(
         `SELECT s.session_id,
+                s.user_id,
                 u.username,
                 u.icon_url,
                 sp.created_at,

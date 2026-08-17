@@ -252,6 +252,12 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         onChangesetCreated: async (changesetId) => {
           await appendAudit(planId, "changeset_created", req, { attemptId, requestedAction: action, changesetId });
         },
+        onVersionsRebased: async (versionRebases) => {
+          await appendAudit(planId, "execution_versions_rebased", req, {
+            attemptId, requestedAction: action, versionRebases,
+            reason: "version_changed_but_content_is_identical",
+          });
+        },
       });
       await appendAudit(planId, "execution_succeeded", req, {
         attemptId,
