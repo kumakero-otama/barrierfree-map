@@ -218,7 +218,7 @@
 
       <nav class="summary" aria-label="現在の3段階">
         <a href="#valhalla-stop"><span class="summary-number">DONE</span><strong>ブラウザ版へ切替済み</strong><small>一般画面はValhalla非依存・比較は管理画面のみ</small></a>
-        <a href="#osm-test"><span class="summary-number">NEXT</span><strong>本番OSM連携を確認</strong><small>本人OAuth再連携 → 実記録1件 → 必要なら取消し</small></a>
+        <a href="#osm-test"><span class="summary-number">NEXT</span><strong>OSMガイドライン対応</strong><small>専用アカウント・Wiki・コミュニティ承認 → 少量試験</small></a>
         <a href="#cloud"><span class="summary-number">DONE</span><strong>クラウドへ移行済み</strong><small>Google Cloudの開発API・DBをUI10から利用</small></a>
       </nav>
 
@@ -337,9 +337,9 @@
               <li class="done"><span class="box"></span><div><span class="task-title">バックグラウンド送信の状態と再試行を実装する</span><span class="note">完了。送信中・完了・再試行をトースト表示し、通信断・画面遷移・再起動後もキューを復元する。成功した工程をチェックポイント保存して再実行せず、2秒から最大5分の間隔で自動再試行する。記録ID／道情報のIdempotency-Keyで二重保存を防ぐ自動試験に合格。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">利用者判断が必要な処理だけ確定前に止める</span><span class="note">完了。道路の左右はGPS軌跡・accuracy・Way方向からアプリが自動判定し、利用者へ質問しない。経路不成立、PROタグ未選択など記録内容そのものを確定できない場合だけ案内する。確定後のAPI通信では画面を止めず、OSM連携失敗でも記録を失わない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">記録開始から変更内容の最終確認までを通して試験する</span><span class="note">完了。StepBy認証済み利用者のセッション開始 → GPS raw → ブラウザフィッティング → 共有Nodeで連続する経路確定 → セッション終了 → OSM連携状態確認 → Way分割・Relation引継ぎを含む未送信変更案 → 詳細画面、の順で結合試験に合格。確定後の保存は永続キューへ渡すため画面を待たせない。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">Google認証とOSM認証の両方を利用開始条件にする</span><span class="note">完了。GoogleでのStepBy新規登録直後と、既存利用者のGoogleログイン直後にOSM連携状態を確認し、未連携の場合はOSM公式の登録・OAuth小窓を自動で開く。サーバーでOSM連携完了を確認できるまで地図画面へ進ませない。小窓を閉じた場合、登録途中、設定不足、通信失敗の場合も地図へ迂回せず認証画面に留まり、次回Googleログインで再試行する。OSM側でログイン中のアカウントを強制ログアウト・切替えする処理は行わない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">利用者認証とOSM編集主体を分離する</span><span class="note">2026-08-17に方針変更。StepBy利用者はGoogle認証だけで利用し、個別OSMアカウントを要求しない。OSM changesetはサーバー管理のStepBy専用アカウントから送信し、利用者・session・changesetの対応はStepBy内部監査だけへ保存する。旧利用者別OSM連携データは移行監査のため読み取り専用で保持する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">リアルタイム記録からOSM変更案保存までを結合試験する</span><span class="note">完了。開発DBにセッション終了日時、GPS raw 3点、フィット点3点、ブラウザ経路、Way ID/Version/Node/全座標/追加予定タグのスナップショット、未送信変更案、1記録1変更案リンク、<code>split_plan_created</code>監査イベントが揃うことを確認。送信・取消送信APIはいずれも423で停止し、OSM送信0件。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">保存操作をOSM公開へ接続する</span><span class="note">完了。OSM公開対象の記録は、利用者が保存を押すと永続キューがStepBy保存→変更案作成→本人のOSM OAuthで公開まで順番に実行する。開発OSMのchangeset 660298で公開と冪等性を確認後、2026-08-13にAPI・OAuthを本番OSMへ切替えた。切替作業では本番OSMへ書き込んでいない。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">専用OSMアカウントの送信を正式に有効化する</span><span class="note">コードは専用アカウント方式へ変更済み。Secret Managerの専用トークン、Automated Edits Wiki URL、コミュニティ承認、opt-out、書込みフラグが全て揃うまで実送信はロックする。利用者の保存は変更案と内部監査まで進める。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">本人の緑線からOSM取消しへ接続する</span><span class="note">完了。本人所有の緑線だけに「この記録を削除」を表示し、削除確定を永続キューから取消APIへ送る。開発OSMのchangeset 660299で取消し・冪等性・監査・試験地物削除を確認済み。現在は本番OSMへ接続し、本番Wayの現在Versionを再取得して競合時は停止する。</span></div></li>
             </ul>
           </article>
@@ -503,11 +503,11 @@
             <div class="spec-item"><b>リアルタイム選択条件</b><span>GPS点に最も近い歩道または道路を候補とし、歩道を最優先。前回選択したWayとの連続性も考慮する。</span></div>
             <div class="spec-item"><b>確定時の経路</b><span>記録全体を再計算し、GPSが直接選ばなかった接続WayもOSM Nodeグラフから補完する。全Wayが共有Nodeでつながる一本の経路だけを確定し、接続不能または網羅率80%未満なら保存・変更案作成を中止する。</span></div>
             <div class="spec-item"><b>Way途中の開始・終了</b><span>記録開始点・終了点を既存Way上へ投影し、必要なNodeを作ってWayを分割。対象区間だけへ点字ブロック情報を付与する。</span></div>
-            <div class="spec-item"><b>OSMタグ</b><span>独立歩道Wayには tactile_paving=yes。道路中心線の場合は sidewalk:left/right:tactile_paving=yes など、OSM上の表現に合わせる。</span></div>
+            <div class="spec-item"><b>OSMタグ</b><span>添付ガイドラインに合わせ、独立した歩行可能Wayの既存 <code>tactile_paving=no</code> を <code>yes</code> にする場合だけ対象とする。値なし・未知値、道路中心線の左右タグ、yes→noは自動変更しない。</span></div>
             <div class="spec-item"><b>StepBy由来の記録</b><span>変更セットへ created_by=StepBy、source=survey、説明用commentを付与。独自のオブジェクトタグはコミュニティ確認後に判断する。</span></div>
             <div class="spec-item"><b>StepByサーバー保存</b><span>内部ユーザーID・記録日時・確認日時・変更セットID・Way ID/Version・開始終了Node ID・順序・タグ・形状照合情報を保存する。</span></div>
             <div class="spec-item"><b>公開範囲と安全な移行</b><span>StepByユーザーIDはOSMへ公開しない。新旧同時計算、限定利用、自動フォールバックを経てValhallaを最後に停止する。</span></div>
-            <div class="spec-item"><b>OSM送信の許可と禁止条件</b><span>OSM連携済み本人の保存はその記録1件の公開許可、本人所有の緑線に対する削除確定はその1件の取消許可とする。機能フラグ、所有者、OAuth、監査、冪等性、Version確認のどれかを満たさない場合は送信しない。既存データ一括移行等は管理者の個別許可を必要とする。</span></div>
+            <div class="spec-item"><b>OSM送信の許可と禁止条件</b><span>利用者の保存・本人所有記録の削除確定を各1件の要求として内部監査する。専用アカウントSecret、コミュニティ承認、Wiki、opt-out、機能フラグ、所有者、監査、冪等性、最新Version確認のどれかを満たさない場合は送信しない。</span></div>
             <div class="spec-item"><b>マージ履歴と取消し</b><span>送信要求、確認者、対象、変更内容、結果、changeset ID、エラー、取消しまで全イベントを追記型で保存する。履歴は削除・上書きしない。取消しは元の編集を消すのではなく、反対変更を新しいchangesetとして送る方式にする。</span></div>
             <div class="spec-item"><b>開発リポジトリ・ブランチ</b><span>新しいリポジトリは作らない。フロントはStepBy内のUI10・UI11等、バックエンドはbarrierfree-mapの常設devブランチで開発する。</span></div>
             <div class="spec-item"><b>開発サーバーの分離</b><span>本番と別フォルダ・別プロセス・別ポート・別DBで稼働。最初はTailscale Serve、GitHub Pagesからの結合試験時はFunnelの10000番を利用する。</span></div>

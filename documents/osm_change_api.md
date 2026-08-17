@@ -1,12 +1,12 @@
 
-### OSM変更API（開発版・OSM開発環境へ接続中）
+### OSM変更API（StepBy専用OSMアカウント方式・送信ロック中）
 
-変更案、送信、取消送信、監査履歴を扱う。2026-08-13からクラウド開発サーバーの送信先は本番OSM API `https://api.openstreetmap.org`、OAuthは `https://www.openstreetmap.org` とし、`OSM_WRITES_ENABLED=true` にしている。切替時に開発OSMの既存トークンを監査付きで失効させたため、各利用者は本番OSMへ再連携する必要がある。切替確認ではOSM書込みを行っていない。
+変更案、送信、取消送信、監査履歴を扱う。各利用者のOSM OAuthではなく、サーバーがSecret Managerから取得するStepBy専用OSMアカウントでchangesetを作成する。StepBy利用者はGoogle認証だけを行い、利用者・session・changesetの対応は内部監査へ保存する。専用トークン、Wiki URL、コミュニティ承認、書込みフラグがすべて揃うまで送信はロックされる。
 
 - `GET /api/osm/status`: 安全装置の状態を取得する。
 - `POST /api/osm/plans`: `merge`、`delete`、`revert` の変更案を追記保存する。
 - `POST /api/osm/split-plan`: Way途中の開始・終了位置から、Node作成、Way分割、`tactile_paving=yes` の変更案を作る。
-- `POST /api/osm/records/:recordId/publish`: 記録所有者が保存を確定した1件を、本人のOSM OAuthトークンで送信する。本文は `authorization: record_save`。同じ記録の再要求は既存changesetを返し、二重送信しない。
+- `POST /api/osm/records/:recordId/publish`: 記録所有者が保存を確定した1件を、StepBy専用OSMアカウントで送信する。本文は `authorization: record_save`。同じ記録の再要求は既存changesetを返し、二重送信しない。
 - `POST /api/osm/records/:recordId/revert`: 記録所有者がStepBy由来の緑線の削除を確定した1件について、反対変更案の作成と取消changeset送信を行う。本文は `authorization: owned_green_line_delete`。青線・他人の記録・対応不明の地物にはフロントから操作を出さず、APIも所有者確認で拒否する。
 - `GET /api/osm-tactile-ways`: 公開OSMの点字ブロック表示に加え、現在接続中のOSM環境への送信成功を追記型監査履歴で確認できるStepBy記録を、開発DBの確定経路から緑線として補完する。本人の線にだけ取消対象の記録IDを付与する。
 - `GET /api/osm/plans/:planId`: 変更案と監査イベントを取得する。作成者または管理者のみ。
@@ -21,12 +21,14 @@
 
 一般利用者の保存・緑線削除による送信には次の条件がすべて必要となる。
 
-1. サーバー環境変数 `OSM_WRITES_ENABLED=true`
+1. `OSM_WRITES_ENABLED=true` かつ `OSM_COMMUNITY_APPROVED=true`
 2. ログイン利用者が対象StepBy記録の所有者であること
 3. 保存または緑線削除の対象限定authorization
-4. 本人のOSM OAuth連携がconnectedで、`write_api` 権限を含むこと
+4. StepBy専用OSMアカウントのトークン、表示名、Automated Edits Wiki URLがSecret／設定として存在すること
 5. 送信開始前の追記型監査イベント保存
 6. 記録ID単位の冪等性とOSM Version一致
+
+changesetには人間が読めるcomment、`#StepBy`、`mechanical=yes`（協議結果により`bot=yes`）、Automated Edits Wikiへのリンク、`source=survey`を付ける。StepBy内部user IDやplan IDはOSMへ公開しない。
 
 既存データ一括移行など一般利用者の保存・削除に直接対応しない管理者APIは、従来どおり管理者キーとplan ID単位の直前確認を必要とする。
 

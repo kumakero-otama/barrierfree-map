@@ -7,7 +7,7 @@ function way(overrides = {}) {
     wayVersion: 7,
     nodes: [10, 11, 12, 13],
     fullCoordinates: [[139, 35], [139.001, 35], [139.002, 35], [139.003, 35]],
-    tags: { highway: "footway", surface: "paved" },
+    tags: { highway: "footway", surface: "paved", tactile_paving: "no" },
     from: { kind: "projection", segmentIndex: 0, fraction: 0.5, coordinate: [139.0005, 35] },
     to: { kind: "projection", segmentIndex: 2, fraction: 0.5, coordinate: [139.0025, 35] },
     ...overrides,
@@ -20,7 +20,7 @@ function run() {
   assert.strictEqual(middle.ways[0].sections.length, 3);
   assert.deepStrictEqual(middle.ways[0].sections.map((s) => s.tactile), [false, true, false]);
   assert.strictEqual(middle.ways[0].sections[1].tags.tactile_paving, "yes");
-  assert.strictEqual(middle.ways[0].sections[0].tags.tactile_paving, undefined);
+  assert.strictEqual(middle.ways[0].sections[0].tags.tactile_paving, "no");
   assert.strictEqual(middle.ways[0].tagStrategy.kind, "independent_walkway");
 
   const whole = createSplitPlan({ segments: [way({
@@ -85,21 +85,17 @@ function run() {
     "both recorded ranges on the repeated Way must receive tactile tags");
   assert.throws(() => createSplitPlan({ segments: [way(), way({ wayVersion: 8 })] }), /inconsistent_duplicate_way/);
   assert.strictEqual(middle.osmSent, false);
-  const roadwayLeft = createSplitPlan({ segments: [way({
+  assert.throws(() => createSplitPlan({ segments: [way({
     tags: { highway: "residential", sidewalk: "both" },
     side: "left",
-  })] });
-  const roadwayTactileSection = roadwayLeft.ways[0].sections.find((section) => section.tactile);
-  assert.strictEqual(roadwayLeft.ways[0].tagStrategy.kind, "roadway_sidewalk");
-  assert.strictEqual(roadwayTactileSection.tags["sidewalk:left:tactile_paving"], "yes");
-  assert.strictEqual(roadwayTactileSection.tags.tactile_paving, undefined);
-  assert.throws(() => createSplitPlan({ segments: [way({ tags: { highway: "residential" } })] }), /missing_side_for_roadway/);
+  })] }), /non_walkway_way_not_eligible/);
+  assert.throws(() => createSplitPlan({ segments: [way({ tags: { highway: "residential" } })] }), /non_walkway_way_not_eligible/);
   assert.throws(() => createSplitPlan({ segments: [way({
     tags: { highway: "footway", tactile_paving: "yes" },
   })] }), /tactile_tag_already_present/, "既存の点字ブロックへ重複タグや不要な分割を作らない");
   assert.throws(() => createSplitPlan({ segments: [way({
-    tags: { highway: "residential", "sidewalk:left:tactile_paving": "yes" }, side: "left",
-  })] }), /tactile_tag_already_present/, "道路左右タグも重複登録を止める");
+    tags: { highway: "footway" },
+  })] }), /tactile_no_to_yes_required/, "値なしからの推測更新を止める");
   console.log("osm_split_planner: all tests passed");
 }
 run();

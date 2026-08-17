@@ -112,6 +112,19 @@ function createOsmApiClient({ baseUrl, accessToken, fetchImpl = global.fetch }) 
     return text;
   }
   return {
+    async fetchElementMetadata(elementType, osmId) {
+      if (!['node', 'way', 'relation'].includes(elementType) || !Number.isSafeInteger(Number(osmId)) || Number(osmId) <= 0) {
+        throw new Error("invalid_element_identity");
+      }
+      const xml = await call(`/api/0.6/${elementType}/${osmId}`, { method: "GET" });
+      const element = new RegExp(`<${elementType}\\s+([^>]*\\bid="${Number(osmId)}"[^>]*)>`).exec(xml)
+        || new RegExp(`<${elementType}\\s+([^>]*)\\/>`).exec(xml);
+      if (!element) throw new Error("invalid_osm_element_response");
+      const attrs = Object.fromEntries([...element[1].matchAll(/([a-zA-Z_:][\w:.-]*)="([^"]*)"/g)].map((match) => [match[1], match[2]]));
+      const version = Number(attrs.version);
+      if (!Number.isInteger(version) || version <= 0) throw new Error("invalid_osm_element_response");
+      return { version, userId: attrs.uid ? Number(attrs.uid) : null, userName: attrs.user || null };
+    },
     async fetchElementVersion(elementType, osmId) {
       if (!['node', 'way', 'relation'].includes(elementType) || !Number.isSafeInteger(Number(osmId)) || Number(osmId) <= 0) {
         throw new Error("invalid_element_identity");

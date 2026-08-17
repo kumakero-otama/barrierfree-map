@@ -1,5 +1,18 @@
 const { createOsmApiClient } = require("./osm_api_client");
 
+function changesetMetadata(summary) {
+  const hashtag = String(process.env.OSM_CHANGESET_HASHTAG || "#StepBy").trim() || "#StepBy";
+  const wikiUrl = String(process.env.OSM_AUTOMATED_EDIT_WIKI_URL || "").trim();
+  const automatedTag = String(process.env.OSM_AUTOMATED_EDIT_TAG || "mechanical").trim() === "bot" ? "bot" : "mechanical";
+  return {
+    created_by: `StepBy ${String(process.env.STEPBY_VERSION || "development").trim()}`,
+    comment: `${String(summary || "StepBy field survey: tactile paving confirmed").trim()} ${hashtag}`.trim(),
+    source: "survey",
+    description: wikiUrl,
+    [automatedTag]: "yes",
+  };
+}
+
 function executeWithClient({ client, operations, summary, planId, operationType, onChangesetCreated }) {
   return (async () => {
     for (const operation of operations) {
@@ -14,13 +27,7 @@ function executeWithClient({ client, operations, summary, planId, operationType,
         throw error;
       }
     }
-    const changesetId = await client.createChangeset({
-      created_by: "StepBy",
-      comment: summary,
-      source: "survey;StepBy",
-      "stepby:plan_id": planId,
-      "stepby:operation": operationType,
-    });
+    const changesetId = await client.createChangeset(changesetMetadata(summary));
     if (onChangesetCreated) {
       try {
         await onChangesetCreated(changesetId);
@@ -58,4 +65,4 @@ function createConfiguredClient() {
   });
 }
 
-module.exports = { executeWithClient, createConfiguredClient };
+module.exports = { executeWithClient, createConfiguredClient, changesetMetadata };

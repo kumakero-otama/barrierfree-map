@@ -14,7 +14,7 @@
   </defs>
   <rect width="1600" height="1000" fill="#fff"/>
   <text x="55" y="55" class="title">StepBy 現在のシステム構成</text>
-  <text x="55" y="83" class="subtitle">2026年8月15日時点　UI10開発版のみ　緑＝StepBy／Google Cloud　橙＝外部サービス</text>
+  <text x="55" y="83" class="subtitle">2026年8月17日時点　UI10開発版のみ　緑＝StepBy／Google Cloud　橙＝外部サービス</text>
 
   <!-- top services -->
   <rect x="55" y="125" width="300" height="130" rx="20" class="card" filter="url(#shadow)"/>
@@ -38,7 +38,7 @@
   <rect x="1325" y="125" width="220" height="130" rx="20" class="external" filter="url(#shadow)"/>
   <text x="1435" y="169" text-anchor="middle" class="boxTitle">OpenStreetMap</text>
   <text x="1435" y="198" text-anchor="middle" class="body">地図・Way・点字データ</text>
-  <text x="1435" y="224" text-anchor="middle" class="small">OAuth／Changeset／Overpass</text>
+  <text x="1435" y="224" text-anchor="middle" class="small">StepBy専用アカウント／Changeset／Overpass</text>
 
   <path d="M355 190H650" class="line"/><path d="M950 180h100" class="lineOrange"/><path d="M950 230c170 55 260 55 375 0" class="lineOrange"/>
   <text x="500" y="178" text-anchor="middle" class="label">HTML・CSS・JavaScript</text>
@@ -56,7 +56,7 @@
   <rect x="395" y="435" width="555" height="265" rx="20" class="inner"/>
   <text x="672" y="473" text-anchor="middle" class="boxTitle">Node.js バックエンド</text>
   <text x="672" y="498" text-anchor="middle" class="small">systemd: stepby-dev.service／devブランチ</text>
-  <rect x="425" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="548" text-anchor="middle" class="body">認証・プロフィール</text><text x="545" y="570" text-anchor="middle" class="small">Google／OSM OAuth</text>
+  <rect x="425" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="548" text-anchor="middle" class="body">認証・プロフィール</text><text x="545" y="570" text-anchor="middle" class="small">利用者はGoogle認証のみ</text>
   <rect x="680" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="548" text-anchor="middle" class="body">記録・タグAPI</text><text x="800" y="570" text-anchor="middle" class="small">raw・PRO・道情報</text>
   <rect x="425" y="606" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="632" text-anchor="middle" class="body">OSM変更API</text><text x="545" y="654" text-anchor="middle" class="small">分割・公開・取消し</text>
   <rect x="680" y="606" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="632" text-anchor="middle" class="body">安全・管理API</text><text x="800" y="654" text-anchor="middle" class="small">監査・競合停止・冪等</text>
@@ -73,13 +73,13 @@
   <rect x="95" y="755" width="240" height="105" rx="18" class="external"/>
   <text x="215" y="790" text-anchor="middle" class="boxTitle">Cloud Storage</text><text x="215" y="817" text-anchor="middle" class="body">日次バックアップ</text><text x="215" y="841" text-anchor="middle" class="small">DB＋uploads／30日保持</text>
   <rect x="395" y="735" width="555" height="125" rx="18" class="inner"/>
-  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・OSMデータ処理</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpassから読取</text><text x="672" y="823" text-anchor="middle" class="small">端末で連続Way経路を確定・左右を自動判定</text><text x="672" y="846" text-anchor="middle" class="small">本人の保存・削除確定時だけ本番OSMへ送信</text>
+  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・OSMデータ処理</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpassから読取</text><text x="672" y="823" text-anchor="middle" class="small">端末で連続Way経路を確定・左右を自動判定</text><text x="672" y="846" text-anchor="middle" class="small">保存を内部監査し、専用アカウントで送信（現在ロック）</text>
   <rect x="1010" y="625" width="300" height="105" rx="18" class="inner"/>
   <text x="1160" y="660" text-anchor="middle" class="boxTitle">監視・管理画面</text><text x="1160" y="687" text-anchor="middle" class="body">稼働・容量・API履歴</text><text x="1160" y="711" text-anchor="middle" class="small">秘密情報は表示しない</text>
 
   <path d="M335 497h60" class="lineGreen"/><path d="M950 517h60" class="lineGreen"/><path d="M335 677c35 0 35-90 60-90" class="lineOrange"/><path d="M395 680c-35 30-35 127-60 127" class="lineOrange"/><path d="M950 647h60" class="lineGreen"/>
   <path d="M800 295v25H40v177h55" class="lineGreen"/><text x="470" y="310" class="label">UI10 API通信</text>
-  <path d="M910 435c0-90 475-80 475-180" class="lineOrange"/><text x="1190" y="332" class="label">読取／OAuth／OSM編集</text>
+  <path d="M910 435c0-90 475-80 475-180" class="lineOrange"/><text x="1190" y="332" class="label">読取／専用トークン／OSM編集</text>
 
   <text x="55" y="952" class="small">UI10のフィッティングは端末内で行い、Google Cloud APIは認証・記録・タグ・OSM変更・監査・DB保存を担当する。</text>
   <text x="1545" y="978" text-anchor="end" class="tiny">構成変更時はこのSVGとタスクリストを同時更新する</text>

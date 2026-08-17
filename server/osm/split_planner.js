@@ -37,18 +37,12 @@ function normalizeBoundary(raw, nodes, coordinates, snapFraction) {
 function resolveTactileTagStrategy(segment, tactileValue) {
   const tags = segment && segment.tags && typeof segment.tags === "object" ? segment.tags : {};
   const highway = String(tags.highway || "").toLowerCase();
-  const requestedSide = String(segment && (segment.side || segment.tactileSide) || "").toLowerCase();
   const independentWalkway = WALKABLE_WAY_HIGHWAYS.has(highway) || String(tags.footway || "").toLowerCase() === "sidewalk";
   if (independentWalkway) {
     return { kind: "independent_walkway", side: null, tags: { tactile_paving: tactileValue } };
   }
   if (!highway) throw new Error("missing_highway_tag");
-  if (!new Set(["left", "right"]).has(requestedSide)) throw new Error("missing_side_for_roadway");
-  return {
-    kind: "roadway_sidewalk",
-    side: requestedSide,
-    tags: { [`sidewalk:${requestedSide}:tactile_paving`]: tactileValue },
-  };
+  throw new Error("non_walkway_way_not_eligible");
 }
 
 function planWay(segment, counters, options) {
@@ -120,6 +114,13 @@ function planWay(segment, counters, options) {
     const error = new Error("tactile_tag_already_present");
     error.wayId = wayId;
     error.tagKey = existingTactileValue;
+    throw error;
+  }
+  const currentTactile = String(baseTags.tactile_paving || "").toLowerCase();
+  if (currentTactile !== "no") {
+    const error = new Error("tactile_no_to_yes_required");
+    error.wayId = wayId;
+    error.currentValue = currentTactile || null;
     throw error;
   }
   const sections = sectionEnds.map((endIndex) => {

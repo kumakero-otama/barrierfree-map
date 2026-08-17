@@ -7,7 +7,9 @@ function createHealthHandler({ sendJson }) {
     const checks = {
       api: "ok",
       database: pool ? "checking" : "unavailable",
-      osmWrites: process.env.OSM_WRITES_ENABLED === "true" ? "enabled" : "locked",
+      osmWrites: process.env.OSM_WRITES_ENABLED === "true" && process.env.OSM_COMMUNITY_APPROVED === "true" ? "enabled" : "locked",
+      osmEditorMode: "stepby_service_account",
+      osmServiceAccountConfigured: Boolean(String(process.env.OSM_SERVICE_ACCESS_TOKEN || "").trim() && String(process.env.OSM_SERVICE_ACCOUNT_NAME || "").trim()),
       osmOAuth: process.env.OSM_OAUTH_CLIENT_ID ? "configured" : "not_configured",
     };
     if (pool) {

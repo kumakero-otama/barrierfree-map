@@ -76,7 +76,7 @@ async function run() {
         full_coordinates: [[139, 35], [139.001, 35], [139.002, 35], [139.003, 35]],
         segment_from: { kind: "projection", segmentIndex: 0, fraction: 0.5 },
         segment_to: { kind: "projection", segmentIndex: 2, fraction: 0.5 },
-        original_tags: { highway: "footway" },
+        original_tags: { highway: "footway", tactile_paving: "no" },
         relations: [],
         side: null,
         planned_tags: { tactile_paving: "yes" },
@@ -135,7 +135,7 @@ async function run() {
         wayVersion: 7,
         nodes: [10, 11, 12, 13],
         fullCoordinates: [[139, 35], [139.001, 35], [139.002, 35], [139.003, 35]],
-        tags: { highway: "footway" },
+        tags: { highway: "footway", tactile_paving: "no" },
         relations: [{
           id: 900,
           version: 3,
@@ -181,7 +181,7 @@ async function run() {
     method: "POST", headers,
     body: JSON.stringify({ recordId, summary: "duplicate must fail", segments: [{
       wayId: 101, wayVersion: 1, nodes: [1, 2], fullCoordinates: [[139, 35], [139.001, 35]],
-      tags: { highway: "footway" }, from: { kind: "node", index: 0 }, to: { kind: "node", index: 1 },
+      tags: { highway: "footway", tactile_paving: "no" }, from: { kind: "node", index: 0 }, to: { kind: "node", index: 1 },
     }] }),
   });
   assert.strictEqual(duplicate.status, 409);

@@ -5,7 +5,8 @@ const { createSplitPlan } = require("../osm/split_planner");
 const { executeWithClient, createConfiguredClient } = require("../osm/osm_executor");
 const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
-const { createUserOsmClient } = require("../osm/user_oauth_client");
+const { createServiceAccountOsmClient, serviceAccountConfig } = require("../osm/service_account_client");
+const { ensureOptOutSchema, findOptOutMatch } = require("../osm/opt_out");
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
@@ -36,8 +37,16 @@ function isAdminRequest(req) {
   return expected.length >= 32 && expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
+function writeGate() {
+  if (process.env.OSM_WRITES_ENABLED !== "true") return { enabled: false, reason: "server_feature_flag_disabled" };
+  if (process.env.OSM_COMMUNITY_APPROVED !== "true") return { enabled: false, reason: "community_approval_not_recorded" };
+  if (!String(process.env.OSM_AUTOMATED_EDIT_WIKI_URL || "").trim()) return { enabled: false, reason: "automated_edit_wiki_url_missing" };
+  if (!serviceAccountConfig().configured) return { enabled: false, reason: "osm_service_account_not_configured" };
+  return { enabled: true, reason: null };
+}
+
 function writesEnabled() {
-  return process.env.OSM_WRITES_ENABLED === "true";
+  return writeGate().enabled;
 }
 
 function hasImmediateConfirmation(req, body, planId, action) {
@@ -67,7 +76,7 @@ function validateElements(value) {
   return elements;
 }
 
-function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmClient }) {
+function createOsmChangesHandler({ sendJson, serviceClientFactory = createServiceAccountOsmClient }) {
   const { pool, error: dbError } = createDbPool();
   let initialized = false;
 
@@ -112,6 +121,7 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
     await pool.query("CREATE INDEX IF NOT EXISTS osm_change_plans_created_idx ON osmchange.change_plans(created_at DESC)");
     await pool.query("CREATE INDEX IF NOT EXISTS osm_audit_plan_idx ON osmchange.audit_events(plan_id, event_id)");
     await ensureRecordLinkSchema(pool);
+    await ensureOptOutSchema(pool);
     await pool.query(`
       CREATE OR REPLACE FUNCTION osmchange.prevent_history_mutation()
       RETURNS trigger LANGUAGE plpgsql AS $$
@@ -188,8 +198,9 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
 
   async function executeUserPlan(req, plan, action) {
     const planId = plan.plan_id;
-    if (!writesEnabled()) {
-      await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "server_feature_flag_disabled", authorization: "user_save_or_delete" });
+    const gate = writeGate();
+    if (!gate.enabled) {
+      await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: gate.reason, authorization: "user_save_or_delete", editorMode: "stepby_service_account" });
       const error = new Error("osm_write_locked");
       error.status = 423;
       throw error;
@@ -202,9 +213,22 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
     });
     let client;
     try {
-      client = await userClientFactory(pool, req.authUserId);
+      client = await serviceClientFactory();
     } catch (error) {
       await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: error.message || "osm_connection_required" });
+      throw error;
+    }
+    const optOutMatch = await findOptOutMatch(pool, plan, client);
+    if (optOutMatch) {
+      await appendAudit(planId, "execution_blocked", req, {
+        requestedAction: action,
+        reason: "osm_opt_out_match",
+        ruleId: optOutMatch.rule.rule_id,
+        ruleType: optOutMatch.rule.rule_type,
+        target: optOutMatch.operation,
+      });
+      const error = new Error("osm_opt_out_match");
+      error.status = 409;
       throw error;
     }
     const attemptId = crypto.randomUUID();
@@ -215,6 +239,7 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
     );
     await appendAudit(planId, "execution_authorized", req, {
       attemptId, requestedAction: action, authorization: "user_save_or_delete", elementCount: plan.elements.length,
+      editorMode: "stepby_service_account", serviceAccountName: serviceAccountConfig().displayName,
       osmApiBaseUrl: process.env.OSM_API_BASE_URL || null,
     });
     try {
@@ -289,6 +314,9 @@ function createOsmChangesHandler({ sendJson, userClientFactory = createUserOsmCl
           proposalApiEnabled: true,
           osmNetworkCodePresent: true,
           osmWritesEnabled: writesEnabled(),
+          osmWriteGate: writeGate(),
+          osmEditorMode: "stepby_service_account",
+          osmServiceAccountConfigured: serviceAccountConfig().configured,
           requiredSafeguards: ["server_feature_flag", "record_ownership", "user_osm_oauth", "user_save_or_delete_confirmation", "idempotency", "append_only_audit"],
           reason: writesEnabled() ? "Owned records can be published by Save and reverted by confirmed green-line deletion" : "OSM write code is installed and locked by the server feature flag",
         });

@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
 const { extractBearerToken, verifyAccessToken } = require("../auth_token");
+const { serviceAccountConfig } = require("../osm/service_account_client");
 
 const DEFAULT_AUTHORIZE_URL = "https://www.openstreetmap.org/oauth2/authorize";
 const DEFAULT_TOKEN_URL = "https://www.openstreetmap.org/oauth2/token";
@@ -185,6 +186,15 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
   async function handleStatus(req, res) {
     const userId = await authenticatedUserId(req);
     if (!userId) return sendJson(res, 401, { error: "authentication_required" });
+    const service = serviceAccountConfig();
+    return sendJson(res, 200, {
+      configured: service.configured,
+      connected: service.configured,
+      editorMode: "stepby_service_account",
+      connection: service.configured ? { displayName: service.displayName, managedByStepBy: true } : null,
+      osmWritesEnabled: process.env.OSM_WRITES_ENABLED === "true" && process.env.OSM_COMMUNITY_APPROVED === "true",
+    });
+    /* Legacy per-user OAuth data is retained read-only for audit/migration.
     if (pool && encryptionKey) await ensureSchema();
     if (!configured) {
       return sendJson(res, 200, { configured: false, connected: false, reason: "osm_oauth_app_not_configured" });
@@ -209,11 +219,14 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
       } : null,
       osmWritesEnabled: process.env.OSM_WRITES_ENABLED === "true",
     });
+    */
   }
 
   async function handleStart(req, res, requestUrl) {
     const userId = await authenticatedUserId(req);
     if (!userId) return sendJson(res, 401, { error: "authentication_required" });
+    return sendJson(res, 410, { error: "individual_osm_oauth_retired", editorMode: "stepby_service_account" });
+    /* Legacy individual OAuth flow retained temporarily for audit reference.
     if (!configured) return sendJson(res, 503, { error: "osm_oauth_app_not_configured" });
     await ensureSchema();
     const returnUrl = safeReturnUrl(requestUrl.searchParams.get("return_url"), frontendReturnUrl);
@@ -238,6 +251,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     target.searchParams.set("code_challenge", challenge);
     target.searchParams.set("code_challenge_method", "S256");
     sendJson(res, 200, { authorizationUrl: target.toString() });
+    */
   }
 
   async function handleCallback(req, res, requestUrl) {
@@ -310,6 +324,8 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
   async function handleDisconnect(req, res) {
     const userId = await authenticatedUserId(req);
     if (!userId) return sendJson(res, 401, { error: "authentication_required" });
+    return sendJson(res, 410, { error: "service_account_managed_by_stepby" });
+    /* Legacy individual disconnect is disabled in service-account mode.
     if (!configured) return sendJson(res, 503, { error: "osm_oauth_app_not_configured" });
     await ensureSchema();
     const [rows] = await pool.query("SELECT osm_user_id,osm_display_name,status FROM login.osm_connections WHERE user_id=? LIMIT 1", [userId]);
@@ -321,6 +337,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     );
     await appendAudit(userId, "disconnected", { osmUserId: current.osm_user_id, osmDisplayName: current.osm_display_name, localOnly: true });
     sendJson(res, 200, { connected: false });
+    */
   }
 
   return async function handleOsmOAuth(req, res) {
