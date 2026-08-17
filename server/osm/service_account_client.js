@@ -1,4 +1,5 @@
 const { createOsmApiClient } = require("./osm_api_client");
+const { loadStoredServiceAccount } = require("./service_account_store");
 
 function serviceAccountConfig() {
   const accessToken = String(process.env.OSM_SERVICE_ACCESS_TOKEN || "").trim();
@@ -10,8 +11,15 @@ function serviceAccountConfig() {
   };
 }
 
-function createServiceAccountOsmClient() {
+async function resolvedServiceAccountConfig() {
   const config = serviceAccountConfig();
+  if (config.configured) return config;
+  const stored = await loadStoredServiceAccount();
+  return stored ? { configured: true, ...stored } : config;
+}
+
+async function createServiceAccountOsmClient() {
+  const config = await resolvedServiceAccountConfig();
   if (!config.configured) {
     const error = new Error("osm_service_account_not_configured");
     error.status = 503;
@@ -23,4 +31,4 @@ function createServiceAccountOsmClient() {
   });
 }
 
-module.exports = { serviceAccountConfig, createServiceAccountOsmClient };
+module.exports = { serviceAccountConfig, resolvedServiceAccountConfig, createServiceAccountOsmClient };

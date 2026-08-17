@@ -37,6 +37,7 @@ module.exports = {
         OSM_OAUTH_CLIENT_SECRET: process.env.OSM_OAUTH_CLIENT_SECRET || "",
         OSM_OAUTH_REDIRECT_URI: process.env.OSM_OAUTH_REDIRECT_URI || "https://barrierfree-map.tail5de5e1.ts.net:10000/auth/osm/callback",
         OSM_OAUTH_FRONTEND_RETURN_URL: process.env.OSM_OAUTH_FRONTEND_RETURN_URL || "https://kumakero-otama.github.io/StepBy/UI10/profile/Index.html",
+        OSM_SERVICE_OAUTH_ADMIN_RETURN_URL: process.env.OSM_SERVICE_OAUTH_ADMIN_RETURN_URL || "https://barrierfree-map.tail5de5e1.ts.net:10000/admin/database.html",
         OSM_OAUTH_AUTHORIZE_URL: process.env.OSM_OAUTH_AUTHORIZE_URL || "https://master.apis.dev.openstreetmap.org/oauth2/authorize",
         OSM_OAUTH_TOKEN_URL: process.env.OSM_OAUTH_TOKEN_URL || "https://master.apis.dev.openstreetmap.org/oauth2/token",
         OSM_USER_DETAILS_URL: process.env.OSM_USER_DETAILS_URL || "https://master.apis.dev.openstreetmap.org/api/0.6/user/details.json",

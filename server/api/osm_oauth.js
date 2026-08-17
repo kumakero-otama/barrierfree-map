@@ -1,12 +1,14 @@
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
 const { extractBearerToken, verifyAccessToken } = require("../auth_token");
-const { serviceAccountConfig } = require("../osm/service_account_client");
+const { serviceAccountConfig, resolvedServiceAccountConfig } = require("../osm/service_account_client");
+const { ensureServiceAccountSchema } = require("../osm/service_account_store");
 
 const DEFAULT_AUTHORIZE_URL = "https://www.openstreetmap.org/oauth2/authorize";
 const DEFAULT_TOKEN_URL = "https://www.openstreetmap.org/oauth2/token";
 const DEFAULT_USER_DETAILS_URL = "https://api.openstreetmap.org/api/0.6/user/details.json";
 const REQUIRED_SCOPE = "openid read_prefs write_api";
+const SERVICE_REQUIRED_SCOPE = "read_prefs write_api";
 
 function base64Url(buffer) {
   return Buffer.from(buffer).toString("base64url");
@@ -37,6 +39,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
   const clientSecret = String(process.env.OSM_OAUTH_CLIENT_SECRET || "").trim();
   const redirectUri = String(process.env.OSM_OAUTH_REDIRECT_URI || "").trim();
   const frontendReturnUrl = String(process.env.OSM_OAUTH_FRONTEND_RETURN_URL || "").trim();
+  const serviceAdminReturnUrl = String(process.env.OSM_SERVICE_OAUTH_ADMIN_RETURN_URL || "").trim();
   const encryptionSecret = String(process.env.OSM_TOKEN_ENCRYPTION_KEY || "").trim();
   const authorizeUrl = String(process.env.OSM_OAUTH_AUTHORIZE_URL || DEFAULT_AUTHORIZE_URL);
   const tokenUrl = String(process.env.OSM_OAUTH_TOKEN_URL || DEFAULT_TOKEN_URL);
@@ -72,6 +75,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     if (initPromise) return initPromise;
     initPromise = (async () => {
       await pool.query("CREATE SCHEMA IF NOT EXISTS login");
+      await ensureServiceAccountSchema(pool);
       await pool.query(`
         CREATE TABLE IF NOT EXISTS login.osm_connections (
           user_id BIGINT PRIMARY KEY REFERENCES login.users(user_id) ON DELETE RESTRICT,
@@ -222,6 +226,124 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     */
   }
 
+  async function handleServiceStatus(_req, res) {
+    if (!pool || !encryptionKey) return sendJson(res, 503, { error: "osm_oauth_app_not_configured" });
+    await ensureSchema();
+    const service = await resolvedServiceAccountConfig();
+    return sendJson(res, 200, {
+      configured: service.configured,
+      editorMode: "stepby_service_account",
+      connection: service.configured ? {
+        osmUserId: service.osmUserId || null,
+        displayName: service.displayName,
+        scope: service.scope || null,
+        connectedAt: service.connectedAt || null,
+        lastVerifiedAt: service.lastVerifiedAt || null,
+        source: service.osmUserId ? "encrypted_database" : "environment",
+      } : null,
+      writesEnabled: process.env.OSM_WRITES_ENABLED === "true",
+      communityApproved: process.env.OSM_COMMUNITY_APPROVED === "true",
+    });
+  }
+
+  async function handleServiceStart(req, res) {
+    if (!configured || !serviceAdminReturnUrl) return sendJson(res, 503, { error: "osm_service_oauth_not_configured" });
+    await ensureSchema();
+    let raw = "";
+    for await (const chunk of req) {
+      raw += chunk;
+      if (Buffer.byteLength(raw) > 16 * 1024) return sendJson(res, 413, { error: "payload_too_large" });
+    }
+    let body = {};
+    try { body = JSON.parse(raw || "{}"); } catch { return sendJson(res, 400, { error: "invalid_json" }); }
+    const expectedDisplayName = String(body.expectedDisplayName || "").trim();
+    if (!expectedDisplayName || expectedDisplayName.length > 255) {
+      return sendJson(res, 400, { error: "expected_osm_display_name_required" });
+    }
+    const state = base64Url(crypto.randomBytes(32));
+    const verifier = base64Url(crypto.randomBytes(48));
+    const challenge = base64Url(sha256(verifier));
+    await pool.query(`INSERT INTO login.osm_service_oauth_states
+      (state_hash,code_verifier_encrypted,expected_display_name,expires_at)
+      VALUES (?,?,?,CURRENT_TIMESTAMP + INTERVAL '10 minutes')`,
+    [base64Url(sha256(state)), encrypt(verifier), expectedDisplayName]);
+    await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details)
+      VALUES('authorization_started',?::jsonb)`, [JSON.stringify({ expectedDisplayName, scope: SERVICE_REQUIRED_SCOPE })]);
+    const target = new URL(authorizeUrl);
+    target.searchParams.set("response_type", "code");
+    target.searchParams.set("client_id", clientId);
+    target.searchParams.set("redirect_uri", redirectUri);
+    target.searchParams.set("scope", SERVICE_REQUIRED_SCOPE);
+    target.searchParams.set("state", state);
+    target.searchParams.set("code_challenge", challenge);
+    target.searchParams.set("code_challenge_method", "S256");
+    sendJson(res, 200, { authorizationUrl: target.toString(), expiresInSeconds: 600 });
+  }
+
+  function redirectServiceResult(res, result, message) {
+    const target = new URL(serviceAdminReturnUrl);
+    target.searchParams.set("osm_service", result);
+    if (message) target.searchParams.set("osm_service_message", message);
+    res.writeHead(302, { Location: target.toString(), "Cache-Control": "no-store" });
+    res.end();
+  }
+
+  async function tryHandleServiceCallback(res, requestUrl, stateHash, code) {
+    const [rows] = await pool.query(`SELECT state_hash,code_verifier_encrypted,expected_display_name,expires_at,used_at
+      FROM login.osm_service_oauth_states WHERE state_hash=? LIMIT 1`, [stateHash]);
+    const pending = rows[0];
+    if (!pending) return false;
+    if (pending.used_at || new Date(pending.expires_at).getTime() <= Date.now()) {
+      redirectServiceResult(res, "error", "専用OSMアカウント認証の有効期限が切れました。");
+      return true;
+    }
+    await pool.query("UPDATE login.osm_service_oauth_states SET used_at=CURRENT_TIMESTAMP WHERE state_hash=? AND used_at IS NULL", [stateHash]);
+    if (requestUrl.searchParams.get("error") || !code) {
+      await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details) VALUES('authorization_denied',?::jsonb)`,
+        [JSON.stringify({ reason: requestUrl.searchParams.get("error") || "missing_code" })]);
+      redirectServiceResult(res, "cancelled", "OSMでの許可がキャンセルされました。");
+      return true;
+    }
+    try {
+      const body = new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri,
+        client_id: clientId, code_verifier: decrypt(pending.code_verifier_encrypted) });
+      if (clientSecret) body.set("client_secret", clientSecret);
+      const tokenResponse = await fetchImpl(tokenUrl, { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "StepBy" }, body });
+      const tokenPayload = await tokenResponse.json().catch(() => ({}));
+      if (!tokenResponse.ok || !tokenPayload.access_token) throw new Error("token_exchange_failed");
+      const detailsResponse = await fetchImpl(userDetailsUrl, { headers: {
+        Authorization: `Bearer ${tokenPayload.access_token}`, "User-Agent": "StepBy" } });
+      const detailsPayload = await detailsResponse.json().catch(() => ({}));
+      const osmUser = detailsPayload.user;
+      if (!detailsResponse.ok || !osmUser?.id || !osmUser?.display_name) throw new Error("user_details_failed");
+      if (osmUser.display_name !== pending.expected_display_name) {
+        await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,osm_user_id,osm_display_name,details)
+          VALUES('identity_rejected',?,?,?::jsonb)`, [osmUser.id, osmUser.display_name,
+          JSON.stringify({ expectedDisplayName: pending.expected_display_name })]);
+        redirectServiceResult(res, "wrong_account", `OSM表示名「${osmUser.display_name}」ではなく「${pending.expected_display_name}」で認証してください。`);
+        return true;
+      }
+      const granted = new Set(String(tokenPayload.scope || "").split(/\s+/).filter(Boolean));
+      if (!["read_prefs", "write_api"].every((scope) => granted.has(scope))) throw new Error("required_scope_missing");
+      await pool.query(`INSERT INTO login.osm_service_account
+        (singleton,osm_user_id,osm_display_name,access_token_encrypted,granted_scope,status,connected_at,last_verified_at,updated_at)
+        VALUES(TRUE,?,?,?,?,'connected',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+        ON CONFLICT(singleton) DO UPDATE SET osm_user_id=EXCLUDED.osm_user_id,osm_display_name=EXCLUDED.osm_display_name,
+        access_token_encrypted=EXCLUDED.access_token_encrypted,granted_scope=EXCLUDED.granted_scope,status='connected',
+        connected_at=CURRENT_TIMESTAMP,last_verified_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`,
+      [osmUser.id, osmUser.display_name, encrypt(tokenPayload.access_token), tokenPayload.scope]);
+      await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,osm_user_id,osm_display_name,details)
+        VALUES('connected',?,?,?::jsonb)`, [osmUser.id, osmUser.display_name, JSON.stringify({ scope: tokenPayload.scope })]);
+      redirectServiceResult(res, "connected", `OSM表示名「${osmUser.display_name}」をStepBy専用アカウントとして認証しました。`);
+    } catch (error) {
+      await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details) VALUES('authorization_failed',?::jsonb)`,
+        [JSON.stringify({ reason: error.message || "unknown" })]);
+      redirectServiceResult(res, "error", "専用OSMアカウントの認証を完了できませんでした。");
+    }
+    return true;
+  }
+
   async function handleStart(req, res, requestUrl) {
     const userId = await authenticatedUserId(req);
     if (!userId) return sendJson(res, 401, { error: "authentication_required" });
@@ -260,6 +382,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     const state = requestUrl.searchParams.get("state") || "";
     const code = requestUrl.searchParams.get("code") || "";
     const stateHash = base64Url(sha256(state));
+    if (await tryHandleServiceCallback(res, requestUrl, stateHash, code)) return;
     const [rows] = await pool.query(
       `SELECT state_hash,user_id,code_verifier_encrypted,return_url,flow_mode,expires_at,used_at
        FROM login.osm_oauth_states WHERE state_hash=? LIMIT 1`,
@@ -344,6 +467,8 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     try {
       if (req.method === "GET" && requestUrl.pathname === "/auth/osm/status") return await handleStatus(req, res);
+      if (req.method === "GET" && requestUrl.pathname === "/api/admin/osm-service-account/status") return await handleServiceStatus(req, res);
+      if (req.method === "POST" && requestUrl.pathname === "/api/admin/osm-service-account/start") return await handleServiceStart(req, res);
       if (req.method === "POST" && requestUrl.pathname === "/auth/osm/start") return await handleStart(req, res, requestUrl);
       if (req.method === "GET" && requestUrl.pathname === "/auth/osm/callback") return await handleCallback(req, res, requestUrl);
       if (req.method === "POST" && requestUrl.pathname === "/auth/osm/disconnect") return await handleDisconnect(req, res);

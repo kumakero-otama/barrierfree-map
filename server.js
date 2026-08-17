@@ -446,7 +446,7 @@ function handleRequest(req, res) {
     handleTactileTags(req, res);
     return;
   }
-  if (req.url && req.url.startsWith("/auth/osm/")) {
+  if (req.url && (req.url.startsWith("/auth/osm/") || req.url.startsWith("/api/admin/osm-service-account/"))) {
     handleOsmOAuth(req, res);
     return;
   }

@@ -3,6 +3,8 @@
 
 変更案、送信、取消送信、監査履歴を扱う。各利用者のOSM OAuthではなく、サーバーがSecret Managerから取得するStepBy専用OSMアカウントでchangesetを作成する。StepBy利用者はGoogle認証だけを行い、利用者・session・changesetの対応は内部監査へ保存する。専用トークン、Wiki URL、コミュニティ承認、書込みフラグがすべて揃うまで送信はロックされる。
 
+専用アカウントの初回認証は開発管理画面から開始する。OSM公式OAuth画面で `read_prefs write_api` を許可し、返されたトークンだけをAES-256-GCMで暗号化してDBへ保存する。暗号鍵はSecret Managerから注入する。OSMのメールアドレスやパスワードはStepByへ入力・保存しない。管理者が入力したOSM表示名と認証結果が一致しない場合、トークンは保存しない。個人OSMアカウントの既存セッションはログアウトしない。
+
 - `GET /api/osm/status`: 安全装置の状態を取得する。
 - `POST /api/osm/plans`: `merge`、`delete`、`revert` の変更案を追記保存する。
 - `POST /api/osm/split-plan`: Way途中の開始・終了位置から、Node作成、Way分割、`tactile_paving=yes` の変更案を作る。
