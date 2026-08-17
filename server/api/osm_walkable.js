@@ -161,11 +161,13 @@ function normalizeWays(payload) {
   });
 }
 
-function fetchWalkableNetwork(centerLat, centerLng, radiusMeters = DEFAULT_RADIUS_METERS, host = process.env.OVERPASS_HOST || "overpass-api.de") {
+function fetchWalkableNetwork(centerLat, centerLng, radiusMeters = DEFAULT_RADIUS_METERS, host = process.env.OVERPASS_HOST || "overpass-api.de", options = {}) {
   const radius = Math.round(Math.min(MAX_RADIUS_METERS, Math.max(100, Number(radiusMeters) || DEFAULT_RADIUS_METERS)));
   const cacheKey = `${Number(centerLat).toFixed(3)}:${Number(centerLng).toFixed(3)}:${radius}`;
   const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) return Promise.resolve({ ...cached.response, cached: true });
+  if (!options.forceRefresh && cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
+    return Promise.resolve({ ...cached.response, cached: true });
+  }
   return new Promise((resolve, reject) => {
     fetchOverpass(host, buildQuery(centerLat, centerLng, radius), (error, payload) => {
       if (error) return reject(error);
@@ -188,6 +190,7 @@ function createOsmWalkableNetworkHandler({ sendJson }) {
     const centerLat = Number(url.searchParams.get("centerLat"));
     const centerLng = Number(url.searchParams.get("centerLng"));
     const requestedRadius = Number(url.searchParams.get("radiusMeters"));
+    const forceRefresh = url.searchParams.get("forceRefresh") === "1";
     if (!Number.isFinite(centerLat) || centerLat < -90 || centerLat > 90 ||
         !Number.isFinite(centerLng) || centerLng < -180 || centerLng > 180) {
       sendJson(res, 400, { error: "invalid_center" });
@@ -198,7 +201,7 @@ function createOsmWalkableNetworkHandler({ sendJson }) {
     );
     const cacheKey = `${centerLat.toFixed(3)}:${centerLng.toFixed(3)}:${radiusMeters}`;
     const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
+    if (!forceRefresh && cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
       sendJson(res, 200, { ...cached.response, cached: true });
       return;
     }
