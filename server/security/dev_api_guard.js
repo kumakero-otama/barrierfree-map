@@ -17,6 +17,19 @@ function clientAddress(req) {
   return forwarded || req.socket.remoteAddress || "unknown";
 }
 
+function isSameOrigin(req, origin) {
+  if (!origin) return false;
+  try {
+    const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+    const protocol = forwardedProto || (req.socket && req.socket.encrypted ? "https" : "http");
+    const forwardedHost = String(req.headers["x-forwarded-host"] || "").split(",")[0].trim();
+    const host = forwardedHost || String(req.headers.host || "").trim();
+    return Boolean(host) && new URL(origin).origin === `${protocol}://${host}`;
+  } catch {
+    return false;
+  }
+}
+
 function consumeRateLimit(key, limit) {
   const now = Date.now();
   const current = counters.get(key);
@@ -72,7 +85,7 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
     }
 
     const origin = String(req.headers.origin || "");
-    if (origin && !allowedOriginSet.has(origin)) {
+    if (origin && !allowedOriginSet.has(origin) && !isSameOrigin(req, origin)) {
       log("ORIGIN_REJECTED", req);
       sendJson(res, 403, { error: "origin_not_allowed", requestId: req.securityRequestId });
       return false;
