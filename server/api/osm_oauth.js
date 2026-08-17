@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
 const { extractBearerToken, verifyAccessToken } = require("../auth_token");
-const { serviceAccountConfig, resolvedServiceAccountConfig } = require("../osm/service_account_client");
+const { resolvedServiceAccountConfig } = require("../osm/service_account_client");
 const { ensureServiceAccountSchema } = require("../osm/service_account_store");
 
 const DEFAULT_AUTHORIZE_URL = "https://www.openstreetmap.org/oauth2/authorize";
@@ -190,7 +190,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
   async function handleStatus(req, res) {
     const userId = await authenticatedUserId(req);
     if (!userId) return sendJson(res, 401, { error: "authentication_required" });
-    const service = serviceAccountConfig();
+    const service = await resolvedServiceAccountConfig();
     return sendJson(res, 200, {
       configured: service.configured,
       connected: service.configured,
