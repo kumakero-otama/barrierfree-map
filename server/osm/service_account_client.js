@@ -12,10 +12,13 @@ function serviceAccountConfig() {
 }
 
 async function resolvedServiceAccountConfig() {
-  const config = serviceAccountConfig();
-  if (config.configured) return config;
+  // 管理画面で明示的に認証したStepBy専用アカウントを最優先する。
+  // 環境変数は初期導入時のフォールバックに限定し、過去の個人トークンが
+  // 残っていても編集主体を上書きしない。
   const stored = await loadStoredServiceAccount();
-  return stored ? { configured: true, ...stored } : config;
+  if (stored) return { configured: true, ...stored, source: "database" };
+  const config = serviceAccountConfig();
+  return { ...config, source: config.configured ? "environment" : null };
 }
 
 async function createServiceAccountOsmClient() {

@@ -815,13 +815,15 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         "invalid_boundary", "invalid_node_boundary", "invalid_projection_boundary",
         "invalid_boundary_fraction", "invalid_boundary_lng", "invalid_boundary_lat", "zero_length_tactile_segment",
         "invalid_relation", "inconsistent_relation", "invalid_record_id", "record_not_found_or_forbidden", "record_already_linked",
-        "missing_highway_tag", "missing_side_for_roadway",
+        "missing_highway_tag", "missing_side_for_roadway", "non_walkway_way_not_eligible",
+        "tactile_no_to_yes_required", "tactile_tag_already_present",
       ]);
       const status = Number.isInteger(error.status) ? error.status
         : error.message === "record_not_found_or_forbidden" ? 404
         : error.message === "record_already_linked" ? 409
         : ["osm_connection_required", "record_not_merged", "revert_not_executable", "osm_version_conflict"].includes(error.message) ? 409
         : error.message === "osm_write_locked" ? 423
+        : ["non_walkway_way_not_eligible", "tactile_no_to_yes_required", "tactile_tag_already_present"].includes(error.message) ? 422
         : error.message === "invalid_json" || clientErrors.has(error.message) ? 400
         : error.message === "body_too_large" ? 413 : 500;
       console.error("[osm_changes] request failed:", error.message);

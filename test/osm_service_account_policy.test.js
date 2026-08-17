@@ -1,4 +1,6 @@
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 
 process.env.OSM_SERVICE_ACCESS_TOKEN = "test-token-never-sent";
 process.env.OSM_SERVICE_ACCOUNT_NAME = "StepBy-test";
@@ -10,6 +12,10 @@ process.env.STEPBY_VERSION = "test";
 
 const { serviceAccountConfig, createServiceAccountOsmClient } = require("../server/osm/service_account_client");
 const { changesetMetadata } = require("../server/osm/osm_executor");
+
+const serviceClientSource = fs.readFileSync(path.join(__dirname, "../server/osm/service_account_client.js"), "utf8");
+assert.ok(serviceClientSource.indexOf("await loadStoredServiceAccount()") < serviceClientSource.indexOf("serviceAccountConfig();"),
+  "the explicitly connected StepBy database account must take precedence over legacy environment credentials");
 
 (async () => {
   assert.strictEqual(serviceAccountConfig().configured, true);
