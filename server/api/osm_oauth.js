@@ -265,10 +265,10 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     const challenge = base64Url(sha256(verifier));
     await pool.query(`INSERT INTO login.osm_service_oauth_states
       (state_hash,code_verifier_encrypted,expected_display_name,expires_at)
-      VALUES (?,?,?,CURRENT_TIMESTAMP + INTERVAL '10 minutes')`,
+      VALUES (?,?,?,CURRENT_TIMESTAMP + INTERVAL '10 minutes') RETURNING state_hash`,
     [base64Url(sha256(state)), encrypt(verifier), expectedDisplayName]);
     await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details)
-      VALUES('authorization_started',?::jsonb)`, [JSON.stringify({ expectedDisplayName, scope: SERVICE_REQUIRED_SCOPE })]);
+      VALUES('authorization_started',?::jsonb) RETURNING audit_id`, [JSON.stringify({ expectedDisplayName, scope: SERVICE_REQUIRED_SCOPE })]);
     const target = new URL(authorizeUrl);
     target.searchParams.set("response_type", "code");
     target.searchParams.set("client_id", clientId);
@@ -299,7 +299,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     }
     await pool.query("UPDATE login.osm_service_oauth_states SET used_at=CURRENT_TIMESTAMP WHERE state_hash=? AND used_at IS NULL", [stateHash]);
     if (requestUrl.searchParams.get("error") || !code) {
-      await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details) VALUES('authorization_denied',?::jsonb)`,
+      await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details) VALUES('authorization_denied',?::jsonb) RETURNING audit_id`,
         [JSON.stringify({ reason: requestUrl.searchParams.get("error") || "missing_code" })]);
       redirectServiceResult(res, "cancelled", "OSMでの許可がキャンセルされました。");
       return true;
@@ -319,7 +319,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
       if (!detailsResponse.ok || !osmUser?.id || !osmUser?.display_name) throw new Error("user_details_failed");
       if (osmUser.display_name !== pending.expected_display_name) {
         await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,osm_user_id,osm_display_name,details)
-          VALUES('identity_rejected',?,?,?::jsonb)`, [osmUser.id, osmUser.display_name,
+          VALUES('identity_rejected',?,?,?::jsonb) RETURNING audit_id`, [osmUser.id, osmUser.display_name,
           JSON.stringify({ expectedDisplayName: pending.expected_display_name })]);
         redirectServiceResult(res, "wrong_account", `OSM表示名「${osmUser.display_name}」ではなく「${pending.expected_display_name}」で認証してください。`);
         return true;
@@ -331,13 +331,13 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
         VALUES(TRUE,?,?,?,?,'connected',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
         ON CONFLICT(singleton) DO UPDATE SET osm_user_id=EXCLUDED.osm_user_id,osm_display_name=EXCLUDED.osm_display_name,
         access_token_encrypted=EXCLUDED.access_token_encrypted,granted_scope=EXCLUDED.granted_scope,status='connected',
-        connected_at=CURRENT_TIMESTAMP,last_verified_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`,
+        connected_at=CURRENT_TIMESTAMP,last_verified_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP RETURNING singleton`,
       [osmUser.id, osmUser.display_name, encrypt(tokenPayload.access_token), tokenPayload.scope]);
       await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,osm_user_id,osm_display_name,details)
-        VALUES('connected',?,?,?::jsonb)`, [osmUser.id, osmUser.display_name, JSON.stringify({ scope: tokenPayload.scope })]);
+        VALUES('connected',?,?,?::jsonb) RETURNING audit_id`, [osmUser.id, osmUser.display_name, JSON.stringify({ scope: tokenPayload.scope })]);
       redirectServiceResult(res, "connected", `OSM表示名「${osmUser.display_name}」をStepBy専用アカウントとして認証しました。`);
     } catch (error) {
-      await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details) VALUES('authorization_failed',?::jsonb)`,
+      await pool.query(`INSERT INTO login.osm_service_account_audit(event_type,details) VALUES('authorization_failed',?::jsonb) RETURNING audit_id`,
         [JSON.stringify({ reason: error.message || "unknown" })]);
       redirectServiceResult(res, "error", "専用OSMアカウントの認証を完了できませんでした。");
     }
