@@ -3,8 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const { OAuth2Client } = require("google-auth-library");
 const { createDbPool } = require("../db");
-const TERMS_VERSION = "2026-08-03";
-const PRIVACY_VERSION = "2026-08-03";
+const TERMS_VERSION = "2026-08-17";
+const PRIVACY_VERSION = "2026-08-17";
 const {
   createAccessToken,
   verifyAccessToken,

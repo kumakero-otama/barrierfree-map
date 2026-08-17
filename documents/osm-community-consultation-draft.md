@@ -10,11 +10,11 @@ StepByによる現地調査の点字ブロック情報をOSMへ反映する方�
 
 ## 本文案
 
-StepByは、利用者が現地を歩いてGPSで点字ブロックの敷設区間を記録するWebアプリです。利用者本人のOSM OAuth認証を使い、保存した1記録を1回の編集としてOSMへ反映する方式を検討しています。
+StepByは、利用者が現地を歩いてGPSで点字ブロックの敷設区間を記録するWebアプリです。一般利用者はGoogle認証でStepByへログインし、OSM編集はStepBy専用OSMアカウントから行います。保存した1記録を1回の編集としてOSMへ反映し、StepBy利用者・記録・changesetの対応は外部公開せず内部監査へ保存します。
 
 処理は、現在のOSM歩行ネットワークを取得し、GPS列を既存Way上の連続経路へフィッティングします。記録の始点・終点がWay途中の場合はWayを分割し、独立した歩道には `tactile_paving=yes`、道路に付随する歩道には左右をアプリで推定して `sidewalk:left:tactile_paving=yes` または `sidewalk:right:tactile_paving=yes` を付けます。既存の同等タグがある場合は送信を停止します。
 
-changesetには、`created_by=StepBy`、人が読めるコメント、`source=survey;StepBy` を付けます。StepBy内部のユーザーID・記録IDはWayタグとして公開しません。内部では変更前後、Way・Node・RelationのIDとVersion、changeset ID、実行結果を追記型監査履歴へ保存します。
+changesetには、`created_by=StepBy <アプリ版>`、人が読めるコメントと `#StepBy`、`source=survey`、`mechanical=yes`、公開仕様へのリンクを付けます。StepBy内部のユーザーID・記録IDはWayタグとして公開しません。内部では変更前後、Way・Node・RelationのIDとVersion、changeset ID、実行結果を追記型監査履歴へ保存します。
 
 取消しは履歴削除ではなく、現在Versionを再取得して反対変更を新しいchangesetとして送ります。第三者編集が入った場合は自動上書きせず停止します。点字ブロック以外のPROモード情報はOSMへ送りません。
 
@@ -35,4 +35,3 @@ changesetには、`created_by=StepBy`、人が読めるコメント、`source=su
 - 対象地域
 - 実例changeset
 - 自動編集・組織的編集・Importのどれに該当するかについての希望ではなく、コミュニティ判断を求める文言
-

@@ -2,7 +2,7 @@
 
 参照元: `public/docs/openapi.yaml`  
 OpenAPI version: `3.0.3`  
-API version: `1.27.2`
+API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 
 ## 認証
 
@@ -45,10 +45,20 @@ API version: `1.27.2`
 | GET | `/auth/me` | 必要 | ログインユーザー情報を取得 |
 | POST | `/auth/logout` | 必要 | ログアウト |
 | POST | `/auth/profile` | 必要 | ユーザープロフィール更新 |
+| GET | `/auth/osm/status` | 必要 | StepBy専用OSMアカウントによる公開準備状態を取得 |
+| GET | `/api/osm-walkable-network` | 必要 | 1km圏の歩行可能Wayを取得。`forceRefresh=1`で保存直前のキャッシュを回避 |
+| POST | `/api/osm/split-plan` | 必要 | 所有記録のWay分割・点字タグ変更案を追記保存 |
+| GET | `/api/osm/records/:recordId` | 必要 | 所有記録と送信・取消changesetの状態を取得 |
+| POST | `/api/osm/records/:recordId/publish` | 必要 | 保存確認済みの1記録をStepBy専用OSMアカウントから送信 |
+| POST | `/api/osm/records/:recordId/revert` | 必要 | 本人の緑線削除確認に対応する反対changesetを送信 |
+| GET | `/api/osm/audit-events` | 管理者 | 追記型OSM監査履歴を取得 |
+| GET/POST | `/api/admin/osm-service-account/*` | 管理者 | StepBy専用OSMアカウントの状態確認・OAuth認証 |
 
 注記:
 - `GET /api/records` は OpenAPI 上で security 指定があります。実装上は `mine=1` 指定時に認証が必要になる想定です。
 - `GET /api/road-info` は OpenAPI 上で security 指定があります。実装上は `mine=1` 指定時など、一部条件で認証が必要になる想定です。
+- 一般ユーザーの個人OSM OAuthは廃止済みです。`POST /auth/osm/start` と `POST /auth/osm/disconnect` は `410 individual_osm_oauth_retired` を返し、OSM送信には使用しません。
+- OSM公開対象は点字ブロック系の `osm_exportable=true` タグだけです。柵・塀・グレーチング・その他・ひとことメモはPostgreSQLだけに保存します。
 
 ## エンドポイント詳細
 

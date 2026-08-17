@@ -16,8 +16,8 @@ async function run() {
     body: JSON.stringify({
       terms_accepted: true,
       privacy_accepted: true,
-      terms_version: "2026-08-03",
-      privacy_version: "2026-08-03",
+      terms_version: "2026-08-17",
+      privacy_version: "2026-08-17",
     }),
   });
   assert.strictEqual(guest.status, 200);
@@ -32,8 +32,8 @@ async function run() {
     [guest.body.user.userId]
   );
   assert.deepStrictEqual(consentRows[0], {
-    terms_version: "2026-08-03",
-    privacy_version: "2026-08-03",
+    terms_version: "2026-08-17",
+    privacy_version: "2026-08-17",
     acceptance_source: "guest_signup",
   });
   const headers = {

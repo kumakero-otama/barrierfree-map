@@ -1,6 +1,6 @@
 # StepBy 現行仕様・運用状態・今後のタスク
 
-最終更新: 2026-08-13（Asia/Tokyo）  
+最終更新: 2026-08-17（Asia/Tokyo）
 対象: 開発版 StepBy UI10 / Google Cloud 開発API  
 この文書は、現在の確定仕様、実装済み機能、既知の問題、残作業、主要リンクを一か所にまとめた引継ぎ資料です。
 
@@ -10,7 +10,7 @@
 - 新しい開発版は UI10。通常のフィッティングでは Valhalla を使わず、ブラウザ内でOSM道路網へフィッティングします。
 - UI10のフロントエンドは GitHub Pages、APIと開発DBは Google Cloud の `stepby-dev-1` で稼働しています。
 - UI10の記録・プロフィール・実験データは開発専用PostgreSQLへ読み書きし、現行版DBとは分離しています。
-- UI10のOSM送信先とOAuth認証先は、現在は本番OpenStreetMapです。
+- UI10のOSM送信先は本番OpenStreetMapです。編集はサーバーで認証したStepBy専用OSMアカウント（表示名 `StepBy`）から行います。
 - 開発用OSMの旧OAuthトークンは、本番切替時に監査履歴を残して失効させました。
 
 ## 2. 一般利用者の操作仕様
@@ -20,8 +20,8 @@
 1. Google認証でStepByへログインします。
 2. 初回プロフィール登録時に、利用規約とプライバシーポリシーをリンクから閲覧できます。
 3. 両方への同意チェックがない場合、StepByアカウントを作成できません。
-4. OSM連携が必要になった最初の点字ブロック記録時だけ、OSM OAuthの小窓を表示します。
-5. 2回目以降は保存済みOAuth連携を利用し、通常はOSM画面を表示しません。
+4. 一般ユーザーは個人のOSMアカウントを作成・連携する必要がありません。
+5. Google認証後はそのままStepByを利用でき、OSMのログイン画面は表示しません。
 
 ### 2.2 点字ブロック記録
 
@@ -46,6 +46,7 @@
 - 現在地周辺約1kmの歩行可能なOSM Way・Node・Relationをブラウザへ読み込みます。
 - 取得中心から650m以上移動した場合、次の約1km範囲をバックグラウンド取得します。
 - 取得済み道路網はIndexedDBへ30分保存し、Way IDごとに新しいVersionを優先して統合します。
+- 記録の保存直前はブラウザとAPIサーバーの道路網キャッシュを強制的に回避し、現在のOSM Way・Versionを再取得してから最終経路を確定します。
 - GPS点は最寄りの道路・歩道候補へ投影し、道路と歩道が近い場合は歩道を優先します。
 - 前回Wayとの連続性と、共有Nodeで接続したOSM上の一本の経路であることを必須とします。
 - accuracyが25mを超える低精度点は、前後の信頼できる点から矛盾のない位置を補間します。補間できない点、60m以内に候補がない点は破棄します。
@@ -73,15 +74,17 @@
 - 記録開始・終了がWay途中の場合、新しい境界Nodeを作成します。
 - 元WayのNode順、道路タグ、Relationのmember順・role・タグを引き継ぎます。
 - 元Wayの `source=YahooJapan/ALPSMAP` なども、道路の由来を失わないよう分割先へ引き継ぎます。
-- StepByによる今回の現地調査元はchangeset側の `source=survey;StepBy` で区別します。
+- StepByによる今回の現地調査元はchangeset側の `source=survey` と `#StepBy` で区別します。
 
 ### 4.4 Changeset
 
-- `created_by=StepBy`
-- `source=survey;StepBy`
-- `stepby:plan_id=<Plan ID>`
-- `stepby:operation=merge` または取消し操作
-- 通常のコメント: `StepByによる点字ブロック記録`
+- `created_by=StepBy <アプリ版>`
+- `source=survey`
+- `mechanical=yes`
+- `description=<公開中のStepBy OSM編集仕様URL>`
+- `comment=<人が読める操作概要> #StepBy`
+
+StepBy内部のユーザーID、記録ID、Plan IDはOSMへ公開せず、PostgreSQLの追記型監査履歴だけで対応付けます。
 
 過去のchangeset `187377001` には旧コメント「OSM未送信」が残っています。閉じたchangesetのコメントは変更できないため、履歴としてそのまま保持します。
 
@@ -96,7 +99,10 @@ OSMへ送信した場合も、以下をStepBy開発DBへ保存します。
 - `osmchange.change_plans`: OSM変更前後と操作一覧
 - `osmchange.record_links`: StepBy記録、送信changeset、取消changesetの対応
 - `osmchange.audit_events`: 要求、許可、変更、成功、失敗、競合、取消し結果
-- `login.osm_connections`: 暗号化したOAuthトークンと連携状態
+- `login.osm_service_account`: StepBy専用OSMアカウントの暗号化OAuthトークンと連携状態
+- `login.osm_service_account_audit`: 専用アカウントの認証監査
+
+旧 `login.osm_connections` は個人OSM連携時代の監査・移行確認用として読み取り対象に残しますが、現在の送信・ログインには使用しません。
 
 OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存しません。
 
@@ -150,6 +156,13 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
   - 残りの分割Way: `1549284664`
   - 取消changeset: `187379145`
   - OSM取消しとStepBy側の非表示化を確認済み
+- StepBy専用OSMアカウントによる実記録:
+  - StepBy record: `6812530d-c32a-405e-b092-9e4417c5376c`（内部記録者 `otama`）
+  - 送信changeset: `187585080`
+  - 現在Way: `1550317435` Version 3を基準に分割
+  - 点字ブロック区間Way: `1550335908`
+  - 公開タグ: `sidewalk:left:tactile_paving=yes`
+  - 同時選択された非公開タグ「柵」はPostgreSQLだけに保持
 
 ## 9. はっきりしている問題・注意点
 
@@ -158,16 +171,17 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 - 取消し後もStepBy保存線が残る問題: 修正済み。取消成功時に通常表示を無効化し、両レイヤーを再読込します。
 - 緑線のタップ位置がずれて感じられる問題: 重複する2本の透明判定が原因でした。OSM送信済み記録はOSM線側の48px判定だけを使うよう修正済みです。
 - Changesetコメントの「OSM未送信」: 今後は削除済み。過去changesetだけ変更不能です。
+- 削除済みWayを30分キャッシュから参照して `osm_http_410` になった問題: 修正済み。保存直前にブラウザ・API双方のキャッシュを回避して最新Wayを取得します。
 
 ### 未完了・要検証
 
 - 実端末での長距離移動、1km圏を越えた道路網追加取得、通信断、バックグラウンド復帰、電池消費の現地試験。
 - 実端末で、複数Way、道路左右、独立歩道の少数実地確認。
-- OSMコミュニティへ、道路左右タグ、Way分割、StepBy由来表現、継続的支援型編集の運用相談。
+- OSMコミュニティへの初回相談は実施済み。対象範囲やアルゴリズムを拡大するときは再相談します。
 - 既存276経路の候補ごとの品質確認と、コミュニティ確認後の少量移行。
 - UI0からUI10を標準版へ昇格する判断。昇格前もUI0とValhallaは停止しません。
 
-### 2026-08-13に追加確認・修正したこと
+### 2026-08-17に追加確認・修正したこと
 
 - フロント9試験、バックエンド9試験に合格。
 - 既存の同等点字ブロックタグがあるWayでは、不要な分割・changesetを作らず正常完了するガードを追加。
@@ -175,15 +189,17 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 - PROモードのグレーチング3件がクラウドDBだけに保存され、OSM変更案・changesetが作られないことを確認。
 - 現行DBを読み取り専用で棚卸し。328記録、raw 7,344点、経路276件、完全重複経路0件。rawなし6件、経路なし52件、孤立raw/matched各3点、旧accuracy全件未保存。
 - 既存データ移行監査とOSMコミュニティ相談文案を作成。
+- 個人OSM OAuthを廃止し、StepBy専用OSMアカウントへ一本化。利用者別の記録者情報はPostgreSQLだけで保持。
+- 通常・PRO・ゲストを含むOSM公開対象判定をサーバーで再検証し、非公開タグとメモは記録者本人以外へ返さない。
+- 本番Changeset `187585080` で、点字ブロックだけが公開され「柵」がOSMへ出ないことを確認。
 
 ## 10. 次に行う順番
 
-1. OSMコミュニティへタグ・分割・利用者保存時の自動反映方式を相談する。
-2. 1km圏を越える移動、通信断、画面ロック、長時間記録を実端末で確認する。
-3. 判明した不具合を直し、回帰テストを追加する。
-4. 限定利用者で運用し、誤送信率・競合率・処理時間・取消し件数を測定する。
-5. UI10の標準版昇格を判断する。
-6. 既存276経路を候補ごとに確認し、コミュニティ合意と個別許可後に少量ずつ扱う。
+1. 1km圏を越える移動、通信断、画面ロック、長時間記録を実端末で確認する。
+2. 判明した不具合を直し、回帰テストを追加する。
+3. 限定利用者で運用し、誤送信率・競合率・処理時間・取消し件数を測定する。
+4. UI10の標準版昇格を判断する。
+5. 既存276経路を候補ごとに確認し、追加のコミュニティ確認と個別許可後に少量ずつ扱う。
 
 ## 11. 絶対ルール
 
@@ -213,6 +229,8 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 - [初回本番changeset 187377001](https://www.openstreetmap.org/changeset/187377001)
 - [初回本番Way 1549284663の履歴](https://www.openstreetmap.org/way/1549284663/history)
 - [初回本番取消changeset 187379145](https://www.openstreetmap.org/changeset/187379145)
+- [StepBy専用アカウントChangeset 187585080](https://www.openstreetmap.org/changeset/187585080)
+- [StepBy専用アカウントで公開したWay 1550335908](https://www.openstreetmap.org/way/1550335908)
 - [StepByフロントエンドGitHub](https://github.com/kumakero-otama/StepBy)
 - [StepByバックエンドGitHub](https://github.com/kumakero-otama/barrierfree-map)
 

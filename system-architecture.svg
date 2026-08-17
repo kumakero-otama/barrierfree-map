@@ -28,7 +28,7 @@
   <text x="800" y="196" text-anchor="middle" class="body">スマートフォン／PC</text>
   <text x="800" y="222" text-anchor="middle" class="small">画面表示・GPS生座標取得</text>
   <text x="800" y="244" text-anchor="middle" class="small">1km OSMデータでブラウザフィット</text>
-  <text x="800" y="266" text-anchor="middle" class="small">送信待ちキュー・オフライン再送</text>
+  <text x="800" y="266" text-anchor="middle" class="small">保存直前に最新Way取得・送信待ちキュー</text>
 
   <rect x="1050" y="125" width="235" height="130" rx="20" class="external" filter="url(#shadow)"/>
   <text x="1167" y="169" text-anchor="middle" class="boxTitle">Google Identity</text>
@@ -65,7 +65,7 @@
   <text x="1160" y="480" text-anchor="middle" class="boxTitle">PostgreSQL 16</text>
   <text x="1160" y="508" text-anchor="middle" class="body">stepby_app_dev</text>
   <text x="1160" y="532" text-anchor="middle" class="small">記録・GPS raw・Way座標</text>
-  <text x="1160" y="554" text-anchor="middle" class="small">タグ・OSMリンク・追記監査</text>
+  <text x="1160" y="554" text-anchor="middle" class="small">公開／本人限定タグ・OSMリンク・追記監査</text>
   <text x="1160" y="576" text-anchor="middle" class="tiny">UI10専用DB</text>
 
   <rect x="95" y="625" width="240" height="105" rx="18" class="external"/>
@@ -73,7 +73,7 @@
   <rect x="95" y="755" width="240" height="105" rx="18" class="external"/>
   <text x="215" y="790" text-anchor="middle" class="boxTitle">Cloud Storage</text><text x="215" y="817" text-anchor="middle" class="body">日次バックアップ</text><text x="215" y="841" text-anchor="middle" class="small">DB＋uploads／30日保持</text>
   <rect x="395" y="735" width="555" height="125" rx="18" class="inner"/>
-  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・OSMデータ処理</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpassから読取</text><text x="672" y="823" text-anchor="middle" class="small">端末で連続Way経路を確定・左右を自動判定</text><text x="672" y="846" text-anchor="middle" class="small">保存を内部監査し、StepBy専用アカウントで送信</text>
+  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・OSMデータ処理</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpassから読取</text><text x="672" y="823" text-anchor="middle" class="small">保存直前は両キャッシュを回避・最新Version確認</text><text x="672" y="846" text-anchor="middle" class="small">点字タグだけを専用アカウントで送信・本人限定情報はDBのみ</text>
   <rect x="1010" y="625" width="300" height="105" rx="18" class="inner"/>
   <text x="1160" y="660" text-anchor="middle" class="boxTitle">監視・管理画面</text><text x="1160" y="687" text-anchor="middle" class="body">稼働・容量・API履歴</text><text x="1160" y="711" text-anchor="middle" class="small">秘密情報は表示しない</text>
 

@@ -1,5 +1,18 @@
 # Barrierfree Map
 
+## 現在のUI10バックエンド（2026-08-17）
+
+- Google Cloud Compute Engine `stepby-dev-1` でNode.js APIをsystemdの `stepby-dev.service` として実行
+- Caddyが公開HTTPSを終端し、APIは `127.0.0.1:3100` で待受け
+- PostgreSQL 16 + PostGISへ、StepBy利用者、GPS raw、フィット経路、公開／本人限定タグ、OSM変更案・changeset対応・追記監査を保存
+- 一般利用者はGoogle認証だけを使用。OSM編集は暗号化保存したStepBy専用OSMアカウントから行う
+- 保存直前に最新OSM Way・Versionを取得し、所有者、監査、冪等性、Version競合停止を満たす1記録だけを公開
+- PROの柵・塀・グレーチング・その他・ひとことメモはOSMへ送らない
+
+確定仕様は `documents/stepby-current-spec-and-tasks.md`、OSM API仕様は `documents/osm_change_api.md`、全体構成は `system-architecture.svg` を参照してください。
+
+以下のPM2・Tailscale説明はローカル旧構成を保守する場合の参考です。UI10クラウドAPIの起動手順ではありません。
+
 ## バージョン管理
 
 アプリケーションのバージョンは`package.json`で一元管理されています。

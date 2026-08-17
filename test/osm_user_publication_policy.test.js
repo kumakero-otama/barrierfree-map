@@ -1,21 +1,9 @@
 const assert = require("assert");
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { decryptAccessToken } = require("../server/osm/user_oauth_client");
-
-const originalSecret = process.env.OSM_TOKEN_ENCRYPTION_KEY;
-process.env.OSM_TOKEN_ENCRYPTION_KEY = "test-only-secret-that-is-never-used-for-osm";
-const key = crypto.createHash("sha256").update(process.env.OSM_TOKEN_ENCRYPTION_KEY).digest();
-const iv = crypto.randomBytes(12);
-const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-const ciphertext = Buffer.concat([cipher.update("fake-user-oauth-token", "utf8"), cipher.final()]);
-const encrypted = `${iv.toString("base64url")}.${cipher.getAuthTag().toString("base64url")}.${ciphertext.toString("base64url")}`;
-assert.strictEqual(decryptAccessToken(encrypted), "fake-user-oauth-token");
-if (originalSecret == null) delete process.env.OSM_TOKEN_ENCRYPTION_KEY;
-else process.env.OSM_TOKEN_ENCRYPTION_KEY = originalSecret;
 
 const source = fs.readFileSync(path.join(__dirname, "../server/api/osm_changes.js"), "utf8");
+const oauthSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_oauth.js"), "utf8");
 const tactileSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_tactile.js"), "utf8");
 const tagSource = fs.readFileSync(path.join(__dirname, "../server/api/tactile_tags.js"), "utf8");
 assert.match(source, /parts\[4\] === "publish"/);
@@ -35,5 +23,10 @@ assert.match(source, /osm_version_conflict/);
 assert.match(source, /publication_skipped_existing_tactile/);
 assert.match(source, /osm_status === "already_present"/);
 assert.match(source, /changesetId: null/);
+assert.match(source, /createServiceAccountOsmClient/);
+assert.doesNotMatch(source, /createUserOsmClient/);
+assert.match(oauthSource, /individual_osm_oauth_retired/);
+assert.match(oauthSource, /tryHandleServiceCallback[\s\S]*?return sendJson\(res, 410/,
+  "unknown callbacks must never revive legacy per-user OSM authorization");
 
 console.log("OSM user publication/revert policy tests passed; no OSM network used");

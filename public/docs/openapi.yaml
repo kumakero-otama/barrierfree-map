@@ -1533,6 +1533,56 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /auth/osm/status:
+    get:
+      summary: StepBy専用OSMアカウントによる公開準備状態を取得
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: editorMode=stepby_service_account と設定状態 }
+        '401': { description: authentication_required }
+  /api/osm-walkable-network:
+    get:
+      summary: ブラウザフィッティング用の1km OSM道路網を取得
+      description: 記録保存直前は forceRefresh=1 によりブラウザ・API双方のキャッシュを回避する。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: centerLat, required: true, schema: { type: number } }
+        - { in: query, name: centerLng, required: true, schema: { type: number } }
+        - { in: query, name: radiusMeters, schema: { type: integer, maximum: 1500, default: 1000 } }
+        - { in: query, name: forceRefresh, schema: { type: integer, enum: [0, 1], default: 0 } }
+      responses:
+        '200': { description: 現在のWay・Node・Relation }
+  /api/osm/split-plan:
+    post:
+      summary: 所有記録のWay分割・点字タグ変更案を追記保存
+      description: 公開対象タグだけを扱い、柵・塀・グレーチング・メモは含めない。
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: 変更案作成 }
+        '409': { description: 所有者不一致、非公開記録、既存点字タグなど }
+  /api/osm/records/{recordId}/publish:
+    post:
+      summary: 保存確認済みの1記録をStepBy専用OSMアカウントから送信
+      description: authorization=record_save、追記監査、冪等性、最新Version一致を必須とする。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: recordId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 送信成功または冪等な既存結果 }
+        '409': { description: 許可不足またはVersion競合 }
+        '423': { description: OSM書込み安全条件未成立 }
+  /api/osm/records/{recordId}/revert:
+    post:
+      summary: 本人の緑線削除確認に対応する反対changesetを送信
+      description: authorization=owned_green_line_delete。元履歴は削除せず追記する。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: recordId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 取消し成功または冪等な既存結果 }
+        '409': { description: 所有者不一致またはVersion競合 }
+        '423': { description: OSM書込み安全条件未成立 }
+
 components:
   securitySchemes:
     bearerAuth:

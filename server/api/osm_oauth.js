@@ -383,6 +383,10 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     const code = requestUrl.searchParams.get("code") || "";
     const stateHash = base64Url(sha256(state));
     if (await tryHandleServiceCallback(res, requestUrl, stateHash, code)) return;
+    // 個人別OAuthは廃止済み。過去のDB行は監査・移行確認用に保持するが、
+    // 新しい認証やcallback処理には絶対に使用しない。
+    return sendJson(res, 410, { error: "individual_osm_oauth_retired", editorMode: "stepby_service_account" });
+    /* Legacy individual callback retained as unreachable migration reference.
     const [rows] = await pool.query(
       `SELECT state_hash,user_id,code_verifier_encrypted,return_url,flow_mode,expires_at,used_at
        FROM login.osm_oauth_states WHERE state_hash=? LIMIT 1`,
@@ -442,6 +446,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
       await appendAudit(pending.user_id, "authorization_failed", { reason: error.message || "unknown" });
       finishAuthorization(res, pending, "error", "OSM連携を完了できませんでした。");
     }
+    */
   }
 
   async function handleDisconnect(req, res) {

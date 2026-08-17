@@ -37,7 +37,7 @@ const TABLES = Object.freeze({
              FROM osmchange.record_links ORDER BY created_at DESC LIMIT ?`,
   },
   "osmchange.change_plans": {
-    label: "OSM未送信変更案",
+    label: "OSM dry-run変更案",
     rows: `SELECT plan_id,operation_type,created_by,source_plan_id,summary,status,created_at
              FROM osmchange.change_plans ORDER BY created_at DESC LIMIT ?`,
   },

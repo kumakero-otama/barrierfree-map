@@ -1,7 +1,7 @@
 const assert = require("assert");
 const { createDbPool } = require("../server/db");
 const BASE_URL = process.env.TEST_API_URL || "http://127.0.0.1:3100";
-const consent = { terms_accepted: true, privacy_accepted: true, terms_version: "2026-08-03", privacy_version: "2026-08-03" };
+const consent = { terms_accepted: true, privacy_accepted: true, terms_version: "2026-08-17", privacy_version: "2026-08-17" };
 
 (async () => {
   const guestResponse = await fetch(`${BASE_URL}/auth/guest`, {

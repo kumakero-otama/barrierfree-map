@@ -9,7 +9,7 @@ async function request(path, options = {}) {
 (async () => {
   const guest = await request("/auth/guest", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ terms_accepted: true, privacy_accepted: true, terms_version: "2026-08-03", privacy_version: "2026-08-03" }),
+    body: JSON.stringify({ terms_accepted: true, privacy_accepted: true, terms_version: "2026-08-17", privacy_version: "2026-08-17" }),
   });
   assert.strictEqual(guest.status, 200, JSON.stringify(guest.body));
   const key = `road:test-${Date.now()}`;
