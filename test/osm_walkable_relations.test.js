@@ -1,5 +1,5 @@
 const assert = require("assert");
-const { buildQuery, normalizeWays, normalizeOsmXml } = require("../server/api/osm_walkable");
+const { buildQuery, normalizeWays, normalizeOsmXml, clearWalkableNetworkCache } = require("../server/api/osm_walkable");
 
 const query = buildQuery(35, 139, 1000);
 assert.match(query, /relation\(bw\.walkable\)/);
@@ -29,4 +29,6 @@ const fallbackWays = normalizeWays(normalizeOsmXml(`<?xml version="1.0"?><osm>
 assert.strictEqual(fallbackWays.length, 1);
 assert.strictEqual(fallbackWays[0].id, 200);
 assert.deepStrictEqual(fallbackWays[0].nodes, [1, 2]);
+assert.strictEqual(typeof clearWalkableNetworkCache, "function",
+  "successful OSM writes must be able to invalidate the server read cache");
 console.log("osm_walkable_relations: mocked relation normalization passed; no OSM network used");

@@ -3,6 +3,7 @@ const { getRecordPublication } = require("../pro_record_policy");
 const { createDbPool } = require("../db");
 const { createSplitPlan } = require("../osm/split_planner");
 const { executeWithClient } = require("../osm/osm_executor");
+const { clearWalkableNetworkCache } = require("./osm_walkable");
 const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
 const { createServiceAccountOsmClient, resolvedServiceAccountConfig } = require("../osm/service_account_client");
@@ -276,6 +277,13 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
            WHERE merge_plan_id=?`, [executionResult.changesetId, planId]
         );
       }
+      const clearedWalkableCacheEntries = clearWalkableNetworkCache();
+      await appendAudit(planId, "osm_read_cache_invalidated", req, {
+        attemptId,
+        requestedAction: action,
+        clearedWalkableCacheEntries,
+        reason: "osm_write_succeeded",
+      });
       return { success: true, planId, attemptId, osmSent: true, executionResult };
     } catch (executionError) {
       await appendAudit(planId, "execution_failed", req, {

@@ -5,6 +5,12 @@ const MAX_RADIUS_METERS = 1500;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map();
 
+function clearWalkableNetworkCache() {
+  const clearedEntries = cache.size;
+  cache.clear();
+  return clearedEntries;
+}
+
 function buildQuery(lat, lng, radiusMeters) {
   return `[out:json][timeout:25];
 way(around:${radiusMeters},${lat},${lng})
@@ -227,3 +233,4 @@ module.exports.buildQuery = buildQuery;
 module.exports.normalizeWays = normalizeWays;
 module.exports.fetchWalkableNetwork = fetchWalkableNetwork;
 module.exports.normalizeOsmXml = normalizeOsmXml;
+module.exports.clearWalkableNetworkCache = clearWalkableNetworkCache;
