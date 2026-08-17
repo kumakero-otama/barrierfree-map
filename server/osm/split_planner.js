@@ -1,5 +1,9 @@
 const DEFAULT_NODE_SNAP_FRACTION = 1e-6;
 const WALKABLE_WAY_HIGHWAYS = new Set(["footway", "path", "pedestrian", "steps", "corridor"]);
+const WALKABLE_ROAD_HIGHWAYS = new Set([
+  "living_street", "residential", "service", "unclassified",
+  "tertiary", "secondary", "primary",
+]);
 
 function finiteNumber(value, label) {
   const number = Number(value);
@@ -39,9 +43,23 @@ function resolveTactileTagStrategy(segment, tactileValue) {
   const highway = String(tags.highway || "").toLowerCase();
   const independentWalkway = WALKABLE_WAY_HIGHWAYS.has(highway) || String(tags.footway || "").toLowerCase() === "sidewalk";
   if (independentWalkway) {
-    return { kind: "independent_walkway", side: null, tags: { tactile_paving: tactileValue } };
+    return {
+      kind: "independent_walkway", side: null,
+      tags: { tactile_paving: tactileValue }, targetTagKey: "tactile_paving", allowMissing: false,
+    };
   }
   if (!highway) throw new Error("missing_highway_tag");
+  const foot = String(tags.foot || "").toLowerCase();
+  const access = String(tags.access || "").toLowerCase();
+  if (WALKABLE_ROAD_HIGHWAYS.has(highway) && foot !== "no" && access !== "no" && access !== "private") {
+    const side = String(segment.side || "").toLowerCase();
+    if (!['left', 'right'].includes(side)) throw new Error("missing_side_for_roadway");
+    const targetTagKey = `sidewalk:${side}:tactile_paving`;
+    return {
+      kind: "roadway_side", side,
+      tags: { [targetTagKey]: tactileValue }, targetTagKey, allowMissing: true,
+    };
+  }
   throw new Error("non_walkway_way_not_eligible");
 }
 
@@ -116,10 +134,11 @@ function planWay(segment, counters, options) {
     error.tagKey = existingTactileValue;
     throw error;
   }
-  const currentTactile = String(baseTags.tactile_paving || "").toLowerCase();
-  if (currentTactile !== "no") {
+  const currentTactile = String(baseTags[tagStrategy.targetTagKey] || "").toLowerCase();
+  if (currentTactile !== "no" && !(tagStrategy.allowMissing && !currentTactile)) {
     const error = new Error("tactile_no_to_yes_required");
     error.wayId = wayId;
+    error.tagKey = tagStrategy.targetTagKey;
     error.currentValue = currentTactile || null;
     throw error;
   }

@@ -62,8 +62,11 @@
 
 ### 4.2 道路中心線上で左右を表す場合
 
+- 独立した歩道Wayがなく、歩行可能な道路中心線へ経路が確定した場合もOSM送信対象にします。
 - 右側: `sidewalk:right:tactile_paving=yes`
 - 左側: `sidewalk:left:tactile_paving=yes`
+- 左右はGPS軌跡とOSM Node順からアプリが自動判定し、判定不能なら送信しません。
+- `motorway`、歩行禁止、立入禁止・私有の道路は対象外です。
 
 ### 4.3 Way分割
 
