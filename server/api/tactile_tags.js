@@ -390,14 +390,21 @@ function createTactileTagsHandler({ sendJson }) {
 
     try {
       const [sessionRows] = await pool.query(
-        `SELECT session_id
-         FROM tactile.sessions
-         WHERE session_id = ? AND user_id = ?
+        `SELECT s.session_id,
+                COALESCE(u.is_pro, FALSE) AS is_pro,
+                COALESCE(u.is_guest, FALSE) AS is_guest
+         FROM tactile.sessions s
+         JOIN login.users u ON u.user_id = s.user_id
+         WHERE s.session_id = ? AND s.user_id = ?
          LIMIT 1`,
         [sessionId, userId]
       );
       if (sessionRows.length < 1) {
         sendLoggedJson(res, 404, { error: "session_not_found_or_forbidden" }, logContext);
+        return;
+      }
+      if (!Boolean(sessionRows[0].is_pro) || Boolean(sessionRows[0].is_guest)) {
+        sendLoggedJson(res, 403, { error: "pro_required" }, logContext);
         return;
       }
 

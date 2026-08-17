@@ -159,7 +159,8 @@ function createProStatusHandler({ sendJson }) {
     }
     sendJson(res, 200, {
       userId: result.user.user_id,
-      isPro: Boolean(result.user.is_pro),
+      // GuestはDB値に異常があってもPROとして扱わない。
+      isPro: !Boolean(result.user.is_guest) && Boolean(result.user.is_pro),
     });
   }
 
