@@ -36,6 +36,8 @@ async function run() {
     throw new Error("unexpected_fake_url");
   };
   const fakeClient = createOsmApiClient({ baseUrl: "https://invalid.test", accessToken: "fake", fetchImpl: fakeFetch });
+  assert.strictEqual(typeof fakeClient.fetchElementSnapshot, "function",
+    "the real OSM client must expose full-state reads for safe Version recovery");
   let observedChangesetId = null;
   const result = await executeWithClient({
     client: fakeClient, operations, summary: "test", planId: "plan-1", operationType: "merge",

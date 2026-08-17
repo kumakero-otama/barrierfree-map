@@ -106,13 +106,6 @@ function buildOsmChangeXml(operations, changesetId) {
     .map((action) => `<${action}${action === "delete" ? ' if-unused="true"' : ""}>${groups[action].join("")}</${action}>`)
     .join("");
   return {
-    async fetchElementSnapshot(elementType, osmId) {
-      if (!['node', 'way', 'relation'].includes(elementType) || !Number.isSafeInteger(Number(osmId)) || Number(osmId) <= 0) {
-        throw new Error("invalid_element_identity");
-      }
-      const xml = await call(`/api/0.6/${elementType}/${osmId}`, { method: "GET" });
-      return parseElementSnapshot(xml, elementType, osmId);
-    },
     xml: `<?xml version="1.0" encoding="UTF-8"?><osmChange version="0.6" generator="StepBy">${sections}</osmChange>`,
     temporaryIds: Object.fromEntries(temporaryIds),
   };
@@ -157,6 +150,13 @@ function createOsmApiClient({ baseUrl, accessToken, fetchImpl = global.fetch }) 
     return text;
   }
   return {
+    async fetchElementSnapshot(elementType, osmId) {
+      if (!['node', 'way', 'relation'].includes(elementType) || !Number.isSafeInteger(Number(osmId)) || Number(osmId) <= 0) {
+        throw new Error("invalid_element_identity");
+      }
+      const xml = await call(`/api/0.6/${elementType}/${osmId}`, { method: "GET" });
+      return parseElementSnapshot(xml, elementType, osmId);
+    },
     async fetchElementMetadata(elementType, osmId) {
       if (!['node', 'way', 'relation'].includes(elementType) || !Number.isSafeInteger(Number(osmId)) || Number(osmId) <= 0) {
         throw new Error("invalid_element_identity");
