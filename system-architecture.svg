@@ -69,7 +69,7 @@
   <text x="1160" y="576" text-anchor="middle" class="tiny">UI10専用DB</text>
 
   <rect x="95" y="625" width="240" height="105" rx="18" class="external"/>
-  <text x="215" y="660" text-anchor="middle" class="boxTitle">Secret Manager</text><text x="215" y="687" text-anchor="middle" class="body">認証・暗号鍵を保管</text><text x="215" y="711" text-anchor="middle" class="small">VMサービスアカウントだけ読取</text>
+  <text x="215" y="660" text-anchor="middle" class="boxTitle">Secret Manager</text><text x="215" y="687" text-anchor="middle" class="body">OAuth暗号鍵を保管</text><text x="215" y="711" text-anchor="middle" class="small">専用OSMトークンはDB内で暗号化</text>
   <rect x="95" y="755" width="240" height="105" rx="18" class="external"/>
   <text x="215" y="790" text-anchor="middle" class="boxTitle">Cloud Storage</text><text x="215" y="817" text-anchor="middle" class="body">日次バックアップ</text><text x="215" y="841" text-anchor="middle" class="small">DB＋uploads／30日保持</text>
   <rect x="395" y="735" width="555" height="125" rx="18" class="inner"/>

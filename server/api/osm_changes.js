@@ -2,10 +2,10 @@ const crypto = require("crypto");
 const { getRecordPublication } = require("../pro_record_policy");
 const { createDbPool } = require("../db");
 const { createSplitPlan } = require("../osm/split_planner");
-const { executeWithClient, createConfiguredClient } = require("../osm/osm_executor");
+const { executeWithClient } = require("../osm/osm_executor");
 const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
-const { createServiceAccountOsmClient, serviceAccountConfig } = require("../osm/service_account_client");
+const { createServiceAccountOsmClient, resolvedServiceAccountConfig } = require("../osm/service_account_client");
 const { ensureOptOutSchema, findOptOutMatch } = require("../osm/opt_out");
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -37,16 +37,16 @@ function isAdminRequest(req) {
   return expected.length >= 32 && expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
-function writeGate() {
+async function writeGate() {
   if (process.env.OSM_WRITES_ENABLED !== "true") return { enabled: false, reason: "server_feature_flag_disabled" };
   if (process.env.OSM_COMMUNITY_APPROVED !== "true") return { enabled: false, reason: "community_approval_not_recorded" };
   if (!String(process.env.OSM_AUTOMATED_EDIT_WIKI_URL || "").trim()) return { enabled: false, reason: "automated_edit_wiki_url_missing" };
-  if (!serviceAccountConfig().configured) return { enabled: false, reason: "osm_service_account_not_configured" };
+  if (!(await resolvedServiceAccountConfig()).configured) return { enabled: false, reason: "osm_service_account_not_configured" };
   return { enabled: true, reason: null };
 }
 
-function writesEnabled() {
-  return writeGate().enabled;
+async function writesEnabled() {
+  return (await writeGate()).enabled;
 }
 
 function hasImmediateConfirmation(req, body, planId, action) {
@@ -198,7 +198,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
 
   async function executeUserPlan(req, plan, action) {
     const planId = plan.plan_id;
-    const gate = writeGate();
+    const gate = await writeGate();
     if (!gate.enabled) {
       await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: gate.reason, authorization: "user_save_or_delete", editorMode: "stepby_service_account" });
       const error = new Error("osm_write_locked");
@@ -239,7 +239,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     );
     await appendAudit(planId, "execution_authorized", req, {
       attemptId, requestedAction: action, authorization: "user_save_or_delete", elementCount: plan.elements.length,
-      editorMode: "stepby_service_account", serviceAccountName: serviceAccountConfig().displayName,
+      editorMode: "stepby_service_account", serviceAccountName: (await resolvedServiceAccountConfig()).displayName,
       osmApiBaseUrl: process.env.OSM_API_BASE_URL || null,
     });
     try {
@@ -308,17 +308,19 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       const parts = url.pathname.split("/").filter(Boolean);
 
       if (url.pathname === "/api/osm/status" && req.method === "GET") {
+        const gate = await writeGate();
+        const service = await resolvedServiceAccountConfig();
         sendJson(res, 200, {
           success: true,
           environment: "development",
           proposalApiEnabled: true,
           osmNetworkCodePresent: true,
-          osmWritesEnabled: writesEnabled(),
-          osmWriteGate: writeGate(),
+          osmWritesEnabled: gate.enabled,
+          osmWriteGate: gate,
           osmEditorMode: "stepby_service_account",
-          osmServiceAccountConfigured: serviceAccountConfig().configured,
+          osmServiceAccountConfigured: service.configured,
           requiredSafeguards: ["server_feature_flag", "record_ownership", "user_osm_oauth", "user_save_or_delete_confirmation", "idempotency", "append_only_audit"],
-          reason: writesEnabled() ? "Owned records can be published by Save and reverted by confirmed green-line deletion" : "OSM write code is installed and locked by the server feature flag",
+          reason: gate.enabled ? "Owned records can be published by Save and reverted by confirmed green-line deletion" : "OSM write code is installed and locked by the server feature flag",
         });
         return;
       }
@@ -448,7 +450,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             sendJson(res, 409, { error: "record_save_confirmation_required", osmSent: false });
             return;
           }
-          if (!writesEnabled()) {
+          if (!(await writesEnabled())) {
             await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute", reason: "server_feature_flag_disabled", authorization: "record_save" });
             sendJson(res, 423, { error: "osm_write_locked", osmSent: false });
             return;
@@ -490,7 +492,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             sendJson(res, 409, { error: "green_line_delete_confirmation_required", osmSent: false });
             return;
           }
-          if (!writesEnabled()) {
+          if (!(await writesEnabled())) {
             await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute-revert", reason: "server_feature_flag_disabled", authorization: "owned_green_line_delete" });
             sendJson(res, 423, { error: "osm_write_locked", osmSent: false });
             return;
@@ -704,7 +706,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         if (req.method === "POST" && ["execute", "execute-revert"].includes(parts[4])) {
           const action = parts[4];
           const body = await pendingBody;
-          if (!writesEnabled()) {
+          if (!(await writesEnabled())) {
             await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "server_feature_flag_disabled" });
             sendJson(res, 423, { error: "osm_write_locked", osmSent: false, message: "OSM_WRITES_ENABLED is not true" });
             return;
@@ -733,7 +735,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           await appendAudit(planId, "execution_authorized", req, { attemptId, requestedAction: action, elementCount: plan.elements.length });
           try {
             const executionResult = await executeWithClient({
-              client: createConfiguredClient(),
+              client: await serviceClientFactory(),
               operations: plan.elements,
               summary: plan.summary,
               planId,

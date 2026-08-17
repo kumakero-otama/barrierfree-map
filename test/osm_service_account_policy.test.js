@@ -11,12 +11,14 @@ process.env.STEPBY_VERSION = "test";
 const { serviceAccountConfig, createServiceAccountOsmClient } = require("../server/osm/service_account_client");
 const { changesetMetadata } = require("../server/osm/osm_executor");
 
-assert.strictEqual(serviceAccountConfig().configured, true);
-assert.ok(createServiceAccountOsmClient(), "service account client is created from server-only configuration");
-const tags = changesetMetadata("StepBy field survey: tactile paving confirmed");
-assert.strictEqual(tags.source, "survey");
-assert.strictEqual(tags.mechanical, "yes");
-assert.strictEqual(tags.description, process.env.OSM_AUTOMATED_EDIT_WIKI_URL);
-assert.match(tags.comment, /#StepBy/);
-assert.doesNotMatch(JSON.stringify(tags), /plan_id|user_id/);
-console.log("central OSM service account metadata policy passed without network access");
+(async () => {
+  assert.strictEqual(serviceAccountConfig().configured, true);
+  assert.ok(await createServiceAccountOsmClient(), "service account client is created from server-only configuration");
+  const tags = changesetMetadata("StepBy field survey: tactile paving confirmed");
+  assert.strictEqual(tags.source, "survey");
+  assert.strictEqual(tags.mechanical, "yes");
+  assert.strictEqual(tags.description, process.env.OSM_AUTOMATED_EDIT_WIKI_URL);
+  assert.match(tags.comment, /#StepBy/);
+  assert.doesNotMatch(JSON.stringify(tags), /plan_id|user_id/);
+  console.log("central OSM service account metadata policy passed without network access");
+})().catch((error) => { console.error(error); process.exitCode = 1; });
