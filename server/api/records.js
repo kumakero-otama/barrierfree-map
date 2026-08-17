@@ -34,13 +34,10 @@ function createRecordsHandler({ sendJson }) {
       const centerLng = Number(url.searchParams.get("centerLng"));
       const radiusKm = Number(url.searchParams.get("radiusKm"));
       const mineOnly = url.searchParams.get("mine") === "1";
-      let currentUserId = null;
-      if (mineOnly) {
-        currentUserId = await resolveAuthenticatedUserId(req, pool);
-        if (!currentUserId) {
-          sendJson(res, 401, { error: "unauthorized" });
-          return;
-        }
+      const currentUserId = await resolveAuthenticatedUserId(req, pool);
+      if (!currentUserId) {
+        sendJson(res, 401, { error: "unauthorized" });
+        return;
       }
 
       // 基本は全経路を取得し、検索条件があれば同じ SQL に WHERE を積み増していく。
@@ -51,27 +48,36 @@ function createRecordsHandler({ sendJson }) {
           source,
           sp.created_at,
           ST_AsGeoJSON(sp.geom) AS geom_geojson,
-          COALESCE(tag_info.tags, ARRAY[]::text[]) AS tags,
-          COALESCE(tag_info.tag_codes, ARRAY[]::text[]) AS tag_codes,
+          CASE WHEN s.user_id = ?
+            THEN COALESCE(tag_info.all_tags, ARRAY[]::text[])
+            ELSE COALESCE(tag_info.public_tags, ARRAY[]::text[])
+          END AS tags,
+          CASE WHEN s.user_id = ?
+            THEN COALESCE(tag_info.all_tag_codes, ARRAY[]::text[])
+            ELSE COALESCE(tag_info.public_tag_codes, ARRAY[]::text[])
+          END AS tag_codes,
           osm_link.osm_status,
           CASE WHEN COALESCE(tag_info.has_private,FALSE) AND NOT COALESCE(tag_info.has_public,FALSE)
             THEN 'pro_private' ELSE 'stepby_tactile' END AS record_class
         FROM tactile.session_paths sp
         LEFT JOIN tactile.sessions s ON s.session_id = sp.session_id
         LEFT JOIN osmchange.record_links osm_link ON osm_link.record_id = sp.session_id
-        LEFT JOIN (
+        LEFT JOIN LATERAL (
           SELECT
-            st.session_id,
-            ARRAY_AGG(t.label_ja ORDER BY t.sort_order ASC, t.id ASC) AS tags,
-            ARRAY_AGG(t.code ORDER BY t.sort_order ASC, t.id ASC) AS tag_codes,
+            ARRAY_AGG(t.label_ja ORDER BY t.sort_order ASC, t.id ASC) AS all_tags,
+            ARRAY_AGG(t.code ORDER BY t.sort_order ASC, t.id ASC) AS all_tag_codes,
+            ARRAY_AGG(t.label_ja ORDER BY t.sort_order ASC, t.id ASC)
+              FILTER (WHERE t.osm_exportable) AS public_tags,
+            ARRAY_AGG(t.code ORDER BY t.sort_order ASC, t.id ASC)
+              FILTER (WHERE t.osm_exportable) AS public_tag_codes,
             BOOL_OR(t.osm_exportable) AS has_public,
             BOOL_OR(NOT t.osm_exportable) AS has_private
           FROM tactile.session_tags st
           JOIN tactile.tags t ON t.id = st.tag_id
-          GROUP BY st.session_id
-        ) AS tag_info ON tag_info.session_id = sp.session_id
+          WHERE st.session_id = sp.session_id
+        ) AS tag_info ON TRUE
       `;
-      const params = [];
+      const params = [currentUserId, currentUserId];
       const whereClauses = [];
 
       whereClauses.push("s.is_active = true");

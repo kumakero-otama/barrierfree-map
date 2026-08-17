@@ -481,7 +481,11 @@ function createTactileTagsHandler({ sendJson }) {
                 u.icon_url,
                 sp.created_at,
                 CASE WHEN s.user_id = ? THEN s.memo ELSE NULL END AS memo,
-                t.label_ja AS tag_label_ja
+                CASE
+                  WHEN s.user_id = ? OR COALESCE(t.osm_exportable, FALSE)
+                  THEN t.label_ja
+                  ELSE NULL
+                END AS tag_label_ja
          FROM tactile.sessions s
          LEFT JOIN tactile.session_paths sp ON sp.session_id = s.session_id
          LEFT JOIN login.users u ON u.user_id = s.user_id
@@ -489,7 +493,7 @@ function createTactileTagsHandler({ sendJson }) {
          LEFT JOIN tactile.tags t ON t.id = st.tag_id
          WHERE s.session_id = ?
          ORDER BY t.sort_order ASC, t.id ASC`,
-        [req.authUserId, sessionId]
+        [req.authUserId, req.authUserId, sessionId]
       );
       const payload = buildSessionInfoPayload(rows, sessionId);
       if (!payload) {
