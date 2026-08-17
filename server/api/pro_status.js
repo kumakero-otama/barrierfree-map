@@ -159,12 +159,11 @@ function createProStatusHandler({ sendJson }) {
     }
     sendJson(res, 200, {
       userId: result.user.user_id,
-      // GuestはDB値に異常があってもPROとして扱わない。
-      isPro: !Boolean(result.user.is_guest) && Boolean(result.user.is_pro),
+      isPro: Boolean(result.user.is_pro),
     });
   }
 
-  // 本人の Pro フラグを書き換える更新エンドポイント。Guest には変更を許可しない。
+  // 本人のProフラグを書き換える。ゲストも名前・アイコンは固定のままPRO機能を選べる。
   async function handlePut(req, res) {
     const result = await findCurrentUser(req);
     if (result.error === "db_unavailable") {
@@ -179,11 +178,6 @@ function createProStatusHandler({ sendJson }) {
       sendJson(res, 404, { error: "user_not_found" });
       return;
     }
-    if (result.user.is_guest) {
-      sendJson(res, 403, { error: "guest_pro_locked" });
-      return;
-    }
-
     let body;
     try {
       body = await readJsonBody(req);

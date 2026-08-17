@@ -403,7 +403,7 @@ function createTactileTagsHandler({ sendJson }) {
         sendLoggedJson(res, 404, { error: "session_not_found_or_forbidden" }, logContext);
         return;
       }
-      if (!Boolean(sessionRows[0].is_pro) || Boolean(sessionRows[0].is_guest)) {
+      if (!Boolean(sessionRows[0].is_pro)) {
         sendLoggedJson(res, 403, { error: "pro_required" }, logContext);
         return;
       }
