@@ -5,5 +5,5 @@ db:
   port: 5432
   user: stepby_dev
   password: replace_with_development_password
-  database: stepby_dev
+  database: stepby_app_dev
   ssl: false

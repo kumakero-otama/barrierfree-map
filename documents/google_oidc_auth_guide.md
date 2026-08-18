@@ -1,5 +1,7 @@
 # Google OpenID Connect（Googleでログイン）導入まとめ（Google Cloud / Webアプリ向け）
 
+> **初期設計資料:** 現行実装の設定名と再現手順は[`../REPRODUCTION.md`](../REPRODUCTION.md)、実際の処理は`server/api/google_auth.js`を参照してください。シークレット実値をGitへ保存しないでください。
+
 このドキュメントは、あなたのオリジナルアプリに **Google OpenID Connect（OIDC）** を使ったログイン機能を、**初心者向けにシンプル**に実装するための方針・DB設計・フロント/バックの変更点・Google Cloud設定手順をまとめたものです。
 
 ---

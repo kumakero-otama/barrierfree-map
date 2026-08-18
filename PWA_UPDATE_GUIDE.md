@@ -1,107 +1,18 @@
-# PWA 自動更新ガイド
+# PWA更新ガイド
 
-## 概要
-このPWAアプリケーションは、コード更新時にクライアント側が自動的に更新されるように設定されています。
+UI10のフロントエンドとService Workerは、このバックエンドリポジトリではなく[`StepBy`](https://github.com/kumakero-otama/StepBy)リポジトリで管理し、GitHub Pagesから公開します。
 
-## 実装内容
+この`barrierfree-map`リポジトリの`public/`は、クラウド管理画面、OpenAPI、および旧ローカル画面との互換用です。UI10のPWAキャッシュを変更するときは`StepBy/UI10/sw.js`を更新してください。
 
-### 1. Service Worker (public/sw.js)
-- **キャッシュバージョニング**: `CACHE_VERSION`変数でバージョン管理
-- **即座のアクティブ化**: `skipWaiting()`で新しいService Workerを即座にアクティブ化
-- **古いキャッシュの削除**: アクティブ化時に古いキャッシュを自動削除
-- **クライアント制御**: `clients.claim()`で既存のクライアントをすぐに制御
+## UI10更新時
 
-### 2. PWA登録 (public/pwa.js)
-- **自動リロード**: Service Worker更新時にページを自動リロード
-- **定期更新チェック**: 1分ごとに更新をチェック
-- **即座の更新チェック**: ページ表示時とフォーカス時に更新をチェック
-- **自動アクティブ化**: 新しいService Workerを自動的にアクティブ化
+1. `StepBy`の`dev`ブランチで変更
+2. フロントエンドテストを実行
+3. `UI10/sw.js`の`CACHE_VERSION`を更新
+4. `dev`へpush
+5. 確認後に`main`へ昇格しGitHub Pagesへ公開
+6. PWAを再起動し、新しいService Workerが有効になったことを確認
 
-## コード更新時の手順
+APIレスポンスはService Workerへ保存せず、認証情報や記録送信結果に古いキャッシュを使用しません。
 
-### 方法1: バージョン番号を変更（推奨）
-HTMLやCSS、JavaScriptファイルを更新した場合：
-
-1. `public/version.js`の`APP_VERSION`を変更します：
-```javascript
-const APP_VERSION = "1.0.2"; // バージョンを上げる
-```
-
-2. `public/sw.js`の先頭にある`CACHE_VERSION`も同じバージョンに変更します：
-```javascript
-const CACHE_VERSION = "1.0.2"; // バージョンを上げる
-```
-
-**注意**: 両方のファイルのバージョンを同じ値に変更してください。
-
-### 方法2: 自動更新（sw.jsを変更した場合）
-Service Worker自体を変更した場合、ファイルの変更が自動的に検出されます。
-
-## 動作の流れ
-
-1. サーバーにコードをデプロイ
-2. クライアントがページを開く/フォーカスする（または1分経過）
-3. 自動的に更新をチェック
-4. 新しいService Workerをダウンロード・インストール
-5. 即座にアクティブ化
-6. ページを自動リロード
-7. 新しいバージョンが表示される
-
-## デバッグ方法
-
-ブラウザの開発者ツールのコンソールで以下のログを確認できます：
-
-- `[SW] Installing new service worker...` - インストール開始
-- `[SW] Activating new service worker...` - アクティブ化開始
-- `[SW] Deleting old cache: ...` - 古いキャッシュ削除
-- `[PWA] Service Worker registered` - 登録完了
-- `[PWA] New service worker found` - 新しいバージョン検出
-- `[PWA] New service worker activated, reloading...` - リロード開始
-
-## 注意事項
-
-- 初回訪問時はキャッシュがないため、通常のロードが行われます
-- オフライン時は最後にキャッシュされたバージョンが表示されます
-- `/api/`で始まるパスはキャッシュされません（常に最新データを取得）
-- ブラウザによってはService Workerの動作が異なる場合があります
-
-## トラブルシューティング
-
-### 更新が反映されない場合
-
-1. **手動でキャッシュをクリア**:
-   - Chrome: 開発者ツール → Application → Storage → Clear site data
-   - Firefox: 開発者ツール → Storage → Clear All
-   
-2. **Service Workerを手動で削除**:
-   - Chrome: 開発者ツール → Application → Service Workers → Unregister
-   - Firefox: 開発者ツール → Application → Service Workers → Unregister
-
-3. **スーパーリロード**:
-   - Windows/Linux: `Ctrl + Shift + R`
-   - Mac: `Cmd + Shift + R`
-
-4. **CACHE_VERSIONが変更されているか確認**:
-   ```bash
-   grep "CACHE_VERSION" public/sw.js
-   ```
-
-## テスト方法
-
-1. サーバーを起動:
-```bash
-npm start
-```
-
-2. ブラウザで開く:
-```
-http://localhost:3000
-```
-
-3. HTMLファイルを変更
-
-4. `public/sw.js`の`CACHE_VERSION`を変更
-
-5. ブラウザをリロード（F5）
-
-6. 数秒後に自動的にページが再読み込みされ、変更が反映されることを確認
+バックエンドだけを変更した場合は、UI10のキャッシュ更新は不要です。ただしAPI仕様やフロントの呼出し方が変わる場合は、両リポジトリを同時に更新してください。

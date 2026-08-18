@@ -242,6 +242,11 @@
         <b>現行仕様MDをダウンロード ↓</b>
       </a>
 
+      <a class="report-link" href="REPRODUCTION.md" download>
+        <span>GCE、Node.js、PostgreSQL＋PostGIS、Caddy、systemd、Secret Manager、Cloud Storageを使ったバックエンド再現手順です。</span>
+        <b>バックエンド再現手順MDをダウンロード ↓</b>
+      </a>
+
       <a class="report-link" href="documents/existing-data-migration-audit.md" download>
         <span>現行DBの328記録を読み取り専用で棚卸しし、既存データ移行の候補・除外条件・安全手順をまとめています。</span>
         <b>既存データ移行監査MDをダウンロード ↓</b>
@@ -624,6 +629,7 @@
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成し、Tailscale版とGitHub Pages版へ公開。見出し・段落・箇条書きを整形して表示する。Google認証ユーザーの同意欄はログイン画面ではなく、初回プロフィール登録画面の「画像を選ぶ」と「登録」の間に配置した。ゲスト登録時も確認を必須とし、APIは未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。devブランチ全体はmainへマージせず、GitHub Pages公開用にUI10だけをmainへ同期している。UI0とバックエンド本番系には未反映。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">開発APIを監査し一覧を公開する</span><span class="note">Google認証、記録、ブラウザフィッティング、StepBy専用OSMアカウント、変更案、記録単位の送信・取消し、追記監査を一覧化。保存直前の最新Way取得、公開／本人限定タグ分離、所有者確認、冪等性、Version競合停止を実装・試験済み。<a href="api-catalog.html">API一覧を見る</a></span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">第三者向けバックエンド再現資料を整備する</span><span class="note">2026-08-18完了。旧Mapbox・PM2・MariaDB前提の主要MDをGCE、Node.js、PostgreSQL＋PostGIS、Caddy、systemd、Secret Manager、Cloud Storage構成へ更新。稼働開発DBからデータを含まないスキーマSQLを生成し、空の一時DBへ39テーブル・8監査トリガーを再構築できることを確認した。必要ライブラリ、秘密設定名、GCE構築、DB初期化、バックアップ、確認手順を<code>REPRODUCTION.md</code>へ集約。VM再起動相当で<code>/run</code>が空でもSecret Managerから設定を再生成してAPIが起動することも確認した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">UI1へ移行する</span><span class="note">対象範囲と完了条件を先に確定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡する</span><span class="note">状況を伝え、無理のない範囲で協力可能か確認。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへデバッグを依頼するか決める</span><span class="note">忙しくなさそうで、本人が対応可能な場合のみ依頼。</span></div></li>

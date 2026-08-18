@@ -1,5 +1,7 @@
 # server ディレクトリ構成
 
+> **現行UI10について:** この文書のMapbox・Valhalla節は旧APIと診断互換の説明です。通常のUI10はブラウザ内JavaScriptでフィッティングします。現行APIの正は[`../documents/API_list.md`](../documents/API_list.md)と[`../public/docs/openapi.yaml`](../public/docs/openapi.yaml)です。
+
 このディレクトリは、HTTPサーバー本体（`server.js`）から呼び出されるバックエンド処理を実装しています。  
 ここでは `server/` 配下の各ファイルが何をしているかを、実装ベースで具体的に説明します。
 

@@ -1,4 +1,6 @@
 # table_sql.md
+
+> **初期設計資料:** 完全な現行PostgreSQL定義は[`../database/schema.sql`](../database/schema.sql)、概要は[`../TABLE_DDL.md`](../TABLE_DDL.md)を参照してください。
 PostGreのテーブルを作るSQLコマンドのまとめ
 
 ## login.user_sessions

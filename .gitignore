@@ -1,4 +1,7 @@
-﻿# Secrets / local certs7
+# Secrets / local certificates
+.env
+.env.*
+!.env.example
 トークン管理方法.md
 localhost-key.pem
 localhost-cert.pem
@@ -10,6 +13,8 @@ logs/
 node_modules/
 data/mapbox-count.json
 uploads/
+database/*.dump
+database/*.tar.gz
 certs/local.key
 certs/local.crt
 documents/google_clientID.md

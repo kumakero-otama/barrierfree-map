@@ -1,6 +1,6 @@
 # StepBy 現行仕様・運用状態・今後のタスク
 
-最終更新: 2026-08-17（Asia/Tokyo）
+最終更新: 2026-08-18（Asia/Tokyo）
 対象: 開発版 StepBy UI10 / Google Cloud 開発API  
 この文書は、現在の確定仕様、実装済み機能、既知の問題、残作業、主要リンクを一か所にまとめた引継ぎ資料です。
 
@@ -214,6 +214,9 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 
 ## 12. 主要リンク
 
+- [バックエンド再現手順](../REPRODUCTION.md)
+- [PostgreSQL再現用スキーマ](../database/schema.sql)
+- [文書索引](README.md)
 - [タスクリスト](https://barrierfree-map.tail5de5e1.ts.net/project-plan-preview.html)
 - [システム構成図](https://barrierfree-map.tail5de5e1.ts.net/system-architecture.svg)
 - [API一覧](https://barrierfree-map.tail5de5e1.ts.net/api-catalog.html)

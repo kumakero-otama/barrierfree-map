@@ -1,5 +1,7 @@
 # loophole → Tailscale Funnel 移行計画
 
+> **履歴資料:** 旧ローカルサーバーの公開経路に関する文書です。現在のUI10 APIはGCE＋Caddyで公開しています。再現には[`../REPRODUCTION.md`](../REPRODUCTION.md)を使用してください。
+
 ## 背景
 
 現状、Barrierfree Map のバックエンドAPIは loophole トンネル経由で
