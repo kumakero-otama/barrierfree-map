@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
   <title id="title">StepBy 現在のシステム構成</title>
-  <desc id="desc">開発版StepBy UI10と未公開候補UI11の利用者端末、GitHub Pages、Google認証、OpenStreetMap、Google Cloud、Node API、PostgreSQLの接続を示す構成図。</desc>
+  <desc id="desc">開発版StepBy UI10とUI11の利用者端末、GitHub Pages、Google認証、OpenStreetMap、Google Cloud、Node API、PostgreSQLの接続を示す構成図。</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity=".14"/></filter>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0v6l9-3z" fill="#475569"/></marker>
@@ -14,13 +14,13 @@
   </defs>
   <rect width="1600" height="1000" fill="#fff"/>
   <text x="55" y="55" class="title">StepBy 現在のシステム構成</text>
-  <text x="55" y="83" class="subtitle">2026年8月19日時点　UI10公開中／UI11はdev未公開候補　緑＝StepBy／Google Cloud　橙＝外部サービス</text>
+  <text x="55" y="83" class="subtitle">2026年8月19日時点　UI10・UI11をGitHub Pagesで公開中　緑＝StepBy／Google Cloud　橙＝外部サービス</text>
 
   <!-- top services -->
   <rect x="55" y="125" width="300" height="130" rx="20" class="card" filter="url(#shadow)"/>
   <text x="205" y="173" text-anchor="middle" class="boxTitle">GitHub Pages</text>
   <text x="205" y="202" text-anchor="middle" class="body">フロントエンド配信</text>
-  <text x="205" y="226" text-anchor="middle" class="small">UI10公開中／UI11はdev候補</text>
+  <text x="205" y="226" text-anchor="middle" class="small">UI10・UI11公開中</text>
 
   <rect x="650" y="105" width="300" height="190" rx="34" class="card" filter="url(#shadow)"/>
   <rect x="745" y="118" width="110" height="18" rx="9" fill="#374151"/><circle cx="800" cy="127" r="5" fill="#050505"/>
@@ -46,7 +46,7 @@
 
   <!-- cloud current development -->
   <rect x="55" y="345" width="1490" height="555" rx="24" class="cloud" filter="url(#shadow)"/>
-  <text x="85" y="382" class="section">Google Cloud 開発環境（UI10稼働・UI11接続予定）</text>
+  <text x="85" y="382" class="section">Google Cloud 開発環境（UI10・UI11接続）</text>
   <rect x="1248" y="359" width="265" height="34" rx="17" class="pill"/><text x="1380" y="381" text-anchor="middle" class="label">ブラウザフィッティング・稼働中</text>
   <text x="85" y="408" class="small">Compute Engine: stepby-dev-1／固定IP／us-west1　公開HTTPS: stepby-api-8-229-191-182.sslip.io</text>
 
@@ -78,9 +78,9 @@
   <text x="1160" y="660" text-anchor="middle" class="boxTitle">監視・管理画面</text><text x="1160" y="687" text-anchor="middle" class="body">稼働・容量・API履歴</text><text x="1160" y="711" text-anchor="middle" class="small">秘密情報は表示しない</text>
 
   <path d="M335 497h60" class="lineGreen"/><path d="M950 517h60" class="lineGreen"/><path d="M335 677c35 0 35-90 60-90" class="lineOrange"/><path d="M395 680c-35 30-35 127-60 127" class="lineOrange"/><path d="M950 647h60" class="lineGreen"/>
-  <path d="M800 295v25H40v177h55" class="lineGreen"/><text x="470" y="310" class="label">UI10稼働／UI11接続予定</text>
+  <path d="M800 295v25H40v177h55" class="lineGreen"/><text x="470" y="310" class="label">UI10・UI11稼働</text>
   <path d="M910 435c0-90 475-80 475-180" class="lineOrange"/><text x="1190" y="332" class="label">読取／専用トークン／OSM編集</text>
 
-  <text x="55" y="952" class="small">UI10とUI11のフィッティングは端末内で行い、Google Cloud APIは認証・記録・タグ・OSM変更・監査・DB保存を担当する。UI11はまだ未公開。</text>
+  <text x="55" y="952" class="small">UI10とUI11のフィッティングは端末内で行い、Google Cloud APIは認証・記録・タグ・OSM変更・監査・DB保存を担当する。</text>
   <text x="1545" y="978" text-anchor="end" class="tiny">構成変更時はこのSVGとタスクリストを同時更新する</text>
 </svg>
