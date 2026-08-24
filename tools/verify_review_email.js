@@ -25,6 +25,7 @@ transport.verify()
     console.log("SMTP authentication verified. No email was sent.");
   })
   .catch((error) => {
-    console.error(`SMTP verification failed: ${error.code || error.message}`);
+    const detail = error.response || error.message || error.code || "unknown error";
+    console.error(`SMTP verification failed: ${error.code || "ERROR"}: ${detail}`);
     process.exitCode = 1;
   });
