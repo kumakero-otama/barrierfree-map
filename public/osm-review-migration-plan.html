@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StepBy OSM公開審査・既存データ移行タスクリスト</title>
+  <style>
+    :root { color-scheme: light; --ink:#17302c; --muted:#58706b; --line:#cfe0dc; --green:#168b78; --pale:#eef8f5; --warn:#fff5d8; --warn-line:#e4ae24; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f5f8f7; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif; line-height:1.75; }
+    main { width:min(980px,calc(100% - 32px)); margin:32px auto 80px; }
+    header,.section { background:#fff; border:1px solid var(--line); border-radius:18px; padding:28px; margin-bottom:18px; }
+    header { background:linear-gradient(135deg,#e5f7f1,#fff); }
+    h1 { margin:0 0 8px; font-size:clamp(1.7rem,4vw,2.5rem); line-height:1.35; }
+    h2 { margin:0 0 14px; font-size:1.35rem; }
+    h3 { margin:24px 0 8px; font-size:1.08rem; }
+    p { margin:8px 0; }
+    .updated,.note { color:var(--muted); }
+    .decision { border-left:5px solid var(--warn-line); background:var(--warn); }
+    ol,ul { margin:8px 0; padding-left:1.4rem; }
+    li { margin:9px 0; }
+    .task { list-style:none; padding-left:0; }
+    .task li { position:relative; padding-left:32px; }
+    .task li::before { content:""; position:absolute; left:2px; top:.48em; width:17px; height:17px; border:2px solid var(--green); border-radius:4px; background:#fff; }
+    code { background:#edf2f1; padding:2px 5px; border-radius:5px; }
+    a { color:#087765; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="updated">更新日: 2026年8月24日 / 実装中</p>
+    <h1>OSM公開審査・ゲスト除外・既存データ移行</h1>
+    <p>新規記録を即時送信する方式から、管理者が1件ずつ確認して承認した記録だけをOSMへ送る方式へ変更するための実行順です。本番OSMへの試験送信は、この計画の実装・自動試験には含めません。</p>
+  </header>
+
+  <section class="section decision">
+    <h2>決定済み</h2>
+    <ol>
+      <li>航空写真は国土地理院のシームレス空中写真を使用し、OSM・GPS・変更予定経路を別レイヤーで重ねる。</li>
+      <li>審査待ち1件ごとに <code>kumakero.otama@gmail.com</code> へ通知する。</li>
+      <li>管理者画面はGoogle認証を使い、<code>kumakero.otama@gmail.com</code> だけを許可する。</li>
+      <li>旧ローカル本番DBの328記録を対象とし、経路あり276件を一次候補、経路なし52件を要調査に分ける。</li>
+      <li>却下記録は削除せず理由を保存し、再審査可能にする。旧データでゲストと判別できるものはOSM対象外とする。</li>
+    </ol>
+  </section>
+
+  <section class="section">
+    <h2>1. 保存方式と審査キュー</h2>
+    <ul class="task">
+      <li>新規記録の保存処理からOSM即時送信を外し、StepBy記録・GPS生座標・accuracy・フィット経路・Wayスナップショット・変更案をPostgreSQLへ先に保存する。</li>
+      <li>審査状態を <code>pending / approved / rejected / merge_failed / merged</code> として管理し、状態変更を追記型監査履歴にも残す。</li>
+      <li>同じ記録の二重登録・二重承認・二重OSM送信を冪等性キーで防ぐ。</li>
+      <li>一般利用者には「記録しました」のみを表示し、OSM送信完了のような誤解を招く表示をしない。</li>
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>2. ゲストアカウントの扱い</h2>
+    <ul class="task">
+      <li>サーバーで記録者の <code>is_guest</code> を必ず確認し、ゲスト記録ではOSM変更案の実行・承認キュー投入を禁止する。</li>
+      <li>ゲスト記録はStepByのPostgreSQLに保存し、アプリ内の表示・本人限定情報の規則は維持する。</li>
+      <li>画面、利用規約、プライバシーポリシー、仕様書に「ゲストの記録はOSMへ公開されない」と明記する。</li>
+      <li>APIを直接呼んでもゲスト記録を承認・送信できない自動試験を追加する。</li>
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>3. 管理者向けPC審査画面</h2>
+    <ul class="task">
+      <li>未審査一覧、検索、日時・記録者・新規／既存の絞り込み、審査済み履歴を実装する。</li>
+      <li>航空写真、OSM道路・歩道、GPS生座標、フィット経路、対象Way、分割区間、予定タグを重ねて表示する。</li>
+      <li>承認、却下、保留を簡単に選択でき、却下理由・管理者メモを保存できるようにする。</li>
+      <li>承認時に最新OSMデータとVersion、既存タグ、重複、opt-out、競合を再確認し、安全条件を満たす場合だけStepBy専用OSMアカウントで送信する。</li>
+      <li>送信要求、承認者、変更前後、changeset ID、Way/Node/Relation IDとVersion、成功・失敗を追記型監査履歴へ保存する。</li>
+      <li>失敗時は承認済みのまま再試行可能にし、原因を管理画面へ表示する。競合時は自動上書きしない。</li>
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>4. 管理者への通知</h2>
+    <ul class="task">
+      <li>Google認証ユーザーの公開対象記録が審査待ちになった後に通知イベントを作る。</li>
+      <li>メールには秘密情報やアクセストークンを含めず、記録ID・日時・審査画面へのリンクだけを記載する。</li>
+      <li>メール送信失敗で記録保存を失敗させず、通知だけを再試行して履歴を残す。</li>
+      <li>ゲスト記録とOSM非公開タグだけの記録ではOSM審査通知を送らない。</li>
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>5. 既存データ移行</h2>
+    <ul class="task">
+      <li>旧データを読み取り専用で抽出し、元DB・元記録IDを保持したまま審査候補へ取り込む。</li>
+      <li>既存OSMとの重複、無効記録、経路なし、極端に短い経路、現在の道路網と矛盾する記録を自動分類する。</li>
+      <li>旧データはaccuracyがないことを画面で明示し、現在のOSMへ再フィッティングした結果と元経路を両方表示する。</li>
+      <li>新規記録と同じ審査画面から1件ずつ承認し、承認したものだけOSMへ送る。</li>
+      <li>取り込み自体はOSM送信を発生させない。既存データの本番OSM送信は別途、対象を限定した管理者許可を必要とする。</li>
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>6. 切替え・試験・文書更新</h2>
+    <ul class="task">
+      <li>即時送信経路が完全に閉じ、Google利用者の保存が審査待ち、ゲスト保存がOSM対象外になる結合試験を行う。</li>
+      <li>管理者認証、権限外アクセス、CSRF、二重承認、メール失敗、OSM Version競合、送信失敗・再試行を試験する。</li>
+      <li>本番DBへ触れない開発DBとOSMモックで画面・APIを反復確認する。本番OSMへの試験送信は行わない。</li>
+      <li>API一覧、DBスキーマ、再現手順、現行仕様、利用規約、プライバシーポリシー、システム構成図、メインタスクリストを更新する。</li>
+      <li>将来の即時送信再開は自動切替えにせず、正確な記録率・審査件数・却下理由を集計したうえで別の仕様変更として判断する。</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
