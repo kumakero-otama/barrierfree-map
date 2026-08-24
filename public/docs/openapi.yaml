@@ -1583,6 +1583,49 @@ paths:
         '409': { description: 所有者不一致またはVersion競合 }
         '423': { description: OSM書込み安全条件未成立 }
 
+  /api/osm/reviews:
+    get:
+      summary: OSM公開前の審査一覧
+      description: Google認証メールが管理者許可リストと一致する場合だけ利用できます。
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, approved, rejected, merge_failed, merged, all] }
+      responses:
+        '200': { description: 審査一覧、GPS生座標、経路、OSM変更案 }
+        '403': { description: review_admin_required }
+  /api/osm/reviews/{reviewId}/approve:
+    post:
+      summary: 審査記録を承認し、安全条件が揃う場合だけOSMへ送信
+      parameters:
+        - in: path
+          name: reviewId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: 承認結果。機能ロック中はexecutionDeferred=true }
+        '409': { description: 競合または承認不能状態 }
+  /api/osm/reviews/{reviewId}/reject:
+    post:
+      summary: 審査記録を理由付きで却下
+      parameters:
+        - in: path
+          name: reviewId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: 却下済み。OSM送信なし }
+  /api/osm/reviews/{reviewId}/reopen:
+    post:
+      summary: 却下記録を確認待ちへ戻す
+      parameters:
+        - in: path
+          name: reviewId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: 確認待ちへ復帰 }
+
 components:
   securitySchemes:
     bearerAuth:
