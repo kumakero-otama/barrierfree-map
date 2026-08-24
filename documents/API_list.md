@@ -446,3 +446,10 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 - 主なレスポンス:
   - `200`: `ok`, `user`
   - `400`, `401`, `403` (`guest_profile_locked`), `404`, `405`, `500`
+# OSM公開審査API（2026-08-24追加）
+
+- `GET /api/osm/reviews?status=pending`: 管理者のGoogleメールを確認し、審査対象とGPS・経路・変更案を取得
+- `POST /api/osm/reviews/:reviewId/approve`: 承認を追記監査へ保存し、安全条件が揃う場合だけOSMへ送信
+- `POST /api/osm/reviews/:reviewId/reject`: 却下理由を保存。OSM送信なし
+- `POST /api/osm/reviews/:reviewId/reopen`: 却下記録を確認待ちへ戻す
+- `POST /api/osm/records/:recordId/publish`: 一般利用者からの即時送信は `administrator_review_required` で拒否

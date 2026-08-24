@@ -1,0 +1,6 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StepBy OSM公開確認</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="osm-review.css"></head>
+<body><header><h1>OSM公開確認</h1><p>航空写真と記録経路を確認し、公開する記録だけを承認します。</p></header>
+<main><section id="login"><h2>管理者ログイン</h2><div id="google-button"></div><p id="login-status"></p></section>
+<section id="app" hidden><div class="toolbar"><select id="status"><option value="pending">確認待ち</option><option value="approved">承認済み</option><option value="rejected">却下</option><option value="merge_failed">送信失敗</option><option value="merged">OSM公開済み</option><option value="all">すべて</option></select><button id="reload">更新</button></div><div class="layout"><aside id="list"></aside><article><div id="map"></div><div id="detail"><p>左の記録を選択してください。</p></div></article></div></section></main>
+<script src="https://accounts.google.com/gsi/client" async defer></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="osm-review.js"></script></body></html>

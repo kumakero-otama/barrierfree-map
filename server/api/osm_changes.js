@@ -8,6 +8,7 @@ const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
 const { createServiceAccountOsmClient, resolvedServiceAccountConfig } = require("../osm/service_account_client");
 const { ensureOptOutSchema, findOptOutMatch } = require("../osm/opt_out");
+const { ensureReviewSchema, enqueueReview, queueNotification, deliverNotification, isReviewAdmin } = require("../osm/review_queue");
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
@@ -123,6 +124,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     await pool.query("CREATE INDEX IF NOT EXISTS osm_audit_plan_idx ON osmchange.audit_events(plan_id, event_id)");
     await ensureRecordLinkSchema(pool);
     await ensureOptOutSchema(pool);
+    await ensureReviewSchema(pool);
     await pool.query(`
       CREATE OR REPLACE FUNCTION osmchange.prevent_history_mutation()
       RETURNS trigger LANGUAGE plpgsql AS $$
@@ -314,7 +316,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     try {
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       // HTTP body may start streaming immediately, so capture it before awaiting DB initialization.
-      const isExecutionRequest = req.method === "POST" && (/\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname) || /\/api\/osm\/records\/[^/]+\/(publish|revert)$/.test(url.pathname));
+      const isExecutionRequest = req.method === "POST" && (/\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname) || /\/api\/osm\/records\/[^/]+\/(publish|revert)$/.test(url.pathname) || /\/api\/osm\/reviews\/[^/]+\/(approve|reject|reopen)$/.test(url.pathname));
       const pendingBody = (["/api/osm/plans", "/api/osm/split-plan"].includes(url.pathname) || isExecutionRequest) && req.method === "POST"
         ? readJson(req)
         : null;
@@ -333,8 +335,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           osmWriteGate: gate,
           osmEditorMode: "stepby_service_account",
           osmServiceAccountConfigured: service.configured,
-          requiredSafeguards: ["server_feature_flag", "record_ownership", "user_osm_oauth", "user_save_or_delete_confirmation", "idempotency", "append_only_audit"],
-          reason: gate.enabled ? "Owned records can be published by Save and reverted by confirmed green-line deletion" : "OSM write code is installed and locked by the server feature flag",
+          requiredSafeguards: ["server_feature_flag", "google_admin_allowlist", "administrator_review", "guest_exclusion", "service_account_oauth", "idempotency", "append_only_audit", "latest_osm_version"],
+          reason: gate.enabled ? "Only administrator-approved non-guest records can be published" : "OSM write code is installed and locked by a server-side safeguard",
         });
         return;
       }
@@ -342,9 +344,29 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       if (url.pathname === "/api/osm/split-plan" && req.method === "POST") {
         const body = await pendingBody;
         const recordId = await requireOwnedRecord(body.recordId, req.authUserId);
+        const [recordOwners] = await pool.query(`SELECT COALESCE(u.is_guest,FALSE) is_guest
+          FROM tactile.sessions s LEFT JOIN login.users u ON u.user_id=s.user_id
+          WHERE s.session_id=? AND s.user_id=? LIMIT 1`, [recordId, req.authUserId]);
+        if (recordOwners[0] && recordOwners[0].is_guest) {
+          await pool.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+            VALUES(NULL,'guest_review_excluded',?,?,?::jsonb)`, [req.authUserId, req.securityRequestId || null,
+            JSON.stringify({ recordId, osmSent: false, reviewQueued: false })]);
+          sendJson(res, 200, { success: true, recordId, status: "guest_saved_stepby_only", reviewQueued: false, osmSent: false });
+          return;
+        }
         const publication = await getRecordPublication(pool, recordId, req.authUserId);
         if (!publication.osmEligible) {
           sendJson(res, 409, { error: "record_is_stepby_only", osmEligible: false });
+          return;
+        }
+        const [existingLinks] = await pool.query(`SELECT l.merge_plan_id,l.osm_status,q.review_id,q.review_status
+          FROM osmchange.record_links l LEFT JOIN osmchange.review_queue q ON q.record_id=l.record_id
+          WHERE l.record_id=? AND l.created_by=? LIMIT 1`, [recordId, req.authUserId]);
+        if (existingLinks[0]) {
+          sendJson(res, 200, { success: true, recordId, planId: existingLinks[0].merge_plan_id,
+            status: existingLinks[0].review_status || existingLinks[0].osm_status,
+            reviewId: existingLinks[0].review_id || null, reviewQueued: Boolean(existingLinks[0].review_id),
+            osmSent: existingLinks[0].osm_status === "merged", idempotent: true });
           return;
         }
         const planId = crypto.randomUUID();
@@ -400,7 +422,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         const clientContext = {
           ...(body.clientContext && typeof body.clientContext === "object" ? body.clientContext : {}),
           previewOnly: false,
-          osmWriteRequested: true,
+          osmWriteRequested: false,
+          reviewRequired: true,
           planner: "split_planner_v2_relations",
           recordId,
           publication: {
@@ -429,15 +452,97 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             [planId, "split_plan_created", req.authUserId, req.securityRequestId || null,
               JSON.stringify({ ...splitPlan.summary, recordId, osmSent: false })]
           );
+          const review = await enqueueReview(conn, { recordId, planId, actorUserId: req.authUserId });
           await conn.commit();
+          const notification = await queueNotification(pool, review.review_id);
+          void deliverNotification(pool, { ...notification, reviewId: review.review_id })
+            .catch((notificationError) => console.error("[osm_review] notification_failed", notificationError.message));
         } catch (transactionError) {
           await conn.rollback();
           throw transactionError;
         } finally {
           conn.release();
         }
-        sendJson(res, 201, { success: true, recordId, planId, status: "draft", osmSent: false, splitPlan });
+        sendJson(res, 201, { success: true, recordId, planId, status: "pending_review", reviewQueued: true, osmSent: false, splitPlan });
         return;
+      }
+
+      if (parts[0] === "api" && parts[1] === "osm" && parts[2] === "reviews") {
+        if (!(await isReviewAdmin(pool, req.authUserId))) {
+          sendJson(res, 403, { error: "review_admin_required" });
+          return;
+        }
+        if (req.method === "GET" && parts.length === 3) {
+          const status = String(url.searchParams.get("status") || "pending");
+          if (!["pending", "approved", "rejected", "merge_failed", "merged", "all"].includes(status)) {
+            sendJson(res, 400, { error: "invalid_review_status" }); return;
+          }
+          const params = status === "all" ? [] : [status];
+          const where = status === "all" ? "" : "WHERE q.review_status=?";
+          const [rows] = await pool.query(`SELECT q.review_id,q.record_id,q.plan_id,q.source_type,q.source_record_id,
+              q.review_status,q.rejection_reason,q.created_at,q.reviewed_at,u.username,
+              ST_AsGeoJSON(p.geom::geometry) path_geojson,cp.elements,cp.client_context,
+              COALESCE((SELECT jsonb_agg(jsonb_build_object('lat',ST_Y(g.geom::geometry),'lng',ST_X(g.geom::geometry),
+                'accuracy',g.accuracy,'ts',g.ts) ORDER BY g.ts) FROM tactile.gps_raw g WHERE g.session_id=q.record_id),'[]'::jsonb) raw_points
+            FROM osmchange.review_queue q
+            JOIN osmchange.change_plans cp ON cp.plan_id=q.plan_id
+            LEFT JOIN tactile.sessions s ON s.session_id=q.record_id
+            LEFT JOIN login.users u ON u.user_id=s.user_id
+            LEFT JOIN tactile.session_paths p ON p.session_id=q.record_id
+            ${where} ORDER BY q.created_at DESC LIMIT 200`, params);
+          sendJson(res, 200, { success: true, reviews: rows }); return;
+        }
+        if (req.method === "POST" && parts[3]) {
+          const reviewId = decodeURIComponent(parts[3]);
+          const action = parts[4];
+          const body = await pendingBody;
+          const [rows] = await pool.query(`SELECT q.*,cp.operation_type,cp.created_by,cp.summary,cp.elements,cp.client_context
+            FROM osmchange.review_queue q JOIN osmchange.change_plans cp ON cp.plan_id=q.plan_id
+            WHERE q.review_id=? LIMIT 1`, [reviewId]);
+          const review = rows[0];
+          if (!review) { sendJson(res, 404, { error: "review_not_found" }); return; }
+          if (action === "reject") {
+            const reason = String(body && body.reason || "").trim().slice(0, 1000);
+            if (!reason) { sendJson(res, 400, { error: "rejection_reason_required" }); return; }
+            await pool.query(`UPDATE osmchange.review_queue SET review_status='rejected',rejection_reason=?,
+              reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [reason, req.authUserId, reviewId]);
+            await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+              VALUES(?,'rejected',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ reason })]);
+            sendJson(res, 200, { success: true, reviewId, status: "rejected", osmSent: false }); return;
+          }
+          if (action === "reopen") {
+            await pool.query(`UPDATE osmchange.review_queue SET review_status='pending',rejection_reason=NULL,
+              reviewer_user_id=NULL,reviewed_at=NULL,updated_at=NOW() WHERE review_id=?`, [reviewId]);
+            await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+              VALUES(?,'reopened',?,'{}'::jsonb)`, [reviewId, req.authUserId]);
+            sendJson(res, 200, { success: true, reviewId, status: "pending", osmSent: false }); return;
+          }
+          if (action === "approve") {
+            if (!['pending','merge_failed','approved'].includes(review.review_status)) {
+              sendJson(res, 409, { error: "review_not_approvable", status: review.review_status }); return;
+            }
+            await pool.query(`UPDATE osmchange.review_queue SET review_status='approved',rejection_reason=NULL,
+              reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [req.authUserId, reviewId]);
+            await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+              VALUES(?,'approved',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ executeRequested: true })]);
+            if (!(await writesEnabled())) {
+              sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false, executionDeferred: true }); return;
+            }
+            try {
+              const result = await withPlanLock(review.plan_id, () => executeUserPlan(req, review, "execute"));
+              await pool.query("UPDATE osmchange.review_queue SET review_status='merged',updated_at=NOW() WHERE review_id=?", [reviewId]);
+              await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+                VALUES(?,'merged',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ changesetId: result.changesetId || null })]);
+              sendJson(res, 200, { ...result, reviewId, status: "merged" }); return;
+            } catch (executionError) {
+              await pool.query("UPDATE osmchange.review_queue SET review_status='merge_failed',updated_at=NOW() WHERE review_id=?", [reviewId]);
+              await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+                VALUES(?,'merge_failed',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ error: executionError.message })]);
+              throw executionError;
+            }
+          }
+          sendJson(res, 404, { error: "review_action_not_found" }); return;
+        }
       }
 
       if (parts[0] === "api" && parts[1] === "osm" && parts[2] === "records" && parts[3]) {
@@ -458,45 +563,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           return;
         }
         if (req.method === "POST" && parts[4] === "publish") {
-          const body = await pendingBody;
-          if (!body || body.authorization !== "record_save") {
-            await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute", reason: "record_save_confirmation_required" });
-            sendJson(res, 409, { error: "record_save_confirmation_required", osmSent: false });
-            return;
-          }
-          if (!(await writesEnabled())) {
-            await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute", reason: "server_feature_flag_disabled", authorization: "record_save" });
-            sendJson(res, 423, { error: "osm_write_locked", osmSent: false });
-            return;
-          }
-          const result = await withPlanLock(link.merge_plan_id, async () => {
-            const [freshLinks] = await pool.query(
-              `SELECT merge_plan_id,merge_changeset_id,osm_status FROM osmchange.record_links
-               WHERE record_id=? AND created_by=? LIMIT 1`, [recordId, req.authUserId]
-            );
-            const freshLink = freshLinks[0];
-            if (!freshLink) throw new Error("osm_record_link_not_found");
-            if (freshLink.osm_status === "already_present") {
-              return { success: true, recordId, planId: freshLink.merge_plan_id, changesetId: null,
-                osmSent: false, skipped: true, reason: "tactile_tag_already_present", idempotent: true };
-            }
-            if (freshLink.osm_status === "merged" || freshLink.osm_status === "revert_draft" || freshLink.osm_status === "reverted") {
-              return { success: true, recordId, planId: freshLink.merge_plan_id, changesetId: freshLink.merge_changeset_id, osmSent: true, idempotent: true };
-            }
-            if (freshLink.osm_status === "conflict") {
-              const error = new Error("osm_version_conflict");
-              error.status = 409;
-              throw error;
-            }
-            const [plans] = await pool.query(
-              `SELECT plan_id,operation_type,created_by,summary,elements,client_context
-               FROM osmchange.change_plans WHERE plan_id=? AND created_by=? LIMIT 1`,
-              [freshLink.merge_plan_id, req.authUserId]
-            );
-            if (!plans[0] || plans[0].operation_type !== "merge") throw new Error("linked_plan_not_found");
-            return executeUserPlan(req, plans[0], "execute");
-          });
-          sendJson(res, 200, { ...result, recordId });
+          await appendAudit(link.merge_plan_id, "execution_blocked", req, { requestedAction: "execute", reason: "administrator_review_required" });
+          sendJson(res, 409, { error: "administrator_review_required", reviewStatus: "pending", osmSent: false });
           return;
         }
         if (req.method === "POST" && parts[4] === "revert") {

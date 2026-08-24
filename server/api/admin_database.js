@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const { createDbPool } = require("../db");
+const { ensureReviewSchema } = require("../osm/review_queue");
 
 const TABLES = Object.freeze({
   "tactile.sessions": {
@@ -45,6 +46,22 @@ const TABLES = Object.freeze({
     label: "OSM追記型監査履歴",
     rows: `SELECT event_id,plan_id,event_type,actor_user_id,request_id,details,created_at
              FROM osmchange.audit_events ORDER BY created_at DESC LIMIT ?`,
+  },
+  "osmchange.review_queue": {
+    label: "OSM公開前の審査キュー",
+    rows: `SELECT review_id,record_id,plan_id,source_type,source_record_id,review_status,
+                  rejection_reason,reviewer_user_id,reviewed_at,created_at,updated_at
+             FROM osmchange.review_queue ORDER BY created_at DESC LIMIT ?`,
+  },
+  "osmchange.review_events": {
+    label: "OSM審査の追記履歴",
+    rows: `SELECT event_id,review_id,event_type,actor_user_id,details,created_at
+             FROM osmchange.review_events ORDER BY event_id DESC LIMIT ?`,
+  },
+  "osmchange.review_notifications": {
+    label: "OSM審査メール通知",
+    rows: `SELECT notification_id,review_id,recipient,status,attempt_count,last_error,sent_at,created_at,updated_at
+             FROM osmchange.review_notifications ORDER BY created_at DESC LIMIT ?`,
   },
   "experiment.api_records": {
     label: "API作成・削除実験データ",
@@ -139,6 +156,7 @@ function createAdminDatabaseHandler({ sendJson }) {
     if (schemaReady) return schemaReady;
     schemaReady = (async () => {
       if (error || !pool) throw error || new Error("database_unavailable");
+      await ensureReviewSchema(pool);
       await pool.query("CREATE SCHEMA IF NOT EXISTS experiment");
       await pool.query(`CREATE TABLE IF NOT EXISTS tactile.way_snapshots (
         snapshot_id uuid PRIMARY KEY,record_id uuid NOT NULL,segment_order integer NOT NULL CHECK(segment_order>=0),

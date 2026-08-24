@@ -7,7 +7,11 @@ const oauthSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_oaut
 const tactileSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_tactile.js"), "utf8");
 const tagSource = fs.readFileSync(path.join(__dirname, "../server/api/tactile_tags.js"), "utf8");
 assert.match(source, /parts\[4\] === "publish"/);
-assert.match(source, /body\.authorization !== "record_save"/);
+assert.match(source, /administrator_review_required/);
+assert.match(source, /parts\[2\] === "reviews"/);
+assert.match(source, /isReviewAdmin\(pool, req\.authUserId\)/);
+assert.match(source, /guest_review_excluded/);
+assert.match(source, /enqueueReview/);
 assert.match(source, /parts\[4\] === "revert"/);
 assert.match(tactileSource, /stepby_record_id = String\(record\.record_id\)/,
   "all users need a record id for read-only detail display");
