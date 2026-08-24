@@ -4,6 +4,7 @@ const { fetchWalkableNetwork } = require("./osm_walkable");
 const { replay, projectToSegment, inferWaySide } = require("../fitting/browser_matcher");
 const { createSplitPlan } = require("../osm/split_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
+const { ensureReviewSchema, enqueueReview } = require("../osm/review_queue");
 
 function readJson(req) {
   return new Promise((resolve, reject) => { let body = ""; req.on("data", (chunk) => { body += chunk; if (body.length > 32768) reject(new Error("payload_too_large")); });
@@ -32,6 +33,7 @@ function createRecordReplayHandler({ sendJson }) {
         historical_way_ids jsonb NOT NULL,replay_result jsonb NOT NULL,status text NOT NULL,osm_sent boolean NOT NULL DEFAULT false,
         created_at timestamptz NOT NULL DEFAULT NOW())`);
       await ensureRecordLinkSchema(pool);
+      await ensureReviewSchema(pool);
     })().catch((schemaError) => { ready = null; throw schemaError; });
     return ready;
   }
@@ -116,9 +118,11 @@ function createRecordReplayHandler({ sendJson }) {
           await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
             VALUES(?,'split_plan_created',?,?,?::jsonb) RETURNING event_id`, [planId, record.session.user_id, req.securityRequestId || null,
             JSON.stringify({ ...splitPlan.summary, sessionId, source: "production_readonly_copy", previewOnly: true, osmSent: false })]);
+          await enqueueReview(conn, { recordId: sessionId, planId, actorUserId: record.session.user_id,
+            sourceType: "legacy_record", sourceRecordId: sessionId });
           await conn.commit();
         } catch (insertError) { await conn.rollback(); throw insertError; } finally { conn.release(); }
-        return sendJson(res, 201, { success: true, reused: false, sessionId, planId, status: "draft", side, segment,
+        return sendJson(res, 201, { success: true, reused: false, sessionId, planId, status: "pending_review", side, segment,
           rawPoints: record.points.map((point) => [point.lat, point.lng]),
           splitPlan, boundaryDistancesMeters: context.boundaryDistancesMeters, osmSent: false });
       }
