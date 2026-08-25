@@ -4,11 +4,20 @@ const nodemailer = require("nodemailer");
 
 const required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
 const missing = required.filter((name) => !String(process.env[name] || "").trim());
+const password = String(process.env.SMTP_PASS || "");
 
 if (missing.length) {
   console.error(`SMTP configuration is missing: ${missing.join(", ")}`);
   process.exit(1);
 }
+
+console.log(JSON.stringify({
+  smtpUser: process.env.SMTP_USER,
+  passwordLength: password.length,
+  asciiLettersOnly: /^[A-Za-z]{16}$/.test(password),
+  containsWhitespace: /\s/.test(password),
+  containsQuote: /["']/.test(password),
+}));
 
 const transport = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
