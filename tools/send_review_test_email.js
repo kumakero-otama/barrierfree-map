@@ -24,10 +24,16 @@ const transport = nodemailer.createTransport({
 transport.sendMail({
   from: process.env.SMTP_FROM || process.env.SMTP_USER,
   to: process.env.OSM_REVIEW_ADMIN_EMAIL,
-  subject: "[StepBy] OSM公開確認メールの送信テスト",
-  text: `StepByの審査通知メール設定は正常です。\n\n審査画面: ${reviewUrl}\n`,
+  subject: `[StepBy] OSM公開確認メール 再送テスト ${new Date().toISOString()}`,
+  text: `StepByの審査通知メール再送テストです。\n送信日時: ${new Date().toISOString()}\n\n審査画面: ${reviewUrl}\n`,
 }).then((info) => {
-  console.log(`Test email sent: ${info.messageId}`);
+  console.log(JSON.stringify({
+    messageId: info.messageId,
+    response: info.response,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    envelope: info.envelope,
+  }));
 }).catch((error) => {
   console.error(`Test email failed: ${error.code || error.message}`);
   process.exitCode = 1;
