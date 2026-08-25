@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { enqueueReview, queueNotification, deliverNotification, isReviewAdmin } = require("../server/osm/review_queue");
+const { enqueueReview, queueNotification, deliverNotification, retryFailedNotifications, isReviewAdmin } = require("../server/osm/review_queue");
 
 test("enqueueReview creates a pending review and append-only event", async () => {
   const calls = [];
@@ -39,4 +39,9 @@ test("missing SMTP secret records failure without throwing", async () => {
   assert.equal(calls.some(c => c.sql.includes("status='failed'")), true);
   if (previousUser !== undefined) process.env.SMTP_USER = previousUser;
   if (previousPass !== undefined) process.env.SMTP_PASS = previousPass;
+});
+
+test("notification retry is a no-op when nothing is pending", async () => {
+  const pool = { query: async () => [[]] };
+  assert.deepEqual(await retryFailedNotifications(pool), []);
 });

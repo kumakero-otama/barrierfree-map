@@ -8,7 +8,7 @@ const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
 const { createServiceAccountOsmClient, resolvedServiceAccountConfig } = require("../osm/service_account_client");
 const { ensureOptOutSchema, findOptOutMatch } = require("../osm/opt_out");
-const { ensureReviewSchema, enqueueReview, queueNotification, deliverNotification, isReviewAdmin } = require("../osm/review_queue");
+const { ensureReviewSchema, enqueueReview, queueNotification, deliverNotification, retryFailedNotifications, isReviewAdmin } = require("../osm/review_queue");
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
@@ -474,14 +474,26 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         }
         if (req.method === "GET" && parts.length === 3) {
           const status = String(url.searchParams.get("status") || "pending");
-          if (!["pending", "approved", "rejected", "merge_failed", "merged", "all"].includes(status)) {
+          if (!["pending", "held", "approved", "rejected", "merge_failed", "merged", "all"].includes(status)) {
             sendJson(res, 400, { error: "invalid_review_status" }); return;
           }
-          const params = status === "all" ? [] : [status];
-          const where = status === "all" ? "" : "WHERE q.review_status=?";
+          const clauses = [];
+          const params = [];
+          if (status !== "all") { clauses.push("q.review_status=?"); params.push(status); }
+          const sourceType = String(url.searchParams.get("source") || "all");
+          if (["new_record", "legacy_record"].includes(sourceType)) { clauses.push("q.source_type=?"); params.push(sourceType); }
+          const query = String(url.searchParams.get("q") || "").trim().slice(0, 100);
+          if (query) { clauses.push("(LOWER(COALESCE(u.username,'')) LIKE ? OR CAST(q.record_id AS TEXT) LIKE ? OR COALESCE(q.source_record_id,'') LIKE ?)"); const like = `%${query.toLowerCase()}%`; params.push(like, like, like); }
+          const from = String(url.searchParams.get("from") || "");
+          const to = String(url.searchParams.get("to") || "");
+          if (/^\d{4}-\d{2}-\d{2}$/.test(from)) { clauses.push("q.created_at>=?::date"); params.push(from); }
+          if (/^\d{4}-\d{2}-\d{2}$/.test(to)) { clauses.push("q.created_at<?::date + INTERVAL '1 day'"); params.push(to); }
+          const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
           const [rows] = await pool.query(`SELECT q.review_id,q.record_id,q.plan_id,q.source_type,q.source_record_id,
-              q.review_status,q.rejection_reason,q.created_at,q.reviewed_at,u.username,
+              q.review_status,q.rejection_reason,q.admin_note,q.created_at,q.reviewed_at,u.username,
               ST_AsGeoJSON(p.geom::geometry) path_geojson,cp.elements,cp.client_context,
+              (SELECT details->>'error' FROM osmchange.review_events re WHERE re.review_id=q.review_id AND re.event_type='merge_failed' ORDER BY re.event_id DESC LIMIT 1) last_error,
+              (SELECT status FROM osmchange.review_notifications rn WHERE rn.review_id=q.review_id ORDER BY rn.created_at DESC LIMIT 1) notification_status,
               COALESCE((SELECT jsonb_agg(jsonb_build_object('lat',ST_Y(g.geom::geometry),'lng',ST_X(g.geom::geometry),
                 'accuracy',g.accuracy,'ts',g.ts) ORDER BY g.ts) FROM tactile.gps_raw g WHERE g.session_id=q.record_id),'[]'::jsonb) raw_points
             FROM osmchange.review_queue q
@@ -501,6 +513,26 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             WHERE q.review_id=? LIMIT 1`, [reviewId]);
           const review = rows[0];
           if (!review) { sendJson(res, 404, { error: "review_not_found" }); return; }
+          if (action === "hold" || action === "memo") {
+            const note = String(body && body.note || "").trim().slice(0, 2000);
+            if (action === "hold") {
+              await pool.query(`UPDATE osmchange.review_queue SET review_status='held',admin_note=?,reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [note, req.authUserId, reviewId]);
+            } else {
+              await pool.query("UPDATE osmchange.review_queue SET admin_note=?,updated_at=NOW() WHERE review_id=?", [note, reviewId]);
+            }
+            await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+              VALUES(?,?,?,?::jsonb)`, [reviewId, action === "hold" ? "held" : "admin_note_saved", req.authUserId, JSON.stringify({ note })]);
+            sendJson(res, 200, { success: true, reviewId, status: action === "hold" ? "held" : review.review_status, osmSent: false }); return;
+          }
+          if (action === "retry-notification") {
+            const [notifications] = await pool.query(`SELECT notification_id,review_id,recipient FROM osmchange.review_notifications
+              WHERE review_id=? ORDER BY created_at DESC LIMIT 1`, [reviewId]);
+            const notification = notifications[0]
+              ? { notificationId: notifications[0].notification_id, reviewId: notifications[0].review_id, recipient: notifications[0].recipient }
+              : await queueNotification(pool, reviewId);
+            const result = await deliverNotification(pool, notification);
+            sendJson(res, result.sent ? 200 : 502, { success: result.sent, reviewId, ...result }); return;
+          }
           if (action === "reject") {
             const reason = String(body && body.reason || "").trim().slice(0, 1000);
             if (!reason) { sendJson(res, 400, { error: "rejection_reason_required" }); return; }
@@ -543,6 +575,12 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           }
           sendJson(res, 404, { error: "review_action_not_found" }); return;
         }
+      }
+
+      if (parts[0] === "api" && parts[1] === "osm" && parts[2] === "review-notifications" && parts[3] === "retry") {
+        if (!(await isReviewAdmin(pool, req.authUserId))) { sendJson(res, 403, { error: "review_admin_required" }); return; }
+        const results = await retryFailedNotifications(pool, 20);
+        sendJson(res, 200, { success: true, attempted: results.length, sent: results.filter(item => item.sent).length }); return;
       }
 
       if (parts[0] === "api" && parts[1] === "osm" && parts[2] === "records" && parts[3]) {

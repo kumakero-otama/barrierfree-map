@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
-const REVIEW_STATES = new Set(["pending", "approved", "rejected", "merge_failed", "merged"]);
+const REVIEW_STATES = new Set(["pending", "held", "approved", "rejected", "merge_failed", "merged"]);
 
 async function ensureReviewSchema(pool) {
   await pool.query(`CREATE TABLE IF NOT EXISTS osmchange.review_queue (
@@ -18,6 +18,10 @@ async function ensureReviewSchema(pool) {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query("ALTER TABLE osmchange.review_queue ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE osmchange.review_queue DROP CONSTRAINT IF EXISTS review_queue_review_status_check");
+  await pool.query(`ALTER TABLE osmchange.review_queue ADD CONSTRAINT review_queue_review_status_check
+    CHECK(review_status IN ('pending','held','approved','rejected','merge_failed','merged'))`);
   await pool.query(`CREATE TABLE IF NOT EXISTS osmchange.review_events (
     event_id BIGSERIAL PRIMARY KEY,
     review_id UUID NOT NULL,
@@ -104,6 +108,21 @@ async function deliverNotification(pool, { notificationId, reviewId, recipient }
   }
 }
 
+async function retryFailedNotifications(pool, limit = 20) {
+  const [rows] = await pool.query(`SELECT notification_id,review_id,recipient
+    FROM osmchange.review_notifications
+    WHERE status IN ('pending','failed') AND attempt_count < 5
+      AND updated_at < NOW() - INTERVAL '5 minutes'
+    ORDER BY updated_at ASC LIMIT ?`, [Math.max(1, Math.min(Number(limit) || 20, 100))]);
+  const results = [];
+  for (const row of rows) results.push(await deliverNotification(pool, {
+    notificationId: row.notification_id,
+    reviewId: row.review_id,
+    recipient: row.recipient,
+  }));
+  return results;
+}
+
 async function isReviewAdmin(pool, userId) {
   const allowed = String(process.env.OSM_REVIEW_ADMIN_EMAIL || "kumakero.otama@gmail.com").trim().toLowerCase();
   const [rows] = await pool.query(`SELECT 1 FROM login.user_auth_providers
@@ -111,4 +130,4 @@ async function isReviewAdmin(pool, userId) {
   return Boolean(rows[0]);
 }
 
-module.exports = { REVIEW_STATES, ensureReviewSchema, enqueueReview, queueNotification, deliverNotification, isReviewAdmin };
+module.exports = { REVIEW_STATES, ensureReviewSchema, enqueueReview, queueNotification, deliverNotification, retryFailedNotifications, isReviewAdmin };
