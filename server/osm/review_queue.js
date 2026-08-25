@@ -71,7 +71,11 @@ async function deliverNotification(pool, { notificationId, reviewId, recipient }
   const host = String(process.env.SMTP_HOST || "smtp.gmail.com");
   const user = String(process.env.SMTP_USER || "");
   const pass = String(process.env.SMTP_PASS || "");
-  const reviewBaseUrl = String(process.env.OSM_REVIEW_URL || "https://stepby-api-8-229-191-182.sslip.io/admin/osm-review.html");
+  const reviewBaseUrl = String(
+    process.env.OSM_REVIEW_URL
+    || process.env.OSM_REVIEW_BASE_URL
+    || "https://kumakero-otama.github.io/StepBy/UI11/admin/osm-review.html"
+  );
   if (!user || !pass) {
     await pool.query(`UPDATE osmchange.review_notifications SET status='failed',attempt_count=attempt_count+1,
       last_error='smtp_not_configured',updated_at=NOW() WHERE notification_id=?`, [notificationId]);
