@@ -60,7 +60,7 @@ async function enqueueReview(conn, { recordId, planId, actorUserId, sourceType =
   const review = rows[0];
   if (!review) throw new Error("review_enqueue_failed");
   await conn.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-    VALUES(?,'queued',?,?::jsonb)`, [review.review_id, actorUserId, JSON.stringify({ recordId, planId, sourceType })]);
+    VALUES(?,'queued',?,?::jsonb) RETURNING event_id AS id`, [review.review_id, actorUserId, JSON.stringify({ recordId, planId, sourceType })]);
   return review;
 }
 
@@ -68,7 +68,7 @@ async function queueNotification(pool, reviewId) {
   const recipient = String(process.env.OSM_REVIEW_ADMIN_EMAIL || "kumakero.otama@gmail.com").trim().toLowerCase();
   const notificationId = crypto.randomUUID();
   await pool.query(`INSERT INTO osmchange.review_notifications(notification_id,review_id,recipient,status)
-    VALUES(?,?,?,'pending')`, [notificationId, reviewId, recipient]);
+    VALUES(?,?,?,'pending') RETURNING notification_id AS id`, [notificationId, reviewId, recipient]);
   return { notificationId, recipient };
 }
 

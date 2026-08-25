@@ -523,7 +523,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               await pool.query("UPDATE osmchange.review_queue SET admin_note=?,updated_at=NOW() WHERE review_id=?", [note, reviewId]);
             }
             await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-              VALUES(?,?,?,?::jsonb)`, [reviewId, action === "hold" ? "held" : "admin_note_saved", req.authUserId, JSON.stringify({ note })]);
+              VALUES(?,?,?,?::jsonb) RETURNING event_id AS id`, [reviewId, action === "hold" ? "held" : "admin_note_saved", req.authUserId, JSON.stringify({ note })]);
             sendJson(res, 200, { success: true, reviewId, status: action === "hold" ? "held" : review.review_status, osmSent: false }); return;
           }
           if (action === "retry-notification") {
@@ -541,14 +541,14 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             await pool.query(`UPDATE osmchange.review_queue SET review_status='rejected',rejection_reason=?,
               reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [reason, req.authUserId, reviewId]);
             await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-              VALUES(?,'rejected',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ reason })]);
+              VALUES(?,'rejected',?,?::jsonb) RETURNING event_id AS id`, [reviewId, req.authUserId, JSON.stringify({ reason })]);
             sendJson(res, 200, { success: true, reviewId, status: "rejected", osmSent: false }); return;
           }
           if (action === "reopen") {
             await pool.query(`UPDATE osmchange.review_queue SET review_status='pending',rejection_reason=NULL,
               reviewer_user_id=NULL,reviewed_at=NULL,updated_at=NOW() WHERE review_id=?`, [reviewId]);
             await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-              VALUES(?,'reopened',?,'{}'::jsonb)`, [reviewId, req.authUserId]);
+              VALUES(?,'reopened',?,'{}'::jsonb) RETURNING event_id AS id`, [reviewId, req.authUserId]);
             sendJson(res, 200, { success: true, reviewId, status: "pending", osmSent: false }); return;
           }
           if (action === "approve") {
@@ -558,7 +558,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             await pool.query(`UPDATE osmchange.review_queue SET review_status='approved',rejection_reason=NULL,
               reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [req.authUserId, reviewId]);
             await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-              VALUES(?,'approved',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ executeRequested: true })]);
+              VALUES(?,'approved',?,?::jsonb) RETURNING event_id AS id`, [reviewId, req.authUserId, JSON.stringify({ executeRequested: true })]);
             if (review.source_type === "legacy_record" && review.source_metadata && review.source_metadata.legacyNeedsRefit) {
               sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false,
                 executionDeferred: true, reason: "legacy_refit_required" }); return;
@@ -570,12 +570,12 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               const result = await withPlanLock(review.plan_id, () => executeUserPlan(req, review, "execute"));
               await pool.query("UPDATE osmchange.review_queue SET review_status='merged',updated_at=NOW() WHERE review_id=?", [reviewId]);
               await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-                VALUES(?,'merged',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ changesetId: result.changesetId || null })]);
+                VALUES(?,'merged',?,?::jsonb) RETURNING event_id AS id`, [reviewId, req.authUserId, JSON.stringify({ changesetId: result.changesetId || null })]);
               sendJson(res, 200, { ...result, reviewId, status: "merged" }); return;
             } catch (executionError) {
               await pool.query("UPDATE osmchange.review_queue SET review_status='merge_failed',updated_at=NOW() WHERE review_id=?", [reviewId]);
               await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-                VALUES(?,'merge_failed',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ error: executionError.message })]);
+                VALUES(?,'merge_failed',?,?::jsonb) RETURNING event_id AS id`, [reviewId, req.authUserId, JSON.stringify({ error: executionError.message })]);
               throw executionError;
             }
           }
