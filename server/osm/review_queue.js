@@ -19,6 +19,7 @@ async function ensureReviewSchema(pool) {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
   await pool.query("ALTER TABLE osmchange.review_queue ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE osmchange.review_queue ADD COLUMN IF NOT EXISTS source_metadata JSONB NOT NULL DEFAULT '{}'::jsonb");
   await pool.query("ALTER TABLE osmchange.review_queue DROP CONSTRAINT IF EXISTS review_queue_review_status_check");
   await pool.query(`ALTER TABLE osmchange.review_queue ADD CONSTRAINT review_queue_review_status_check
     CHECK(review_status IN ('pending','held','approved','rejected','merge_failed','merged'))`);

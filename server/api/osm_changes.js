@@ -490,12 +490,14 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           if (/^\d{4}-\d{2}-\d{2}$/.test(to)) { clauses.push("q.created_at<?::date + INTERVAL '1 day'"); params.push(to); }
           const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
           const [rows] = await pool.query(`SELECT q.review_id,q.record_id,q.plan_id,q.source_type,q.source_record_id,
-              q.review_status,q.rejection_reason,q.admin_note,q.created_at,q.reviewed_at,u.username,
-              ST_AsGeoJSON(p.geom::geometry) path_geojson,cp.elements,cp.client_context,
+              q.review_status,q.rejection_reason,q.admin_note,q.source_metadata,q.created_at,q.reviewed_at,
+              COALESCE(q.source_metadata->>'username',u.username) username,
+              COALESCE(ST_AsGeoJSON(p.geom::geometry),q.source_metadata->>'pathGeoJson') path_geojson,cp.elements,cp.client_context,
               (SELECT details->>'error' FROM osmchange.review_events re WHERE re.review_id=q.review_id AND re.event_type='merge_failed' ORDER BY re.event_id DESC LIMIT 1) last_error,
               (SELECT status FROM osmchange.review_notifications rn WHERE rn.review_id=q.review_id ORDER BY rn.created_at DESC LIMIT 1) notification_status,
               COALESCE((SELECT jsonb_agg(jsonb_build_object('lat',ST_Y(g.geom::geometry),'lng',ST_X(g.geom::geometry),
-                'accuracy',g.accuracy,'ts',g.ts) ORDER BY g.ts) FROM tactile.gps_raw g WHERE g.session_id=q.record_id),'[]'::jsonb) raw_points
+                'accuracy',g.accuracy,'ts',g.ts) ORDER BY g.ts) FROM tactile.gps_raw g WHERE g.session_id=q.record_id),
+                q.source_metadata->'rawPoints','[]'::jsonb) raw_points
             FROM osmchange.review_queue q
             JOIN osmchange.change_plans cp ON cp.plan_id=q.plan_id
             LEFT JOIN tactile.sessions s ON s.session_id=q.record_id
@@ -557,6 +559,10 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [req.authUserId, reviewId]);
             await pool.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
               VALUES(?,'approved',?,?::jsonb)`, [reviewId, req.authUserId, JSON.stringify({ executeRequested: true })]);
+            if (review.source_type === "legacy_record" && review.source_metadata && review.source_metadata.legacyNeedsRefit) {
+              sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false,
+                executionDeferred: true, reason: "legacy_refit_required" }); return;
+            }
             if (!(await writesEnabled())) {
               sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false, executionDeferred: true }); return;
             }
