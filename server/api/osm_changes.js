@@ -483,7 +483,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           const sourceType = String(url.searchParams.get("source") || "all");
           if (["new_record", "legacy_record"].includes(sourceType)) { clauses.push("q.source_type=?"); params.push(sourceType); }
           const query = String(url.searchParams.get("q") || "").trim().slice(0, 100);
-          if (query) { clauses.push("(LOWER(COALESCE(u.username,'')) LIKE ? OR CAST(q.record_id AS TEXT) LIKE ? OR COALESCE(q.source_record_id,'') LIKE ?)"); const like = `%${query.toLowerCase()}%`; params.push(like, like, like); }
+          if (query) { clauses.push("(LOWER(COALESCE(q.source_metadata->>'username',u.username,'')) LIKE ? OR CAST(q.record_id AS TEXT) LIKE ? OR COALESCE(q.source_record_id,'') LIKE ?)"); const like = `%${query.toLowerCase()}%`; params.push(like, like, like); }
           const from = String(url.searchParams.get("from") || "");
           const to = String(url.searchParams.get("to") || "");
           if (/^\d{4}-\d{2}-\d{2}$/.test(from)) { clauses.push("q.created_at>=?::date"); params.push(from); }
@@ -503,8 +503,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             LEFT JOIN tactile.sessions s ON s.session_id=q.record_id
             LEFT JOIN login.users u ON u.user_id=s.user_id
             LEFT JOIN tactile.session_paths p ON p.session_id=q.record_id
-            ${where} ORDER BY q.created_at DESC LIMIT 200`, params);
-          sendJson(res, 200, { success: true, reviews: rows }); return;
+            ${where} ORDER BY q.created_at DESC LIMIT 500`, params);
+          sendJson(res, 200, { success: true, reviews: rows, count: rows.length }); return;
         }
         if (req.method === "POST" && parts[3]) {
           const reviewId = decodeURIComponent(parts[3]);

@@ -474,6 +474,8 @@
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">既存データの件数・品質・重複・公開可否を調査する</span><span class="note">完了。本番DBを読み取り専用で集計し、328記録、raw 7,344点、Valhalla経路276件、完全重複経路0件を確認。rawなし6件、経路なし52件、孤立raw/matched各3点、旧rawのaccuracy全件未保存を品質課題として記録した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">完了。経路を持つ276件を一次候補とし、無効記録・形状異常・現在OSMとの重複・再フィッティング不成立を除外する手順を <a href="documents/existing-data-migration-audit.md">移行監査文書</a> に整理した。候補ごとの実変更案はコミュニティ確認後に生成し、自動一括送信しない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">旧328記録を審査用クラウドDBへ取り込む</span><span class="note">2026-08-25完了。旧本番DBをREAD ONLYで抽出し、確認待ち218件、保留106件、ゲスト非公開4件に分類。元DBへの書込み・OSM送信は0件。管理画面では航空写真とOSMを並べ、1件ずつ公開／非公開を選べる。</span></div></li>
+              <li><span class="box"></span><div><span class="task-title">旧記録218件を管理者が確認する</span><span class="note"><code>kumakero.otama@gmail.com</code> でログインし、「OSMへ公開する／公開しない」を選ぶ。承認後は現在OSMで変更案を再作成してから送信する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">コミュニティ確認と明示許可後、少量ずつマージする</span><span class="note">全件のchangeset・Way・結果を監査履歴へ保存する。</span></div></li>
             </ul>
           </article>

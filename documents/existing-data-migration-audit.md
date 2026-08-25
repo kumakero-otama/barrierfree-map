@@ -1,10 +1,10 @@
 # StepBy既存点字ブロックデータ移行監査
 
-更新日: 2026-08-13
+更新日: 2026-08-25
 
 ## 結論
 
-現行PostgreSQLは読み取り専用トランザクションで調査しました。既存データを一括してOSMへ送ることはできません。経路を持つ276記録を移行候補とし、品質上の問題がある記録を除外した確認一覧を作ってから、OSMコミュニティへの事前相談と管理者の1回ごとの明示許可を経て少量ずつ扱います。
+現行PostgreSQLは読み取り専用トランザクションで調査・抽出しました。対象期間の328記録はクラウド審査キューへ取込済みで、元DBへの書込みとOSM送信は行っていません。自動分類は確認待ち218件、保留106件、ゲスト非公開4件です。管理者が航空写真とOSMを並べて1件ずつ判断し、承認記録だけを現在OSMで再処理して扱います。
 
 ## 集計結果
 
@@ -48,4 +48,3 @@
 
 - [OSM Import Guidelines](https://wiki.openstreetmap.org/wiki/Import/Guidelines)
 - [Automated Edits code of conduct](https://wiki.openstreetmap.org/wiki/Automated_Edits/Code_of_Conduct)
-
