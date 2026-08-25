@@ -1590,7 +1590,11 @@ paths:
       parameters:
         - in: query
           name: status
-          schema: { type: string, enum: [pending, approved, rejected, merge_failed, merged, all] }
+          schema: { type: string, enum: [pending, held, approved, rejected, merge_failed, merged, all] }
+        - { in: query, name: source, schema: { type: string, enum: [new_record, legacy_record, all] } }
+        - { in: query, name: q, schema: { type: string, maxLength: 100 } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
       responses:
         '200': { description: 審査一覧、GPS生座標、経路、OSM変更案 }
         '403': { description: review_admin_required }
@@ -1625,6 +1629,33 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200': { description: 確認待ちへ復帰 }
+  /api/osm/reviews/{reviewId}/hold:
+    post:
+      summary: 管理者メモとともに審査を保留
+      parameters:
+        - { in: path, name: reviewId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 保留済み。OSM送信なし }
+  /api/osm/reviews/{reviewId}/memo:
+    post:
+      summary: 審査状態を変えず管理者メモを保存
+      parameters:
+        - { in: path, name: reviewId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: メモ保存済み }
+  /api/osm/reviews/{reviewId}/retry-notification:
+    post:
+      summary: 指定記録の管理者通知を再送
+      parameters:
+        - { in: path, name: reviewId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 通知送信成功 }
+        '502': { description: 通知送信失敗。記録保存には影響しない }
+  /api/osm/review-notifications/retry:
+    post:
+      summary: 失敗・未送信の審査通知を再試行
+      responses:
+        '200': { description: 再試行件数と成功件数 }
 
 components:
   securitySchemes:

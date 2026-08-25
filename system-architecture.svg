@@ -14,7 +14,7 @@
   </defs>
   <rect width="1600" height="1000" fill="#fff"/>
   <text x="55" y="55" class="title">StepBy 現在のシステム構成</text>
-  <text x="55" y="83" class="subtitle">2026年8月24日時点　UI11でOSM公開前の管理者審査を実装　緑＝StepBy／Google Cloud　橙＝外部サービス</text>
+  <text x="55" y="83" class="subtitle">2026年8月25日時点　UI11でOSM公開前の管理者審査・メール通知を実装　緑＝StepBy／Google Cloud　橙＝外部サービス</text>
 
   <!-- top services -->
   <rect x="55" y="125" width="300" height="130" rx="20" class="card" filter="url(#shadow)"/>
@@ -33,7 +33,7 @@
   <rect x="1050" y="125" width="235" height="130" rx="20" class="external" filter="url(#shadow)"/>
   <text x="1167" y="169" text-anchor="middle" class="boxTitle">Google Identity</text>
   <text x="1167" y="198" text-anchor="middle" class="body">StepByログイン</text>
-  <text x="1167" y="224" text-anchor="middle" class="small">OpenID Connect／管理者照合／Gmail通知</text>
+  <text x="1167" y="224" text-anchor="middle" class="small">OpenID Connect／管理者照合／StepBy専用Gmail通知</text>
 
   <rect x="1325" y="125" width="220" height="130" rx="20" class="external" filter="url(#shadow)"/>
   <text x="1435" y="169" text-anchor="middle" class="boxTitle">OpenStreetMap</text>
@@ -59,7 +59,7 @@
   <rect x="425" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="548" text-anchor="middle" class="body">認証・プロフィール</text><text x="545" y="570" text-anchor="middle" class="small">利用者はGoogle認証のみ</text>
   <rect x="680" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="548" text-anchor="middle" class="body">記録・タグAPI</text><text x="800" y="570" text-anchor="middle" class="small">raw・PRO・道情報</text>
   <rect x="425" y="606" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="632" text-anchor="middle" class="body">OSM変更API</text><text x="545" y="654" text-anchor="middle" class="small">分割・公開・取消し</text>
-  <rect x="680" y="606" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="632" text-anchor="middle" class="body">審査・安全API</text><text x="800" y="654" text-anchor="middle" class="small">承認・却下・監査・競合停止</text>
+  <rect x="680" y="606" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="632" text-anchor="middle" class="body">審査・安全API</text><text x="800" y="654" text-anchor="middle" class="small">承認・保留・却下・監査・競合停止</text>
 
   <rect x="1010" y="445" width="300" height="145" rx="18" class="db"/>
   <text x="1160" y="480" text-anchor="middle" class="boxTitle">PostgreSQL 16</text>

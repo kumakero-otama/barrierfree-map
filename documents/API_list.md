@@ -446,10 +446,14 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 - 主なレスポンス:
   - `200`: `ok`, `user`
   - `400`, `401`, `403` (`guest_profile_locked`), `404`, `405`, `500`
-# OSM公開審査API（2026-08-24追加）
+# OSM公開審査API（2026-08-25更新）
 
-- `GET /api/osm/reviews?status=pending`: 管理者のGoogleメールを確認し、審査対象とGPS・経路・変更案を取得
+- `GET /api/osm/reviews?status=pending&source=all&q=&from=&to=`: 管理者のGoogleメールを確認し、状態・新規／既存・記録者／ID・期間で絞り込んだ審査対象とGPS・経路・変更案を取得
 - `POST /api/osm/reviews/:reviewId/approve`: 承認を追記監査へ保存し、安全条件が揃う場合だけOSMへ送信
 - `POST /api/osm/reviews/:reviewId/reject`: 却下理由を保存。OSM送信なし
+- `POST /api/osm/reviews/:reviewId/hold`: 管理者メモとともに保留
+- `POST /api/osm/reviews/:reviewId/memo`: 審査状態を変えず管理者メモを保存
 - `POST /api/osm/reviews/:reviewId/reopen`: 却下記録を確認待ちへ戻す
+- `POST /api/osm/reviews/:reviewId/retry-notification`: その記録の審査通知を再送
+- `POST /api/osm/review-notifications/retry`: 失敗・未送信の通知を最大20件再試行
 - `POST /api/osm/records/:recordId/publish`: 一般利用者からの即時送信は `administrator_review_required` で拒否

@@ -1,6 +1,6 @@
 # OSM公開前審査
 
-更新日: 2026-08-24
+更新日: 2026-08-25
 
 ## 目的
 
@@ -20,6 +20,7 @@ Google認証メールが `kumakero.otama@gmail.com` と一致するStepByユー�
 ## 状態
 
 - `pending`: 確認待ち
+- `held`: 管理者が判断を保留。管理者メモを保存可能
 - `approved`: 管理者承認済みだが安全条件または機能フラグにより未送信
 - `rejected`: 却下。理由を保存し再審査可能
 - `merge_failed`: 送信失敗。履歴を残して再試行可能
@@ -29,7 +30,7 @@ Google認証メールが `kumakero.otama@gmail.com` と一致するStepByユー�
 
 ## 通知
 
-審査待ち1件ごとに `kumakero.otama@gmail.com` へ送ります。Gmail SMTPの資格情報はSecret Managerから環境変数へ注入し、Gitには保存しません。通知失敗は記録保存を失敗させず、通知だけを `failed` として残します。
+審査待ち1件ごとにStepBy専用Gmailから `kumakero.otama@gmail.com` へ送ります。Gmail SMTPの資格情報はSecret Managerから環境変数へ注入し、Gitには保存しません。通知失敗は記録保存を失敗させず、通知だけを `failed` として残し、管理画面から個別または一括で再送できます。2026年8月25日にSMTP認証と実メール送信を確認済みです。
 
 ## 安全条件
 
@@ -37,8 +38,8 @@ Google認証メールが `kumakero.otama@gmail.com` と一致するStepByユー�
 
 ## 管理画面
 
-- GitHub Pages候補: `UI11/admin/osm-review.html`
+- GitHub Pages: `UI11/admin/osm-review.html`
 - API同一Origin版: `/admin/osm-review.html`
 - 航空写真: 国土地理院シームレス空中写真
 - 半透明のOSM地図、GPS生座標、保存経路、変更対象を重ねて表示
-
+- 記録者・記録ID検索、期間・新規／既存・状態の絞り込み、保留、管理者メモ、却下理由、通知再送、送信失敗理由を提供
