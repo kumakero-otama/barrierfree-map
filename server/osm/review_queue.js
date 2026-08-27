@@ -54,7 +54,7 @@ async function enqueueReview(conn, { recordId, planId, actorUserId, sourceType =
   const reviewId = crypto.randomUUID();
   await conn.query(`INSERT INTO osmchange.review_queue
     (review_id,record_id,plan_id,source_type,source_record_id)
-    VALUES(?,?,?,?,?) ON CONFLICT(record_id) DO NOTHING`,
+    VALUES(?,?,?,?,?) ON CONFLICT(record_id) DO NOTHING RETURNING review_id AS id`,
   [reviewId, recordId, planId, sourceType, sourceRecordId]);
   const [rows] = await conn.query("SELECT review_id,review_status FROM osmchange.review_queue WHERE record_id=? LIMIT 1", [recordId]);
   const review = rows[0];
