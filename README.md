@@ -1,6 +1,6 @@
 # StepBy backend (`barrierfree-map`)
 
-StepBy UI10のバックエンド実装です。現在の開発・クラウド版は、このリポジトリの`dev`ブランチを基準にしています。
+StepBy UI11のバックエンド実装です。現在の開発・クラウド版は、このリポジトリの`dev`ブランチを基準にしています。
 
 ## 現在の構成
 
@@ -32,9 +32,10 @@ StepBy UI10のバックエンド実装です。現在の開発・クラウド版
 
 ## Node.jsライブラリ
 
-直接依存は次の3つです。間接依存を含む固定バージョンは`package-lock.json`に記録されています。
+直接依存は次の4つです。間接依存を含む固定バージョンは`package-lock.json`に記録されています。
 
 - `google-auth-library`: Google IDトークン検証
+- `nodemailer`: 管理者への公開確認メール送信
 - `pg`: PostgreSQL接続
 - `yaml`: DB設定ファイル読込み
 
@@ -71,7 +72,7 @@ npm start
 OSMへ接続しない単体テストは次のように実行できます。
 
 ```bash
-for file in test/*.test.js; do node "$file"; done
+npm test
 ```
 
 `*.integration.js`は専用テストDBとローカル秘密設定を必要とします。本番DBや本番OSMをテスト先にしないでください。

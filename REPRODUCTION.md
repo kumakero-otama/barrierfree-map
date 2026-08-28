@@ -1,8 +1,8 @@
 # StepByバックエンド再現手順
 
-最終確認日: 2026-08-18
+最終確認日: 2026-08-29
 
-この文書は、`barrierfree-map`の`dev`ブランチから、UI10用バックエンドを新しい環境へ再構築するための手順です。実在ユーザーのデータや本番OSMへの書込みは、再現条件に含めません。新規環境ではOSM書込みを無効にして開始します。
+この文書は、`barrierfree-map`の`dev`ブランチから、UI11用バックエンドを新しい環境へ再構築するための手順です。実在ユーザーのデータや本番OSMへの書込みは、再現条件に含めません。新規環境ではOSM書込みを無効にして開始します。
 
 ## 1. 対象ソース
 
@@ -14,7 +14,7 @@ git rev-parse HEAD
 
 提出時に`dev`を`main`へ昇格した場合は、`--branch main`へ置き換えます。再現結果には使用したcommit IDを記録してください。
 
-フロントエンドは別リポジトリ[`StepBy`](https://github.com/kumakero-otama/StepBy)のUI10です。
+フロントエンドは別リポジトリ[`StepBy`](https://github.com/kumakero-otama/StepBy)のUI11です。
 
 ## 2. 確認済み動作環境
 
@@ -32,6 +32,7 @@ git rev-parse HEAD
 Node.jsの直接依存:
 
 - `google-auth-library` 10系
+- `nodemailer` 9系
 - `pg` 8系
 - `yaml` 2系
 

@@ -1,6 +1,6 @@
 # server ディレクトリ構成
 
-> **現行UI10について:** この文書のMapbox・Valhalla節は旧APIと診断互換の説明です。通常のUI10はブラウザ内JavaScriptでフィッティングします。現行APIの正は[`../documents/API_list.md`](../documents/API_list.md)と[`../public/docs/openapi.yaml`](../public/docs/openapi.yaml)です。
+> **現行UI11について:** Valhalla節は旧APIとの診断互換を説明しています。通常のUI11はブラウザ内JavaScriptでフィッティングします。現行APIの正は[`../documents/API_list.md`](../documents/API_list.md)と[`../public/docs/openapi.yaml`](../public/docs/openapi.yaml)です。
 
 このディレクトリは、HTTPサーバー本体（`server.js`）から呼び出されるバックエンド処理を実装しています。  
 ここでは `server/` 配下の各ファイルが何をしているかを、実装ベースで具体的に説明します。
@@ -11,7 +11,7 @@
 - DBアクセスは `server/db.js` の互換ラッパー経由で実行されます。
 - ログは `server/logger.js` のCSVロガーで `logs/*.csv` に追記されます。
 - API仕様書（OpenAPI）は `public/docs/openapi.yaml` に配置されています。
-- Swagger UI は `https://barrierfree-map.loophole.site/docs/index.html`で閲覧できます。
+- Swagger UI は起動したAPIの `/docs/index.html` で閲覧できます。
 
 ---
 
@@ -96,7 +96,7 @@
   - 通常取得は不要
   - `mine=1` 指定時のみ Bearer または session Cookie が必要
 
-### `server/api/match_valhalla.js`（現行で使用）
+### `server/api/match_valhalla.js`（診断互換）
 - エンドポイント: `GET /api/match`
 - 主な役割:
   - Valhalla `/locate` に座標を投げてスナップ位置を取得
@@ -168,13 +168,6 @@
   - session Cookie の発行/削除（互換運用）
   - `login.*` スキーマのユーザー/セッション管理
   - アイコン画像保存（`/uploads/user_icons/`）
-
-### `server/api/match_mapbox.js`（現在未使用）
-- 旧方式の `/api/match` 実装（Mapbox Matching API版）です。
-- `server.js` は現在 `match_valhalla.js` を使用しているため、通常運用では呼ばれません。
-- 互換・比較用として残されています。
-
----
 
 ## メンテ時の見る順番（推奨）
 
