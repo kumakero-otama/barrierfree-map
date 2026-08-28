@@ -4,7 +4,7 @@
 
 ## 再現用SQL
 
-完全なスキーマ定義は[`database/schema.sql`](database/schema.sql)です。2026-08-18に稼働中の開発DBから、データ・所有者・権限を含めず`pg_dump --schema-only --no-owner --no-acl`で生成しました。
+完全なスキーマ定義は[`database/schema.sql`](../database/schema.sql)です。2026-08-18に稼働中の開発DBから、データ・所有者・権限を含めず`pg_dump --schema-only --no-owner --no-acl`で生成しました。
 
 ```bash
 createdb --owner=stepby_dev stepby_app_dev
@@ -74,6 +74,6 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 
 ## スキーマ更新
 
-既存DBへ変更を加える場合は`migrations/`へPostgreSQL用SQLを追加します。過去の`migrations/001_add_session_uuid.sql`は旧MariaDB用の履歴資料であり、現行DBへ実行しません。新規環境には常に`database/schema.sql`を使用してください。
+既存DBへ変更を加える場合は`migrations/`へPostgreSQL用SQLを追加します。新規環境には常に[`../database/schema.sql`](../database/schema.sql)を使用してください。旧MariaDB用SQLは現行ツリーから削除しており、必要な場合だけGit履歴を参照します。
 
 個人情報や実記録を含むDBダンプはGitへ追加しないでください。

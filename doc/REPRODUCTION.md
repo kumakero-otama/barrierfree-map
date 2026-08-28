@@ -223,7 +223,7 @@ sudo systemctl enable --now stepby-health-observation.timer
 
 OSM送信を使わない再現試験では、この作業は不要です。
 
-運用環境では、管理画面からStepBy専用OSMアカウントのOAuth 2.0＋PKCE認証を行います。一般利用者の個人OSMアカウントは使用しません。書込みを有効化する前に[`documents/osm_change_api.md`](documents/osm_change_api.md)の安全条件とコミュニティ手続をすべて満たしてください。
+運用環境では、管理画面からStepBy専用OSMアカウントのOAuth 2.0＋PKCE認証を行います。一般利用者の個人OSMアカウントは使用しません。書込みを有効化する前に[`osm_change_api.md`](osm_change_api.md)の安全条件とコミュニティ手続をすべて満たしてください。
 
 ## 14. 動作確認
 

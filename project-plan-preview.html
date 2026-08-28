@@ -247,22 +247,22 @@
         <b>現行仕様MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="REPRODUCTION.md" download>
+      <a class="report-link" href="doc/REPRODUCTION.md" download>
         <span>GCE、Node.js、PostgreSQL＋PostGIS、Caddy、systemd、Secret Manager、Cloud Storageを使ったバックエンド再現手順です。</span>
         <b>バックエンド再現手順MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="FRONTEND_REPRODUCTION.md" download>
+      <a class="report-link" href="https://github.com/kumakero-otama/StepBy/blob/main/UI11/README.md" download>
         <span>提出候補のUI10を基準にしたフロントエンドの構成、ローカル再現、テスト、UI0への正式昇格手順です。</span>
         <b>フロントエンド再現手順MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="documents/existing-data-migration-audit.md" download>
+      <a class="report-link" href="doc/existing-data-migration-audit.md" download>
         <span>現行DBの328記録を読み取り専用で棚卸しし、既存データ移行の候補・除外条件・安全手順をまとめています。</span>
         <b>既存データ移行監査MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="documents/osm-community-consultation-draft.md" download>
+      <a class="report-link" href="doc/osm-community-consultation-draft.md" download>
         <span>相談済みのStepBy編集方式と、相談時に用いた内容を保存した文書です。</span>
         <b>コミュニティ相談文案MDをダウンロード ↓</b>
       </a>
@@ -272,7 +272,7 @@
         <b>クラウド管理・監視画面を開く →</b>
       </a>
 
-      <a class="report-link" href="documents/cloud-incident-and-rollback-runbook.md" download>
+      <a class="report-link" href="doc/cloud-incident-and-rollback-runbook.md" download>
         <span>API、DB、HTTPS、OSM連携などの障害切り分けと、安全な切戻し・復旧確認をまとめています。</span>
         <b>障害対応・切戻し手順MDをダウンロード ↓</b>
       </a>
@@ -437,7 +437,7 @@
               <li class="done"><span class="box"></span><div><span class="task-title">重複操作と既存点字ブロックへの安全性を確認する</span><span class="note">完了。記録キュー再送とサーバーの記録単位ロック・冪等応答を再試験した。さらに既存の <code>tactile_paving=yes</code> または左右点字タグがあるWayでは、不要な分割案を作らず <code>tactile_tag_already_present</code> で停止するガードを追加し、クラウドへ反映した。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSM取消し前の第三者編集と部分競合を確認する</span><span class="note">完了。WayのVersionが8から9へ変わった第三者編集をモックで再現し、Version競合時はchangeset作成前に停止し、uploadを一度も呼ばず第三者変更を上書きしないことを確認した。本番OSMへのテスト送信は行っていない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">クラウドの管理・監視画面を整備する</span><span class="note">完了。API・PostgreSQL・Caddy・バックアップ、ディスク、メモリ、API応答、重大エラー、記録件数、OSM成功・失敗・競合・取消しを1画面で確認できる管理APIと画面を追加した。管理者セッションが必要で、秘密情報は表示しない。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">障害対応と切戻し手順を文書化する</span><span class="note">完了。API・DB・HTTPS・容量・OSM OAuth/API・Overpass障害の切り分け、OSM送信停止、アプリ版切戻し、DB復元、復旧完了条件を <a href="documents/cloud-incident-and-rollback-runbook.md">障害対応・切戻し手順</a> に整理した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">障害対応と切戻し手順を文書化する</span><span class="note">完了。API・DB・HTTPS・容量・OSM OAuth/API・Overpass障害の切り分け、OSM送信停止、アプリ版切戻し、DB復元、復旧完了条件を <a href="doc/cloud-incident-and-rollback-runbook.md">障害対応・切戻し手順</a> に整理した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">切戻し可能な並行稼働期間を完了する</span><span class="note">クラウド側の保存を正とする時点を明示し、旧開発環境を読み取り専用化。バックアップと復旧手順を再確認してから正式移行を判定する。</span></div></li>
             </ul>
           </article>
@@ -473,7 +473,7 @@
             <h3>6-1. 既存データをOSMへ移す</h3>
             <ul class="tasks">
               <li class="done"><span class="box"></span><div><span class="task-title">既存データの件数・品質・重複・公開可否を調査する</span><span class="note">完了。本番DBを読み取り専用で集計し、328記録、raw 7,344点、Valhalla経路276件、完全重複経路0件を確認。rawなし6件、経路なし52件、孤立raw/matched各3点、旧rawのaccuracy全件未保存を品質課題として記録した。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">完了。経路を持つ276件を一次候補とし、無効記録・形状異常・現在OSMとの重複・再フィッティング不成立を除外する手順を <a href="documents/existing-data-migration-audit.md">移行監査文書</a> に整理した。候補ごとの実変更案はコミュニティ確認後に生成し、自動一括送信しない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">移行専用の変更案と確認一覧を作る</span><span class="note">完了。経路を持つ276件を一次候補とし、無効記録・形状異常・現在OSMとの重複・再フィッティング不成立を除外する手順を <a href="doc/existing-data-migration-audit.md">移行監査文書</a> に整理した。候補ごとの実変更案はコミュニティ確認後に生成し、自動一括送信しない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">旧328記録を審査用クラウドDBへ取り込む</span><span class="note">2026-08-25完了。旧本番DBをREAD ONLYで抽出し、確認待ち218件、保留106件、ゲスト非公開4件に分類。元DBへの書込み・OSM送信は0件。管理画面では航空写真とOSMを並べ、1件ずつ公開／非公開を選べる。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">旧記録218件を管理者が確認する</span><span class="note"><code>kumakero.otama@gmail.com</code> でログインし、「OSMへ公開する／公開しない」を選ぶ。承認後は現在OSMで変更案を再作成してから送信する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">コミュニティ確認と明示許可後、少量ずつマージする</span><span class="note">全件のchangeset・Way・結果を監査履歴へ保存する。</span></div></li>
@@ -571,7 +571,7 @@
               <li class="done"><span class="box"></span><div><span class="task-title">OSM開発環境で編集テストを実施する</span><span class="note">完了。開発OSMでWay作成・分割・タグ・changeset説明・ID返却・取消しによる完全復元を確認した。Relation、競合、再送、権限エラーはモック自動試験で補完し、本番OSMへ架空テストデータは送っていない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">OSMコミュニティへ方式を確認する</span><span class="note">完了。タグ付け、StepBy由来の表現、支援型編集・大量編集の運用について相談済み。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">限定利用から段階的に切り替える</span><span class="note">開発者、協力者、一部利用者、標準利用の順に拡大。低信頼・データ不足・処理失敗時はValhallaへ自動退避。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">完了。本番DBを読み取り専用で棚卸しし、276経路を一次候補とする品質・重複・再フィッティング・コミュニティ相談・少量移行の順序を <a href="documents/existing-data-migration-audit.md">監査文書</a> に整理した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">既存データ移行用の別タスクリストを作成する</span><span class="note">完了。本番DBを読み取り専用で棚卸しし、276経路を一次候補とする品質・重複・再フィッティング・コミュニティ相談・少量移行の順序を <a href="doc/existing-data-migration-audit.md">監査文書</a> に整理した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">既存の点字ブロックデータをOSMへマージする</span><span class="note">新規データ用機能の安定稼働とコミュニティ確認後、結果を確認しながら段階的に実行。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">新バージョンのValhalla依存を解消する</span><span class="note">完了。UI10一般処理はOSMブラウザフィッターだけを使用し、Valhalla呼出しと比較表示は通常画面から除外した。現行UI0と現行Valhallaは停止せず並行稼働している。</span></div></li>
             </ul>
@@ -642,7 +642,7 @@
               <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成し、Tailscale版とGitHub Pages版へ公開。見出し・段落・箇条書きを整形して表示する。Google認証ユーザーの同意欄はログイン画面ではなく、初回プロフィール登録画面の「画像を選ぶ」と「登録」の間に配置した。ゲスト登録時も確認を必須とし、APIは未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。devブランチ全体はmainへマージせず、GitHub Pages公開用にUI10だけをmainへ同期している。UI0とバックエンド本番系には未反映。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">開発APIを監査し一覧を公開する</span><span class="note">Google認証、記録、ブラウザフィッティング、StepBy専用OSMアカウント、変更案、記録単位の送信・取消し、追記監査を一覧化。保存直前の最新Way取得、公開／本人限定タグ分離、所有者確認、冪等性、Version競合停止を実装・試験済み。<a href="api-catalog.html">API一覧を見る</a></span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">第三者向けバックエンド再現資料を整備する</span><span class="note">2026-08-18完了。旧Mapbox・PM2・MariaDB前提の主要MDをGCE、Node.js、PostgreSQL＋PostGIS、Caddy、systemd、Secret Manager、Cloud Storage構成へ更新。稼働開発DBからデータを含まないスキーマSQLを生成し、空の一時DBへ39テーブル・8監査トリガーを再構築できることを確認した。必要ライブラリ、秘密設定名、GCE構築、DB初期化、バックアップ、確認手順を<code>REPRODUCTION.md</code>へ集約。VM再起動相当で<code>/run</code>が空でもSecret Managerから設定を再生成してAPIが起動することも確認した。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">第三者向けUI10フロントエンド資料を整備する</span><span class="note">2026-08-18完了。UI10を提出候補・機能基準として、GCE API、ブラウザフィッティング、1km/650m/10kmの範囲分離、StepBy専用OSMアカウント、永続送信キュー、PRO情報の公開範囲を文書化。loophole、UI0基準、通常Valhalla処理などの旧資料には履歴表示を付けた。ローカル再現とUI10からUI0への正式昇格手順を<code>FRONTEND_REPRODUCTION.md</code>へまとめ、OpenAPIをバックエンドdev版へ同期し、自動テスト14件の成功を確認した。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">第三者向けUI11フロントエンド資料を整備する</span><span class="note">完了。UI11の構成、ブラウザフィッティング、公開範囲、ローカル確認、テスト方法をフロントエンドリポジトリの<code>UI11/README.md</code>へ集約した。旧UI10移行途中の資料はGit履歴へ移し、現行ツリーには残さない。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">UI4デザインをUI11へ安全に移植する</span><span class="note">2026-08-19完了。UI4は読み取り専用、UI10はコピー元として変更せず、UI10をUI11へ複製した。認証・記録・OSM処理・画面構成を維持したまま、UI4の配色、最大480pxのモバイルシェル、ヘッダー、カード、フォーム、ボタンのデザインを独立CSSへ移植。UI11専用のパス・PWA scope・Service Workerキャッシュへ分離し、自動テストとスマートフォン画面の表示確認に合格。確認済みコミットだけをmainへ昇格し、GitHub Pagesで公開した。UI4・UI10・UI0は変更していない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">UI1へ移行する</span><span class="note">対象範囲と完了条件を先に確定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡する</span><span class="note">状況を伝え、無理のない範囲で協力可能か確認。</span></div></li>

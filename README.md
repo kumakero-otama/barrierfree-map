@@ -17,18 +17,18 @@ StepBy UI11のバックエンド実装です。現在の開発・クラウド版
 
 ## 再現に必要な情報
 
-第三者が新しい環境を構築する場合は、最初に[`REPRODUCTION.md`](REPRODUCTION.md)を参照してください。
+第三者が新しい環境を構築する場合は、最初に[`doc/REPRODUCTION.md`](doc/REPRODUCTION.md)を参照してください。
 
 - Node.js依存関係: [`package.json`](package.json)、[`package-lock.json`](package-lock.json)
 - PostgreSQLスキーマ: [`database/schema.sql`](database/schema.sql)
-- DB概要: [`TABLE_DDL.md`](TABLE_DDL.md)
-- ローカル開発: [`DEVELOPMENT.md`](DEVELOPMENT.md)
+- DB概要: [`doc/TABLE_DDL.md`](doc/TABLE_DDL.md)
+- ローカル開発: [`doc/DEVELOPMENT.md`](doc/DEVELOPMENT.md)
 - GCE/Caddy/systemd/バックアップ: [`cloud/`](cloud/)
 - 設定例: [`.env.example`](.env.example)、[`config.dev.example.yaml`](config.dev.example.yaml)
-- API一覧: [`documents/API_list.md`](documents/API_list.md)、[`public/docs/openapi.yaml`](public/docs/openapi.yaml)
-- OSM処理と安全条件: [`documents/osm_change_api.md`](documents/osm_change_api.md)
-- 現行仕様: [`documents/stepby-current-spec-and-tasks.md`](documents/stepby-current-spec-and-tasks.md)
-- 文書索引: [`documents/README.md`](documents/README.md)
+- API一覧: [`doc/API_list.md`](doc/API_list.md)、[`public/docs/openapi.yaml`](public/docs/openapi.yaml)
+- OSM処理と安全条件: [`doc/osm_change_api.md`](doc/osm_change_api.md)
+- 現行仕様: [`doc/stepby-current-spec-and-tasks.md`](doc/stepby-current-spec-and-tasks.md)
+- 文書索引: [`doc/README.md`](doc/README.md)
 
 ## Node.jsライブラリ
 

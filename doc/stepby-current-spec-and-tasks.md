@@ -214,7 +214,7 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 
 ## 12. 主要リンク
 
-- [バックエンド再現手順](../REPRODUCTION.md)
+- [バックエンド再現手順](REPRODUCTION.md)
 - [PostgreSQL再現用スキーマ](../database/schema.sql)
 - [文書索引](README.md)
 - [タスクリスト](https://barrierfree-map.tail5de5e1.ts.net/project-plan-preview.html)

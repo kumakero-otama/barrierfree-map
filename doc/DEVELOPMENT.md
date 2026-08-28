@@ -1,6 +1,6 @@
 # StepByバックエンド開発ガイド
 
-この文書はUI10用バックエンドのローカル開発手順です。旧Mapbox・PM2・MariaDB構成は対象外です。クラウドを一から再現する場合は[`REPRODUCTION.md`](REPRODUCTION.md)を使用してください。
+この文書はUI11用バックエンドのローカル開発手順です。旧Mapbox・PM2・MariaDB構成は対象外です。クラウドを一から再現する場合は[`REPRODUCTION.md`](REPRODUCTION.md)を使用してください。
 
 ## 必要なソフトウェア
 
@@ -86,7 +86,7 @@ UI10は別リポジトリ`StepBy`にあります。GitHub Pages以外のロー�
 - 送信前に追記監査、所有者、冪等性、最新Versionを確認
 - 非公開PROタグとひとことメモをOSM payloadへ含めない
 
-詳細は[`documents/osm_change_api.md`](documents/osm_change_api.md)を参照してください。
+詳細は[`osm_change_api.md`](osm_change_api.md)を参照してください。
 
 ## 7. テスト
 
@@ -103,6 +103,6 @@ for file in test/*.test.js; do node "$file"; done
 - `README.md`
 - `REPRODUCTION.md`
 - `TABLE_DDL.md`と必要に応じて`database/schema.sql`
-- `documents/API_list.md`と`public/docs/openapi.yaml`
-- `documents/stepby-current-spec-and-tasks.md`
+- `API_list.md`と`public/docs/openapi.yaml`
+- `stepby-current-spec-and-tasks.md`
 - `system-architecture.svg`と`project-plan-preview.html`
