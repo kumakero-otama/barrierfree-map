@@ -85,6 +85,27 @@ function fetchOsmMap(lat, lng, radiusMeters, callback) {
   req.end();
 }
 
+function fetchOsmXmlPath(path) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: "api.openstreetmap.org",
+      path,
+      method: "GET",
+      headers: { "User-Agent": "StepBy-dev/1.0 (https://github.com/kumakero-otama/barrierfree-map)" },
+    }, (res) => {
+      let raw = "";
+      res.on("data", (chunk) => { raw += chunk; });
+      res.on("end", () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`osm_read_status_${res.statusCode || 0}`));
+        resolve(raw);
+      });
+    });
+    req.setTimeout(30000, () => req.destroy(new Error("osm_read_timeout")));
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 function xmlAttr(source, name) {
   const match = source.match(new RegExp(`\\b${name}="([^"]*)"`));
   return match ? match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">") : "";
@@ -110,7 +131,19 @@ function normalizeOsmXml(xml) {
     if (geometry.length < 2) continue;
     ways.push({ type: "way", id: Number(xmlAttr(attrs, "id")), version: Number(xmlAttr(attrs, "version")), nodes: nodeIds, tags, geometry });
   }
-  return { elements: ways };
+  const relations = [];
+  for (const match of xml.matchAll(/<relation\b([^>]*)>([\s\S]*?)<\/relation>/g)) {
+    const attrs = match[1], body = match[2];
+    const tags = {};
+    for (const tag of body.matchAll(/<tag\b([^>]*)\/>/g)) tags[xmlAttr(tag[1], "k")] = xmlAttr(tag[1], "v");
+    const members = Array.from(body.matchAll(/<member\b([^>]*)\/>/g), (member) => ({
+      type: xmlAttr(member[1], "type"),
+      ref: Number(xmlAttr(member[1], "ref")),
+      role: xmlAttr(member[1], "role"),
+    })).filter((member) => ["node", "way", "relation"].includes(member.type) && Number.isSafeInteger(member.ref));
+    relations.push({ type: "relation", id: Number(xmlAttr(attrs, "id")), version: Number(xmlAttr(attrs, "version")), tags, members });
+  }
+  return { elements: [...ways, ...relations] };
 }
 
 function fetchOverpassWithFallback(hosts, query, callback) {
@@ -161,6 +194,22 @@ function normalizeWays(payload) {
   });
 }
 
+// OSM書込み計画へ使うWayは、遅延し得るOverpassの内容を信用せず、公式APIから個別に再取得する。
+async function fetchOfficialWay(wayId) {
+  const id = Number(wayId);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error("invalid_way_id");
+  const [fullXml, relationsXml] = await Promise.all([
+    fetchOsmXmlPath(`/api/0.6/way/${id}/full`),
+    fetchOsmXmlPath(`/api/0.6/way/${id}/relations`),
+  ]);
+  const fullPayload = normalizeOsmXml(fullXml);
+  const relationPayload = normalizeOsmXml(relationsXml);
+  const normalized = normalizeWays({ elements: [...fullPayload.elements, ...relationPayload.elements] });
+  const way = normalized.find((candidate) => Number(candidate.id) === id);
+  if (!way || !Number.isInteger(way.version) || way.version <= 0) throw new Error("osm_official_way_not_found");
+  return way;
+}
+
 function fetchWalkableNetwork(centerLat, centerLng, radiusMeters = DEFAULT_RADIUS_METERS, host = process.env.OVERPASS_HOST || "overpass-api.de", options = {}) {
   const radius = Math.round(Math.min(MAX_RADIUS_METERS, Math.max(100, Number(radiusMeters) || DEFAULT_RADIUS_METERS)));
   const cacheKey = `${Number(centerLat).toFixed(3)}:${Number(centerLng).toFixed(3)}:${radius}`;
@@ -169,12 +218,25 @@ function fetchWalkableNetwork(centerLat, centerLng, radiusMeters = DEFAULT_RADIU
     return Promise.resolve({ ...cached.response, cached: true });
   }
   return new Promise((resolve, reject) => {
-    fetchOverpass(host, buildQuery(centerLat, centerLng, radius), (error, payload) => {
-      if (error) return reject(error);
+    const resolvePayload = (payload, source) => {
       const ways = normalizeWays(payload);
-      const response = { success: true, centerLat, centerLng, radiusMeters: radius, wayCount: ways.length, ways, cached: false };
+      const response = { success: true, centerLat, centerLng, radiusMeters: radius, wayCount: ways.length, ways, cached: false, source };
       cache.set(cacheKey, { createdAt: Date.now(), response });
       resolve(response);
+    };
+    if (options.preferOfficial) {
+      fetchOsmMap(centerLat, centerLng, radius, (mapError, mapPayload) => {
+        if (!mapError) return resolvePayload(mapPayload, "osm_map_read");
+        fetchOverpass(host, buildQuery(centerLat, centerLng, radius), (error, payload) => {
+          if (error) return reject(error);
+          resolvePayload(payload, "overpass_fallback");
+        });
+      });
+      return;
+    }
+    fetchOverpass(host, buildQuery(centerLat, centerLng, radius), (error, payload) => {
+      if (error) return reject(error);
+      resolvePayload(payload, "overpass");
     });
   });
 }
@@ -237,3 +299,4 @@ module.exports.normalizeWays = normalizeWays;
 module.exports.fetchWalkableNetwork = fetchWalkableNetwork;
 module.exports.normalizeOsmXml = normalizeOsmXml;
 module.exports.clearWalkableNetworkCache = clearWalkableNetworkCache;
+module.exports.fetchOfficialWay = fetchOfficialWay;

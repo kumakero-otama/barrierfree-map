@@ -1,5 +1,8 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const { createLegacyReviewPlan } = require("../server/osm/legacy_review_planner");
+const changesSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_changes.js"), "utf8");
 
 const footway = {
   id: 1001,
@@ -49,5 +52,8 @@ assert.ok(roadResult.splitPlan.operations.some((operation) => Object.keys(operat
   .some((key) => key.startsWith("sidewalk:") && key.endsWith(":tactile_paving"))));
 
 assert.throws(() => createLegacyReviewPlan({ rawPoints: [{ lat: 34, lng: 134 }] }, [footway]), /legacy_points_not_available/);
+assert.match(changesSource, /preliminary\.fitting\.wayIds\.map\(fetchOfficialWay\)/,
+  "legacy publishing must refresh every selected Way from the official OSM API before planning");
+assert.match(changesSource, /createLegacyReviewPlan\(metadata, refreshedWays\)/);
 
 console.log("osm_legacy_review_planner.test.js: OK");

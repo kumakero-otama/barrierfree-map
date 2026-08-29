@@ -5,7 +5,7 @@ const { createSplitPlan } = require("../osm/split_planner");
 const { createLegacyReviewPlan } = require("../osm/legacy_review_planner");
 const { executeWithClient } = require("../osm/osm_executor");
 const { clearWalkableNetworkCache } = require("./osm_walkable");
-const { fetchWalkableNetwork } = require("./osm_walkable");
+const { fetchWalkableNetwork, fetchOfficialWay } = require("./osm_walkable");
 const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
 const { createServiceAccountOsmClient, resolvedServiceAccountConfig } = require("../osm/service_account_client");
@@ -227,8 +227,16 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       lat: sum.lat + point.lat / points.length,
       lng: sum.lng + point.lng / points.length,
     }), { lat: 0, lng: 0 });
-    const network = await fetchWalkableNetwork(center.lat, center.lng, 1000, undefined, { forceRefresh: true });
-    const prepared = createLegacyReviewPlan(metadata, network.ways);
+    // OSM公開直前は遅延し得るOverpassより公式map APIを優先し、最新Versionと形状で計画する。
+    const network = await fetchWalkableNetwork(center.lat, center.lng, 1000, undefined, {
+      forceRefresh: true,
+      preferOfficial: true,
+    });
+    const preliminary = createLegacyReviewPlan(metadata, network.ways);
+    const officialRouteWays = await Promise.all(preliminary.fitting.wayIds.map(fetchOfficialWay));
+    const officialById = new Map(officialRouteWays.map((way) => [Number(way.id), way]));
+    const refreshedWays = network.ways.map((way) => officialById.get(Number(way.id)) || way);
+    const prepared = createLegacyReviewPlan(metadata, refreshedWays);
     const replacementPlanId = crypto.randomUUID();
     const summary = `StepBy旧記録の点字ブロック公開（${metadata.startedAt || review.record_id}）`;
     const context = {
