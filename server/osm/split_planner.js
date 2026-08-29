@@ -45,7 +45,10 @@ function resolveTactileTagStrategy(segment, tactileValue) {
   if (independentWalkway) {
     return {
       kind: "independent_walkway", side: null,
-      tags: { tactile_paving: tactileValue }, targetTagKey: "tactile_paving", allowMissing: false,
+      tags: { tactile_paving: tactileValue }, targetTagKey: "tactile_paving",
+      // 通常記録は従来どおり tactile_paving=no の明示を要求する。
+      // 管理者が航空写真等で確認した旧記録だけは、未設定からyesへの追加を許可する。
+      allowMissing: segment.allowMissingTactile === true,
     };
   }
   if (!highway) throw new Error("missing_highway_tag");

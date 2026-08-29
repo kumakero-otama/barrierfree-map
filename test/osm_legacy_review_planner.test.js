@@ -30,6 +30,9 @@ assert.equal(result.segments[0].side, null);
 assert.ok(result.splitPlan.operations.length >= 3);
 assert.ok(result.splitPlan.operations.some((operation) => operation.after?.tags?.tactile_paving === "yes"));
 
+const untaggedResult = createLegacyReviewPlan(metadata, [{ ...footway, tags: { highway: "footway" } }]);
+assert.ok(untaggedResult.splitPlan.operations.some((operation) => operation.after?.tags?.tactile_paving === "yes"));
+
 const roadway = {
   ...footway,
   id: 2001,
