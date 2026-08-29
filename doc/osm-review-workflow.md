@@ -1,6 +1,6 @@
 # OSM公開前審査
 
-更新日: 2026-08-25
+更新日: 2026-08-29
 
 ## 目的
 
@@ -25,7 +25,7 @@ Google認証メールが `kumakero.otama@gmail.com` と一致するStepByユー�
 - `approved`: 管理者承認済みだが安全条件または機能フラグにより未送信
 - `rejected`: 却下。理由を保存し再審査可能
 - `merge_failed`: 送信失敗。履歴を残して再試行可能
-- `merged`: OSM送信成功
+- `merged`: OSM送信成功、または最新OSMに同じ点字ブロック情報が既に存在することを確認済み
 
 すべての判断は `osmchange.review_events`、通知は `osmchange.review_notifications`、OSM変更は既存の `osmchange.audit_events` へ記録します。監査イベントは更新・削除できません。
 
@@ -39,9 +39,10 @@ Google認証メールが `kumakero.otama@gmail.com` と一致するStepByユー�
 
 ## 管理画面
 
-- GitHub Pages: `UI11/admin/osm-review.html`
+- GitHub Pages: `UI0/admin/osm-review.html`
 - API同一Origin版: `/admin/osm-review.html`
 - 航空写真: 国土地理院シームレス空中写真
 - 航空写真とOpenStreetMapを横に並べ、表示位置を同期してGPS生座標、保存経路、変更対象を重ねて表示
 - 記録者・記録ID検索、期間・新規／既存・状態の絞り込み、保留、管理者メモ、却下理由、通知再送、送信失敗理由を提供
-- 旧記録は「OSMへ公開する」「OSMへ公開しない」を1回のボタン操作で記録する。承認時点ではOSMへ即送信せず、現在OSMで変更案を再作成して安全条件を満たしたものだけを送る。
+- 旧記録の「OSMへ公開する」は、最新OSMデータの取得、ブラウザ版ロジックによる再フィッティング、連続Way区間・左右の自動判定、変更案・監査履歴の保存、OSM送信、StepBy地図表示への反映を1回の操作で行う。
+- 最新OSMに同じ点字ブロックタグが既にある場合は重複編集せず、確認済みとしてStepBy地図へ反映する。再フィッティング、Version、opt-out等の安全条件を満たせない記録は送信せず`merge_failed`として理由を残す。
