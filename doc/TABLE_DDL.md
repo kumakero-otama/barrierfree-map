@@ -1,6 +1,6 @@
 # StepBy PostgreSQLスキーマ
 
-現在のUI10バックエンドはMariaDBではなく、PostgreSQL 16＋PostGISを使用します。
+現在のUI0バックエンドはMariaDBではなく、PostgreSQL 16＋PostGISを使用します。
 
 ## 再現用SQL
 
@@ -25,6 +25,7 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 - `roadinfo`: 道情報、タグ、本人限定メモ、画像ファイルへの参照
 - `osmchange`: OSM変更案、実行試行、record/changeset対応、追記監査、opt-out
 - `experiment`: フィッティング比較、GPS再生、管理APIの実験記録
+- `migration`: 旧システムから新DBへ移した記録の出典と、上書き禁止の移行履歴
 
 ## 主要テーブル
 
@@ -71,6 +72,13 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 - `opt_out_rules`
 
 監査履歴は削除・上書きせず、新しいイベントとして追記します。
+
+### `migration`
+
+- `legacy_record_sources`: 旧記録のハッシュ、新DB内の記録ID、旧ユーザー名、安全に一意照合できた新ユーザーID
+- `legacy_record_events`: 取込み件数や対応ユーザーを残す追記型履歴
+
+旧328記録は旧DBを参照し続けるのではなく、`tactile.sessions`、`tactile.gps_raw`、`tactile.session_paths`へ新規記録と同じ形で複製済みです。旧DBへは書き込まず、同じハッシュを二度取り込まない制約を設けています。
 
 ## スキーマ更新
 

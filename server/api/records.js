@@ -49,12 +49,16 @@ function createRecordsHandler({ sendJson }) {
           sp.created_at,
           ST_AsGeoJSON(sp.geom) AS geom_geojson,
           CASE WHEN s.user_id = ?
-            THEN COALESCE(tag_info.all_tags, ARRAY[]::text[])
-            ELSE COALESCE(tag_info.public_tags, ARRAY[]::text[])
+            THEN COALESCE(tag_info.all_tags,
+              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['点字ブロック']::text[] ELSE ARRAY[]::text[] END)
+            ELSE COALESCE(tag_info.public_tags,
+              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['点字ブロック']::text[] ELSE ARRAY[]::text[] END)
           END AS tags,
           CASE WHEN s.user_id = ?
-            THEN COALESCE(tag_info.all_tag_codes, ARRAY[]::text[])
-            ELSE COALESCE(tag_info.public_tag_codes, ARRAY[]::text[])
+            THEN COALESCE(tag_info.all_tag_codes,
+              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['tactile_paving']::text[] ELSE ARRAY[]::text[] END)
+            ELSE COALESCE(tag_info.public_tag_codes,
+              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['tactile_paving']::text[] ELSE ARRAY[]::text[] END)
           END AS tag_codes,
           osm_link.osm_status,
           CASE WHEN COALESCE(tag_info.has_private,FALSE) AND NOT COALESCE(tag_info.has_public,FALSE)
@@ -62,6 +66,7 @@ function createRecordsHandler({ sendJson }) {
         FROM tactile.session_paths sp
         LEFT JOIN tactile.sessions s ON s.session_id = sp.session_id
         LEFT JOIN osmchange.record_links osm_link ON osm_link.record_id = sp.session_id
+        LEFT JOIN migration.legacy_record_sources migrated ON migrated.record_id = sp.session_id
         LEFT JOIN LATERAL (
           SELECT
             ARRAY_AGG(t.label_ja ORDER BY t.sort_order ASC, t.id ASC) AS all_tags,
@@ -106,25 +111,6 @@ function createRecordsHandler({ sendJson }) {
       query += " ORDER BY sp.created_at DESC";
 
       const [paths] = await pool.query(query, params);
-
-      // 旧版から移行し、管理者確認を終えた記録もStepByの緑線として返す。
-      let legacyQuery = `SELECT q.record_id AS session_id,NULL::bigint AS user_id,'legacy_review' AS source,
-        COALESCE(q.reviewed_at,q.created_at) AS created_at,q.source_metadata->>'pathGeoJson' AS geom_geojson,
-        ARRAY['点字ブロック']::text[] AS tags,ARRAY['tactile_paving']::text[] AS tag_codes,
-        l.osm_status,'stepby_tactile' AS record_class
-        FROM osmchange.review_queue q JOIN osmchange.record_links l ON l.record_id=q.record_id
-        WHERE q.source_type='legacy_record' AND q.review_status='merged' AND l.osm_status='merged'
-          AND q.source_metadata->>'pathGeoJson' IS NOT NULL`;
-      const legacyParams = [];
-      if (Number.isFinite(centerLat) && Number.isFinite(centerLng) && Number.isFinite(radiusKm) && radiusKm > 0) {
-        legacyQuery += ` AND ST_DWithin(ST_GeogFromText(ST_AsText(ST_GeomFromGeoJSON(q.source_metadata->>'pathGeoJson'))),
-          ST_SetSRID(ST_MakePoint(?, ?),4326)::geography,?)`;
-        legacyParams.push(centerLng, centerLat, radiusKm * 1000);
-      }
-      if (!mineOnly) {
-        const [legacyPaths] = await pool.query(legacyQuery, legacyParams);
-        paths.push(...legacyPaths);
-      }
 
       sendJson(res, 200, {
         success: true,

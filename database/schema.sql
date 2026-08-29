@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict sXjP7hk4mRNdoyoWiacnACvY1DtJ7OnmNqZ3N4roidb5f3sMVbXu7gOtETz5QdL
+\restrict 27enVynhlASMC7ef0PhaIirEMtmg6JflTjqakbfLNPCHBvCOZicbSsT83Vm360i
 
--- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
--- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
+-- Dumped from database version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+-- Dumped by pg_dump version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -30,6 +30,13 @@ CREATE SCHEMA experiment;
 --
 
 CREATE SCHEMA login;
+
+
+--
+-- Name: migration; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA migration;
 
 
 --
@@ -65,6 +72,20 @@ CREATE SCHEMA tactile;
 --
 
 COMMENT ON SCHEMA tactile IS '点字ブロックマップ機能のためのスキーマ';
+
+
+--
+-- Name: postgis; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION postgis; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION postgis IS 'PostGIS geometry and geography spatial types and functions';
 
 
 --
@@ -110,6 +131,18 @@ CREATE FUNCTION login.prevent_osm_service_audit_mutation() RETURNS trigger
 
 
 --
+-- Name: prevent_legacy_event_mutation(); Type: FUNCTION; Schema: migration; Owner: -
+--
+
+CREATE FUNCTION migration.prevent_legacy_event_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'Legacy migration history is append-only';
+END $$;
+
+
+--
 -- Name: prevent_history_mutation(); Type: FUNCTION; Schema: osmchange; Owner: -
 --
 
@@ -131,6 +164,15 @@ CREATE FUNCTION osmchange.prevent_record_link_delete() RETURNS trigger
     BEGIN
       RAISE EXCEPTION 'OSM record links cannot be deleted';
     END $$;
+
+
+--
+-- Name: prevent_review_history_mutation(); Type: FUNCTION; Schema: osmchange; Owner: -
+--
+
+CREATE FUNCTION osmchange.prevent_review_history_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$ BEGIN RAISE EXCEPTION 'OSM review history is append-only'; END $$;
 
 
 SET default_tablespace = '';
@@ -592,6 +634,54 @@ ALTER SEQUENCE login.users_user_id_seq OWNED BY login.users.user_id;
 
 
 --
+-- Name: legacy_record_events; Type: TABLE; Schema: migration; Owner: -
+--
+
+CREATE TABLE migration.legacy_record_events (
+    event_id bigint NOT NULL,
+    source_digest text NOT NULL,
+    record_id uuid NOT NULL,
+    event_type text NOT NULL,
+    details jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: legacy_record_events_event_id_seq; Type: SEQUENCE; Schema: migration; Owner: -
+--
+
+CREATE SEQUENCE migration.legacy_record_events_event_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: legacy_record_events_event_id_seq; Type: SEQUENCE OWNED BY; Schema: migration; Owner: -
+--
+
+ALTER SEQUENCE migration.legacy_record_events_event_id_seq OWNED BY migration.legacy_record_events.event_id;
+
+
+--
+-- Name: legacy_record_sources; Type: TABLE; Schema: migration; Owner: -
+--
+
+CREATE TABLE migration.legacy_record_sources (
+    source_digest text NOT NULL,
+    record_id uuid NOT NULL,
+    original_username text NOT NULL,
+    original_is_guest boolean NOT NULL,
+    mapped_user_id bigint,
+    source_metadata jsonb NOT NULL,
+    imported_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: audit_events; Type: TABLE; Schema: osmchange; Owner: -
 --
 
@@ -690,6 +780,80 @@ CREATE TABLE osmchange.record_links (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT record_links_osm_status_check CHECK ((osm_status = ANY (ARRAY['draft'::text, 'merged'::text, 'revert_draft'::text, 'reverted'::text, 'failed'::text, 'conflict'::text])))
+);
+
+
+--
+-- Name: review_events; Type: TABLE; Schema: osmchange; Owner: -
+--
+
+CREATE TABLE osmchange.review_events (
+    event_id bigint NOT NULL,
+    review_id uuid NOT NULL,
+    event_type text NOT NULL,
+    actor_user_id bigint,
+    details jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: review_events_event_id_seq; Type: SEQUENCE; Schema: osmchange; Owner: -
+--
+
+CREATE SEQUENCE osmchange.review_events_event_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: review_events_event_id_seq; Type: SEQUENCE OWNED BY; Schema: osmchange; Owner: -
+--
+
+ALTER SEQUENCE osmchange.review_events_event_id_seq OWNED BY osmchange.review_events.event_id;
+
+
+--
+-- Name: review_notifications; Type: TABLE; Schema: osmchange; Owner: -
+--
+
+CREATE TABLE osmchange.review_notifications (
+    notification_id uuid NOT NULL,
+    review_id uuid NOT NULL,
+    recipient text NOT NULL,
+    status text NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    last_error text,
+    sent_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT review_notifications_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'sent'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: review_queue; Type: TABLE; Schema: osmchange; Owner: -
+--
+
+CREATE TABLE osmchange.review_queue (
+    review_id uuid NOT NULL,
+    record_id uuid NOT NULL,
+    plan_id uuid NOT NULL,
+    source_type text NOT NULL,
+    source_record_id text,
+    review_status text DEFAULT 'pending'::text NOT NULL,
+    rejection_reason text,
+    reviewer_user_id bigint,
+    reviewed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    admin_note text,
+    source_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT review_queue_review_status_check CHECK ((review_status = ANY (ARRAY['pending'::text, 'held'::text, 'approved'::text, 'rejected'::text, 'merge_failed'::text, 'merged'::text]))),
+    CONSTRAINT review_queue_source_type_check CHECK ((source_type = ANY (ARRAY['new_record'::text, 'legacy_record'::text])))
 );
 
 
@@ -1065,10 +1229,24 @@ ALTER TABLE ONLY login.users ALTER COLUMN user_id SET DEFAULT nextval('login.use
 
 
 --
+-- Name: legacy_record_events event_id; Type: DEFAULT; Schema: migration; Owner: -
+--
+
+ALTER TABLE ONLY migration.legacy_record_events ALTER COLUMN event_id SET DEFAULT nextval('migration.legacy_record_events_event_id_seq'::regclass);
+
+
+--
 -- Name: audit_events event_id; Type: DEFAULT; Schema: osmchange; Owner: -
 --
 
 ALTER TABLE ONLY osmchange.audit_events ALTER COLUMN event_id SET DEFAULT nextval('osmchange.audit_events_event_id_seq'::regclass);
+
+
+--
+-- Name: review_events event_id; Type: DEFAULT; Schema: osmchange; Owner: -
+--
+
+ALTER TABLE ONLY osmchange.review_events ALTER COLUMN event_id SET DEFAULT nextval('osmchange.review_events_event_id_seq'::regclass);
 
 
 --
@@ -1305,6 +1483,30 @@ ALTER TABLE ONLY login.users
 
 
 --
+-- Name: legacy_record_events legacy_record_events_pkey; Type: CONSTRAINT; Schema: migration; Owner: -
+--
+
+ALTER TABLE ONLY migration.legacy_record_events
+    ADD CONSTRAINT legacy_record_events_pkey PRIMARY KEY (event_id);
+
+
+--
+-- Name: legacy_record_sources legacy_record_sources_pkey; Type: CONSTRAINT; Schema: migration; Owner: -
+--
+
+ALTER TABLE ONLY migration.legacy_record_sources
+    ADD CONSTRAINT legacy_record_sources_pkey PRIMARY KEY (source_digest);
+
+
+--
+-- Name: legacy_record_sources legacy_record_sources_record_id_key; Type: CONSTRAINT; Schema: migration; Owner: -
+--
+
+ALTER TABLE ONLY migration.legacy_record_sources
+    ADD CONSTRAINT legacy_record_sources_record_id_key UNIQUE (record_id);
+
+
+--
 -- Name: audit_events audit_events_pkey; Type: CONSTRAINT; Schema: osmchange; Owner: -
 --
 
@@ -1374,6 +1576,46 @@ ALTER TABLE ONLY osmchange.record_links
 
 ALTER TABLE ONLY osmchange.record_links
     ADD CONSTRAINT record_links_revert_plan_id_key UNIQUE (revert_plan_id);
+
+
+--
+-- Name: review_events review_events_pkey; Type: CONSTRAINT; Schema: osmchange; Owner: -
+--
+
+ALTER TABLE ONLY osmchange.review_events
+    ADD CONSTRAINT review_events_pkey PRIMARY KEY (event_id);
+
+
+--
+-- Name: review_notifications review_notifications_pkey; Type: CONSTRAINT; Schema: osmchange; Owner: -
+--
+
+ALTER TABLE ONLY osmchange.review_notifications
+    ADD CONSTRAINT review_notifications_pkey PRIMARY KEY (notification_id);
+
+
+--
+-- Name: review_queue review_queue_pkey; Type: CONSTRAINT; Schema: osmchange; Owner: -
+--
+
+ALTER TABLE ONLY osmchange.review_queue
+    ADD CONSTRAINT review_queue_pkey PRIMARY KEY (review_id);
+
+
+--
+-- Name: review_queue review_queue_plan_id_key; Type: CONSTRAINT; Schema: osmchange; Owner: -
+--
+
+ALTER TABLE ONLY osmchange.review_queue
+    ADD CONSTRAINT review_queue_plan_id_key UNIQUE (plan_id);
+
+
+--
+-- Name: review_queue review_queue_record_id_key; Type: CONSTRAINT; Schema: osmchange; Owner: -
+--
+
+ALTER TABLE ONLY osmchange.review_queue
+    ADD CONSTRAINT review_queue_record_id_key UNIQUE (record_id);
 
 
 --
@@ -1569,6 +1811,20 @@ CREATE INDEX osm_record_links_user_idx ON osmchange.record_links USING btree (cr
 
 
 --
+-- Name: osm_review_source_idx; Type: INDEX; Schema: osmchange; Owner: -
+--
+
+CREATE INDEX osm_review_source_idx ON osmchange.review_queue USING btree (source_type, created_at DESC);
+
+
+--
+-- Name: osm_review_status_idx; Type: INDEX; Schema: osmchange; Owner: -
+--
+
+CREATE INDEX osm_review_status_idx ON osmchange.review_queue USING btree (review_status, created_at DESC);
+
+
+--
 -- Name: road_info_media_note_idx; Type: INDEX; Schema: roadinfo; Owner: -
 --
 
@@ -1646,6 +1902,20 @@ CREATE TRIGGER user_consents_append_only BEFORE DELETE OR UPDATE ON login.user_c
 
 
 --
+-- Name: legacy_record_events legacy_record_events_append_only; Type: TRIGGER; Schema: migration; Owner: -
+--
+
+CREATE TRIGGER legacy_record_events_append_only BEFORE DELETE OR UPDATE ON migration.legacy_record_events FOR EACH ROW EXECUTE FUNCTION migration.prevent_legacy_event_mutation();
+
+
+--
+-- Name: legacy_record_sources legacy_record_sources_immutable; Type: TRIGGER; Schema: migration; Owner: -
+--
+
+CREATE TRIGGER legacy_record_sources_immutable BEFORE DELETE OR UPDATE ON migration.legacy_record_sources FOR EACH ROW EXECUTE FUNCTION migration.prevent_legacy_event_mutation();
+
+
+--
 -- Name: audit_events osm_audit_events_append_only; Type: TRIGGER; Schema: osmchange; Owner: -
 --
 
@@ -1671,6 +1941,13 @@ CREATE TRIGGER osm_execution_attempts_append_only BEFORE DELETE OR UPDATE ON osm
 --
 
 CREATE TRIGGER osm_record_links_no_delete BEFORE DELETE ON osmchange.record_links FOR EACH ROW EXECUTE FUNCTION osmchange.prevent_record_link_delete();
+
+
+--
+-- Name: review_events osm_review_events_append_only; Type: TRIGGER; Schema: osmchange; Owner: -
+--
+
+CREATE TRIGGER osm_review_events_append_only BEFORE DELETE OR UPDATE ON osmchange.review_events FOR EACH ROW EXECUTE FUNCTION osmchange.prevent_review_history_mutation();
 
 
 --
@@ -1845,4 +2122,4 @@ ALTER TABLE ONLY tactile.sessions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sXjP7hk4mRNdoyoWiacnACvY1DtJ7OnmNqZ3N4roidb5f3sMVbXu7gOtETz5QdL
+\unrestrict 27enVynhlASMC7ef0PhaIirEMtmg6JflTjqakbfLNPCHBvCOZicbSsT83Vm360i

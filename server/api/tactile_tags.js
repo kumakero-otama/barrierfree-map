@@ -477,7 +477,7 @@ function createTactileTagsHandler({ sendJson }) {
       const [rows] = await pool.query(
         `SELECT s.session_id,
                 s.user_id,
-                u.username,
+                COALESCE(u.username,m.original_username) AS username,
                 u.icon_url,
                 sp.created_at,
                 CASE WHEN s.user_id = ? THEN s.memo ELSE NULL END AS memo,
@@ -489,6 +489,7 @@ function createTactileTagsHandler({ sendJson }) {
          FROM tactile.sessions s
          LEFT JOIN tactile.session_paths sp ON sp.session_id = s.session_id
          LEFT JOIN login.users u ON u.user_id = s.user_id
+         LEFT JOIN migration.legacy_record_sources m ON m.record_id = s.session_id
          LEFT JOIN tactile.session_tags st ON st.session_id = s.session_id
          LEFT JOIN tactile.tags t ON t.id = st.tag_id
          WHERE s.session_id = ?

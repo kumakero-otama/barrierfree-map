@@ -65,7 +65,7 @@
   <text x="1160" y="480" text-anchor="middle" class="boxTitle">PostgreSQL 16</text>
   <text x="1160" y="508" text-anchor="middle" class="body">stepby_app_dev</text>
   <text x="1160" y="532" text-anchor="middle" class="small">記録・GPS raw・Way座標</text>
-  <text x="1160" y="554" text-anchor="middle" class="small">審査キュー・公開／本人限定タグ・追記監査</text>
+  <text x="1160" y="554" text-anchor="middle" class="small">審査キュー・旧328記録の実体・追記監査</text>
   <text x="1160" y="576" text-anchor="middle" class="tiny">正式版DB（内部名は移行前から継続）</text>
 
   <rect x="95" y="625" width="240" height="105" rx="18" class="external"/>
@@ -73,7 +73,7 @@
   <rect x="95" y="755" width="240" height="105" rx="18" class="external"/>
   <text x="215" y="790" text-anchor="middle" class="boxTitle">Cloud Storage</text><text x="215" y="817" text-anchor="middle" class="body">日次バックアップ</text><text x="215" y="841" text-anchor="middle" class="small">DB＋uploads／30日保持</text>
   <rect x="395" y="735" width="555" height="125" rx="18" class="inner"/>
-  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・公開審査</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpass／国土地理院から読取</text><text x="672" y="823" text-anchor="middle" class="small">航空写真とOSMを並べ、新規＋旧328記録を1件ずつ確認</text><text x="672" y="846" text-anchor="middle" class="small">承認済み点字タグだけ送信・ゲストと本人限定情報はDBのみ</text>
+  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・公開審査</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpass／国土地理院から読取</text><text x="672" y="823" text-anchor="middle" class="small">旧328記録を新DBへ移し、有効198経路を公開前から表示</text><text x="672" y="846" text-anchor="middle" class="small">全件を審査・承認済み点字タグだけ送信</text>
   <rect x="1010" y="625" width="300" height="105" rx="18" class="inner"/>
   <text x="1160" y="660" text-anchor="middle" class="boxTitle">監視・管理画面</text><text x="1160" y="687" text-anchor="middle" class="body">稼働・容量・審査・API履歴</text><text x="1160" y="711" text-anchor="middle" class="small">kumakero.otama@gmail.com のみ審査可</text>
 
