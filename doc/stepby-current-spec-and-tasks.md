@@ -1,16 +1,15 @@
 # StepBy 現行仕様・運用状態・今後のタスク
 
-最終更新: 2026-08-18（Asia/Tokyo）
-対象: 開発版 StepBy UI10 / Google Cloud 開発API  
+最終更新: 2026-08-29（Asia/Tokyo）
+対象: 正式版 StepBy UI0 / Google Cloud API
 この文書は、現在の確定仕様、実装済み機能、既知の問題、残作業、主要リンクを一か所にまとめた引継ぎ資料です。
 
 ## 1. 現在の位置づけ
 
-- 公開中の現行版は UI0。ローカルサーバーの Valhalla を利用しており、停止していません。
-- 新しい開発版は UI10。通常のフィッティングでは Valhalla を使わず、ブラウザ内でOSM道路網へフィッティングします。
-- UI10のフロントエンドは GitHub Pages、APIと開発DBは Google Cloud の `stepby-dev-1` で稼働しています。
-- UI10の記録・プロフィール・実験データは開発専用PostgreSQLへ読み書きし、現行版DBとは分離しています。
-- UI10のOSM送信先は本番OpenStreetMapです。編集はサーバーで認証したStepBy専用OSMアカウント（表示名 `StepBy`）から行います。
+- 公開中の正式版はUI0です。通常のフィッティングではValhallaを使わず、ブラウザ内でOSM道路網へフィッティングします。
+- UI0のフロントエンドはGitHub Pages、APIとDBはGoogle Cloudの`stepby-dev-1`で稼働しています。VM・サービス・DBの`dev`を含む名前は移行前から継続する内部識別子です。
+- フロントエンドは`StepBy/main`のUI0、バックエンドの公開・再現基準は`barrierfree-map/main`です。今後のバックエンド開発は`dev`で行い、確認後にmainへ昇格します。
+- UI0のOSM送信先は本番OpenStreetMapです。編集はサーバーで認証したStepBy専用OSMアカウント（表示名 `StepBy`）から行います。
 - 開発用OSMの旧OAuthトークンは、本番切替時に監査履歴を残して失効させました。
 
 ## 2. 一般利用者の操作仕様
@@ -27,9 +26,9 @@
 
 1. 利用者は「記録」を押して歩き、「停止」後の確認画面で「保存」を押します。
 2. 道路の左・右は利用者に質問せず、GPS軌跡、accuracy、OSM Way方向からアプリが自動判定します。
-3. 確定後のDB保存とOSM送信は端末内の永続キューでバックグラウンド処理します。
+3. 確定後のDB保存と管理者審査待ち登録は端末内の永続キューでバックグラウンド処理します。
 4. 通信断・画面遷移・アプリ再起動後も再試行し、完了済み工程は繰り返しません。
-5. OSM公開対象の記録は、保存操作をその1記録に限定した送信許可として、本番OSMへ即時送信します。
+5. Google認証利用者のOSM公開対象記録は管理者審査待ちに入り、管理者が航空写真とOSMを確認して承認したものだけ本番OSMへ送信します。ゲスト記録はOSMへ送りません。
 
 ### 2.3 OSM取消し
 
@@ -116,10 +115,10 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 
 ## 7. 現在のシステム構成
 
-### UI10
+### UI0
 
 - フロント: GitHub Pages
-- URL: `https://kumakero-otama.github.io/StepBy/UI10/map/Index.html`
+- URL: `https://kumakero-otama.github.io/StepBy/UI0/map/Index.html`
 - 通常フィッティング: ブラウザ版
 - 保存・取消し: IndexedDB永続キュー
 
@@ -136,11 +135,10 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 - バックアップ: Cloud Storage、日次、30日保持
 - 監視: Cloud Monitoringと軽量な定期観測
 
-### 現行ローカル環境
+### 旧ローカル環境
 
-- UI0・本番バックエンド・本番DB・Valhallaは並行稼働中です。
-- UI10の開発作業のためにUI0や現行Valhallaを停止しません。
-- Tailscale Funnel/Serveはタスクリスト、管理画面、従来経路のため当面維持しています。
+- 正式UI0の公開経路には使用しません。旧コードと旧Valhallaは切戻し・比較資料として扱い、正式版の通常処理からは切り離しています。
+- Tailscale経路はタスクリストなどの運用資料確認用であり、正式UI0のAPI経路ではありません。
 
 ## 8. 確認済みの実績
 
@@ -179,7 +177,6 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 - 実端末で、複数Way、道路左右、独立歩道の少数実地確認。
 - OSMコミュニティへの初回相談は実施済み。対象範囲やアルゴリズムを拡大するときは再相談します。
 - 既存276経路の候補ごとの品質確認と、コミュニティ確認後の少量移行。
-- UI0からUI10を標準版へ昇格する判断。昇格前もUI0とValhallaは停止しません。
 
 ### 2026-08-17に追加確認・修正したこと
 
@@ -198,12 +195,13 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 1. 1km圏を越える移動、通信断、画面ロック、長時間記録を実端末で確認する。
 2. 判明した不具合を直し、回帰テストを追加する。
 3. 限定利用者で運用し、誤送信率・競合率・処理時間・取消し件数を測定する。
-4. UI10の標準版昇格を判断する。
+4. 管理者審査キューの誤承認率・却下率・処理時間を測定する。
 5. 既存276経路を候補ごとに確認し、追加のコミュニティ確認と個別許可後に少量ずつ扱う。
 
 ## 11. 絶対ルール
 
-- 一般利用者の「保存」は、その利用者が所有する記録1件だけのOSM送信許可です。
+- 一般利用者の「保存」はStepBy DBへの保存と管理者審査待ち登録までです。OSM送信は管理者が対象記録を承認した場合だけ実行します。
+- ゲスト記録はStepBy DBだけに保存し、OSM送信対象にしません。
 - 本人の緑線に対する「削除」の確認は、その記録1件だけの取消し許可です。
 - 管理者API、既存データ一括処理、任意のOSM編集は、操作ごとの明示許可が必要です。
 - OSM送信前に追記型監査履歴を保存できなければ送信しません。
@@ -225,8 +223,8 @@ OAuthトークン、秘密鍵、Cookie、パスワードは監査履歴へ保存
 - [OSMコミュニティ相談文案](https://barrierfree-map.tail5de5e1.ts.net/osm-community-consultation-draft.md)
 - [Valhalla・ブラウザ版検証報告](https://barrierfree-map.tail5de5e1.ts.net/valhalla-browser-fitting-report.html)
 - [開発DB管理画面](https://barrierfree-map.tail5de5e1.ts.net/dev-api/admin/database.html)
-- [UI10](https://kumakero-otama.github.io/StepBy/UI10/map/Index.html)
-- [UI10プロフィール](https://kumakero-otama.github.io/StepBy/UI10/profile/Index.html)
+- [UI0](https://kumakero-otama.github.io/StepBy/UI0/map/Index.html)
+- [UI0プロフィール](https://kumakero-otama.github.io/StepBy/UI0/profile/Index.html)
 - [クラウドAPI health](https://stepby-api-8-229-191-182.sslip.io/api/health)
 - [OpenStreetMap本番](https://www.openstreetmap.org/)
 - [初回本番changeset 187377001](https://www.openstreetmap.org/changeset/187377001)

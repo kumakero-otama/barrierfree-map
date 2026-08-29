@@ -219,7 +219,7 @@
       <nav class="summary" aria-label="現在の3段階">
         <a href="#valhalla-stop"><span class="summary-number">DONE</span><strong>ブラウザ版へ切替済み</strong><small>一般画面はValhalla非依存・比較は管理画面のみ</small></a>
         <a href="#osm-test"><span class="summary-number">NEXT</span><strong>OSM運用確認</strong><small>専用アカウント稼働中・監査・競合停止・少量運用</small></a>
-        <a href="#cloud"><span class="summary-number">DONE</span><strong>クラウドへ移行済み</strong><small>Google Cloudの開発API・DBをUI10から利用</small></a>
+        <a href="#cloud"><span class="summary-number">DONE</span><strong>クラウド正式版へ移行済み</strong><small>正式UI0・main・Google Cloud API/DBを利用</small></a>
       </nav>
 
       <section class="sequence" aria-labelledby="sequence-title">
@@ -252,8 +252,8 @@
         <b>バックエンド再現手順MDをダウンロード ↓</b>
       </a>
 
-      <a class="report-link" href="https://github.com/kumakero-otama/StepBy/blob/main/UI11/README.md" download>
-        <span>提出候補のUI10を基準にしたフロントエンドの構成、ローカル再現、テスト、UI0への正式昇格手順です。</span>
+      <a class="report-link" href="https://github.com/kumakero-otama/StepBy/blob/main/UI0/README.md" download>
+        <span>正式UI0フロントエンドの構成、ローカル再現、ブラウザフィッティング、テスト手順です。</span>
         <b>フロントエンド再現手順MDをダウンロード ↓</b>
       </a>
 
@@ -400,7 +400,7 @@
       <section class="track track-cloud" id="cloud">
         <div class="track-head">
           <div class="track-number">05</div>
-          <div><h2>クラウドサーバーへ移行する</h2><p>採用構成は Google Cloud の折衷案に決定しました。現行ローカル版・UI0・Valhallaは切替え完了まで停止せず、新しいUI10環境だけを先に構築します。</p></div>
+          <div><h2>クラウドサーバーへ移行する</h2><p>Google Cloudの折衷構成へ移行済みです。2026-08-29にUI11を正式UI0へ昇格し、バックエンドdevをmainへ昇格する切替作業を実施しました。</p></div>
         </div>
         <div class="columns">
           <article class="panel">
@@ -427,6 +427,7 @@
           <article class="panel wide">
             <h3>5-3. 総合試験・段階切替え・切戻し</h3>
             <ul class="tasks">
+              <li class="done"><span class="box"></span><div><span class="task-title">UI11とバックエンドdevを正式版へ昇格する</span><span class="note">2026-08-29完了。切替直前のフロント、旧バックエンドmain、昇格対象devをGitタグで保存し、PostgreSQLとuploadsをCloud Storageへ手動バックアップした。UI11をUI0へ移植して旧UI群を削除し、公開パス・PWA scope・Service Worker・テスト・READMEをUI0へ統一。バックエンドは21件の単体テスト合格後にmainへ昇格した。GCEのsystemdサービス名とDB名は内部識別子として継続する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">クラウドUI10を通し試験する</span><span class="note">完了。GitHub PagesとクラウドAPI、Google/OSM認証、記録保存、1km道路網、10km点字表示、左右判定、Way分割、OSM追加・取消し、PRO非公開保存を確認した。フロント9試験・バックエンド9試験が合格し、実端末GPS固有の試験だけを5-4へ分離した。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">性能・容量・費用を測る</span><span class="note">2026-08-13に観測を開始。初期値はCPU負荷ほぼ0、メモリ利用可能約448MB、ディスク4.0/29GB（14%）、DB約19MB、設定API 0.05〜0.08秒。API・DB・Caddy・バックアップ結果、CPU負荷、メモリ、ディスク、DB容量、応答時間、重大エラー、送受信量を1時間ごとに31日分CSVへ記録する軽量タイマーを稼働させた。7日経過後にe2-micro継続可否と費用を判定するため、期間未達の現在は未完了。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">日次バックアップの継続成功と保存物を再確認する</span><span class="note">完了。自動タイマーは有効で、2026-08-12夜の日次実行は成功。Cloud Storageの最新DB dump（225項目）とuploads圧縮（6項目）を実際に再取得し、両アーカイブが破損なく読めることを確認した。30日削除規則と既存の別DB復元試験も維持している。</span></div></li>
@@ -642,7 +643,7 @@
               <li class="done"><span class="box"></span><div><span class="task-title">利用規約とプライバシーポリシーを開発版へ実装する</span><span class="note">開発版UI10へMarkdown 2種を作成し、Tailscale版とGitHub Pages版へ公開。見出し・段落・箇条書きを整形して表示する。Google認証ユーザーの同意欄はログイン画面ではなく、初回プロフィール登録画面の「画像を選ぶ」と「登録」の間に配置した。ゲスト登録時も確認を必須とし、APIは未同意・版違いを拒否する。同意日時・文書版・経路を追記型の開発DBへ保存。devブランチ全体はmainへマージせず、GitHub Pages公開用にUI10だけをmainへ同期している。UI0とバックエンド本番系には未反映。本番公開前に問い合わせ先、運営者表示、保存期間、法務確認を確定する。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">開発APIを監査し一覧を公開する</span><span class="note">Google認証、記録、ブラウザフィッティング、StepBy専用OSMアカウント、変更案、記録単位の送信・取消し、追記監査を一覧化。保存直前の最新Way取得、公開／本人限定タグ分離、所有者確認、冪等性、Version競合停止を実装・試験済み。<a href="api-catalog.html">API一覧を見る</a></span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">第三者向けバックエンド再現資料を整備する</span><span class="note">2026-08-18完了。旧Mapbox・PM2・MariaDB前提の主要MDをGCE、Node.js、PostgreSQL＋PostGIS、Caddy、systemd、Secret Manager、Cloud Storage構成へ更新。稼働開発DBからデータを含まないスキーマSQLを生成し、空の一時DBへ39テーブル・8監査トリガーを再構築できることを確認した。必要ライブラリ、秘密設定名、GCE構築、DB初期化、バックアップ、確認手順を<code>REPRODUCTION.md</code>へ集約。VM再起動相当で<code>/run</code>が空でもSecret Managerから設定を再生成してAPIが起動することも確認した。</span></div></li>
-              <li class="done"><span class="box"></span><div><span class="task-title">第三者向けUI11フロントエンド資料を整備する</span><span class="note">完了。UI11の構成、ブラウザフィッティング、公開範囲、ローカル確認、テスト方法をフロントエンドリポジトリの<code>UI11/README.md</code>へ集約した。旧UI10移行途中の資料はGit履歴へ移し、現行ツリーには残さない。</span></div></li>
+              <li class="done"><span class="box"></span><div><span class="task-title">第三者向けUI0フロントエンド資料を整備する</span><span class="note">完了。正式UI0の構成、ブラウザフィッティング、公開範囲、ローカル確認、テスト方法をフロントエンドリポジトリの<code>UI0/README.md</code>へ集約した。旧UI移行途中の資料は切替前タグとGit履歴で参照できる。</span></div></li>
               <li class="done"><span class="box"></span><div><span class="task-title">UI4デザインをUI11へ安全に移植する</span><span class="note">2026-08-19完了。UI4は読み取り専用、UI10はコピー元として変更せず、UI10をUI11へ複製した。認証・記録・OSM処理・画面構成を維持したまま、UI4の配色、最大480pxのモバイルシェル、ヘッダー、カード、フォーム、ボタンのデザインを独立CSSへ移植。UI11専用のパス・PWA scope・Service Workerキャッシュへ分離し、自動テストとスマートフォン画面の表示確認に合格。確認済みコミットだけをmainへ昇格し、GitHub Pagesで公開した。UI4・UI10・UI0は変更していない。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">UI1へ移行する</span><span class="note">対象範囲と完了条件を先に確定する。</span></div></li>
               <li><span class="box"></span><div><span class="task-title">Mariaさんへ連絡する</span><span class="note">状況を伝え、無理のない範囲で協力可能か確認。</span></div></li>

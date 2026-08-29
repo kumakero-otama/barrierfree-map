@@ -2,19 +2,19 @@
 
 最終確認日: 2026-08-29
 
-この文書は、`barrierfree-map`の`dev`ブランチから、UI11用バックエンドを新しい環境へ再構築するための手順です。実在ユーザーのデータや本番OSMへの書込みは、再現条件に含めません。新規環境ではOSM書込みを無効にして開始します。
+この文書は、`barrierfree-map`の`main`ブランチから、正式UI0用バックエンドを新しい環境へ再構築するための手順です。実在ユーザーのデータや本番OSMへの書込みは、再現条件に含めません。新規環境ではOSM書込みを無効にして開始します。
 
 ## 1. 対象ソース
 
 ```bash
-git clone --branch dev https://github.com/kumakero-otama/barrierfree-map.git
+git clone --branch main https://github.com/kumakero-otama/barrierfree-map.git
 cd barrierfree-map
 git rev-parse HEAD
 ```
 
-提出時に`dev`を`main`へ昇格した場合は、`--branch main`へ置き換えます。再現結果には使用したcommit IDを記録してください。
+再現結果には使用したcommit IDを記録してください。追加開発を行う場合は`dev`ブランチを使い、確認済み変更だけを`main`へ昇格します。
 
-フロントエンドは別リポジトリ[`StepBy`](https://github.com/kumakero-otama/StepBy)のUI11です。
+フロントエンドは別リポジトリ[`StepBy`](https://github.com/kumakero-otama/StepBy)のUI0です。
 
 ## 2. 確認済み動作環境
 

@@ -1,6 +1,6 @@
 # StepByバックエンド開発ガイド
 
-この文書はUI11用バックエンドのローカル開発手順です。旧Mapbox・PM2・MariaDB構成は対象外です。クラウドを一から再現する場合は[`REPRODUCTION.md`](REPRODUCTION.md)を使用してください。
+この文書は正式UI0用バックエンドのローカル開発手順です。旧Mapbox・PM2・MariaDB構成は対象外です。クラウドを一から再現する場合は[`REPRODUCTION.md`](REPRODUCTION.md)を使用してください。
 
 ## 必要なソフトウェア
 
@@ -73,9 +73,9 @@ curl -i http://127.0.0.1:3100/api/config
 
 ## 5. フロントエンドとの接続
 
-UI10は別リポジトリ`StepBy`にあります。GitHub Pages以外のローカルOriginを使う場合は、`CORS_ALLOWED_ORIGINS`へ明示的に追加します。
+UI0は別リポジトリ`StepBy`にあります。GitHub Pages以外のローカルOriginを使う場合は、`CORS_ALLOWED_ORIGINS`へ明示的に追加します。
 
-マップマッチングはUI10のブラウザ内JavaScriptで実行されます。`/api/match`、`/api/trace`、Mapbox、Valhalla関連コードは旧版・比較診断との互換用であり、UI10の通常記録フローでは使いません。
+マップマッチングはUI0のブラウザ内JavaScriptで実行されます。`/api/match`、`/api/trace`、Mapbox、Valhalla関連コードは旧版・比較診断との互換用であり、UI0の通常記録フローでは使いません。
 
 ## 6. OSM開発時の原則
 

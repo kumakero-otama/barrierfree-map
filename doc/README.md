@@ -24,6 +24,6 @@
 
 ## 整理方針
 
-このディレクトリには現行GCE・PostgreSQL・UI11構成の理解、再現、運用に必要な資料だけを置きます。MariaDB、PM2、Loophole、旧Tailscale、旧Valhalla構築、UI10移行途中の資料はGit履歴で参照できるため、現行ツリーから削除しています。
+このディレクトリには現行GCE・PostgreSQL・正式UI0構成の理解、再現、運用に必要な資料だけを置きます。MariaDB、PM2、Loophole、旧Tailscale、旧Valhalla構築、UI10・UI11移行途中の資料はGit履歴と切替前タグで参照できるため、現行ツリーから削除しています。
 
 現在の構成と矛盾した場合は、リポジトリ直下の`README.md`、`REPRODUCTION.md`、`../database/schema.sql`、OpenAPI、実装コードの順に確認してください。
