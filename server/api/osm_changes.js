@@ -719,7 +719,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               }
               try {
                 let executableReview = freshReview;
-                if (freshReview.source_type === "legacy_record" && freshReview.source_metadata && freshReview.source_metadata.legacyNeedsRefit) {
+                // 失敗後の再送でも、以前のVersionを持つ変更案は再利用せず必ず再計画する。
+                if (freshReview.source_type === "legacy_record" && freshReview.source_metadata) {
                   try {
                     executableReview = await prepareLegacyReviewPlan(req, freshReview);
                   } catch (plannerError) {
