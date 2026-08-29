@@ -1,0 +1,50 @@
+const assert = require("node:assert/strict");
+const { createLegacyReviewPlan } = require("../server/osm/legacy_review_planner");
+
+const footway = {
+  id: 1001,
+  version: 7,
+  nodes: [11, 12, 13],
+  coordinates: [[134.0, 34.0], [134.0005, 34.0], [134.001, 34.0]],
+  tags: { highway: "footway", tactile_paving: "no" },
+  relations: [],
+  priority: "pedestrian",
+};
+const metadata = {
+  pathGeoJson: JSON.stringify({
+    type: "LineString",
+    coordinates: [[134.0001, 34.0], [134.0009, 34.0]],
+  }),
+  rawPoints: [
+    { lat: 34.0, lng: 134.0001, accuracy: null },
+    { lat: 34.0, lng: 134.0005, accuracy: null },
+    { lat: 34.0, lng: 134.0009, accuracy: null },
+  ],
+};
+
+const result = createLegacyReviewPlan(metadata, [footway]);
+assert.equal(result.fitting.routeConfirmed, true);
+assert.deepEqual(result.fitting.wayIds, [1001]);
+assert.equal(result.segments.length, 1);
+assert.equal(result.segments[0].side, null);
+assert.ok(result.splitPlan.operations.length >= 3);
+assert.ok(result.splitPlan.operations.some((operation) => operation.after?.tags?.tactile_paving === "yes"));
+
+const roadway = {
+  ...footway,
+  id: 2001,
+  tags: { highway: "residential" },
+  priority: "road",
+};
+const roadResult = createLegacyReviewPlan({
+  ...metadata,
+  pathGeoJson: JSON.stringify({ type: "LineString", coordinates: [[134.0001, 34.00002], [134.0009, 34.00002]] }),
+  rawPoints: metadata.rawPoints.map((point) => ({ ...point, lat: 34.00002 })),
+}, [roadway]);
+assert.ok(["left", "right"].includes(roadResult.segments[0].side));
+assert.ok(roadResult.splitPlan.operations.some((operation) => Object.keys(operation.after?.tags || {})
+  .some((key) => key.startsWith("sidewalk:") && key.endsWith(":tactile_paving"))));
+
+assert.throws(() => createLegacyReviewPlan({ rawPoints: [{ lat: 34, lng: 134 }] }, [footway]), /legacy_points_not_available/);
+
+console.log("osm_legacy_review_planner.test.js: OK");

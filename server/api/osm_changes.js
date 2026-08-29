@@ -2,8 +2,10 @@ const crypto = require("crypto");
 const { getRecordPublication } = require("../pro_record_policy");
 const { createDbPool } = require("../db");
 const { createSplitPlan } = require("../osm/split_planner");
+const { createLegacyReviewPlan } = require("../osm/legacy_review_planner");
 const { executeWithClient } = require("../osm/osm_executor");
 const { clearWalkableNetworkCache } = require("./osm_walkable");
+const { fetchWalkableNetwork } = require("./osm_walkable");
 const { createExecutableRevert } = require("../osm/revert_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
 const { createServiceAccountOsmClient, resolvedServiceAccountConfig } = require("../osm/service_account_client");
@@ -213,6 +215,87 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         reason: "osm_revert_succeeded",
       });
     }
+  }
+
+  async function prepareLegacyReviewPlan(req, review) {
+    const metadata = review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {};
+    const points = (Array.isArray(metadata.rawPoints) ? metadata.rawPoints : [])
+      .map((point) => ({ lat: Number(point.lat), lng: Number(point.lng) }))
+      .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+    if (points.length < 2) throw new Error("legacy_points_not_available");
+    const center = points.reduce((sum, point) => ({
+      lat: sum.lat + point.lat / points.length,
+      lng: sum.lng + point.lng / points.length,
+    }), { lat: 0, lng: 0 });
+    const network = await fetchWalkableNetwork(center.lat, center.lng, 1000, undefined, { forceRefresh: true });
+    const prepared = createLegacyReviewPlan(metadata, network.ways);
+    const replacementPlanId = crypto.randomUUID();
+    const summary = `StepBy旧記録の点字ブロック公開（${metadata.startedAt || review.record_id}）`;
+    const context = {
+      previewOnly: false,
+      osmWriteRequested: true,
+      reviewRequired: true,
+      planner: "legacy_browser_refit_v1",
+      recordId: review.record_id,
+      sourcePlanId: review.plan_id,
+      fitting: {
+        routeConfirmed: prepared.fitting.routeConfirmed,
+        coverage: prepared.fitting.coverage,
+        wayIds: prepared.fitting.wayIds,
+        meanSnapDistance: prepared.fitting.meanSnapDistance,
+        maxSnapDistance: prepared.fitting.maxSnapDistance,
+      },
+      splitSummary: prepared.splitPlan.summary,
+    };
+    const updatedMetadata = {
+      ...metadata,
+      legacyNeedsRefit: false,
+      refittedAt: new Date().toISOString(),
+      refittedWayIds: prepared.fitting.wayIds,
+    };
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query(`INSERT INTO osmchange.change_plans
+        (plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
+        VALUES(?,'merge',?,?,?,?,?::jsonb) RETURNING plan_id`, [replacementPlanId, review.created_by,
+        review.plan_id, summary, JSON.stringify(prepared.splitPlan.operations), JSON.stringify(context)]);
+      await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+        VALUES(?,'legacy_refit_plan_created',?,?,?::jsonb) RETURNING event_id AS id`, [replacementPlanId,
+        req.authUserId, req.securityRequestId || null, JSON.stringify({
+          reviewId: review.review_id,
+          recordId: review.record_id,
+          sourcePlanId: review.plan_id,
+          wayIds: prepared.fitting.wayIds,
+          splitSummary: prepared.splitPlan.summary,
+        })]);
+      await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+        VALUES(?,'legacy_plan_superseded',?,?,?::jsonb) RETURNING event_id AS id`, [review.plan_id,
+        req.authUserId, req.securityRequestId || null, JSON.stringify({ replacementPlanId, reviewId: review.review_id })]);
+      await conn.query(`UPDATE osmchange.review_queue SET plan_id=?,source_metadata=?::jsonb,updated_at=NOW()
+        WHERE review_id=?`, [replacementPlanId, JSON.stringify(updatedMetadata), review.review_id]);
+      await conn.query(`INSERT INTO osmchange.record_links(record_id,created_by,merge_plan_id,osm_status)
+        VALUES(?,?,?,'draft') ON CONFLICT(record_id) DO UPDATE SET merge_plan_id=EXCLUDED.merge_plan_id,
+        osm_status='draft',updated_at=NOW() RETURNING record_id`, [review.record_id, review.created_by, replacementPlanId]);
+      await conn.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+        VALUES(?,'legacy_refitted',?,?::jsonb) RETURNING event_id AS id`, [review.review_id, req.authUserId,
+        JSON.stringify({ replacementPlanId, sourcePlanId: review.plan_id, wayIds: prepared.fitting.wayIds,
+          splitSummary: prepared.splitPlan.summary })]);
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+    return {
+      ...review,
+      plan_id: replacementPlanId,
+      summary,
+      elements: prepared.splitPlan.operations,
+      client_context: context,
+      source_metadata: updatedMetadata,
+    };
   }
 
   async function executeUserPlan(req, plan, action) {
@@ -570,17 +653,16 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             await saveReviewTransition(`UPDATE osmchange.review_queue SET review_status='approved',rejection_reason=NULL,
               reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [req.authUserId, reviewId],
             reviewId, "approved", req.authUserId, { executeRequested: true });
-            if (review.source_type === "legacy_record" && review.source_metadata && review.source_metadata.legacyNeedsRefit) {
-              sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false,
-                executionDeferred: true, reason: "legacy_refit_required" }); return;
-            }
             if (!(await writesEnabled())) {
               sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false, executionDeferred: true }); return;
             }
             try {
-              const result = await withPlanLock(review.plan_id, () => executeUserPlan(req, review, "execute"));
+              const executableReview = review.source_type === "legacy_record" && review.source_metadata && review.source_metadata.legacyNeedsRefit
+                ? await prepareLegacyReviewPlan(req, review)
+                : review;
+              const result = await withPlanLock(executableReview.plan_id, () => executeUserPlan(req, executableReview, "execute"));
               await saveReviewTransition("UPDATE osmchange.review_queue SET review_status='merged',updated_at=NOW() WHERE review_id=?",
-                [reviewId], reviewId, "merged", req.authUserId, { changesetId: result.changesetId || null });
+                [reviewId], reviewId, "merged", req.authUserId, { changesetId: result.executionResult?.changesetId || null });
               sendJson(res, 200, { ...result, reviewId, status: "merged" }); return;
             } catch (executionError) {
               await saveReviewTransition("UPDATE osmchange.review_queue SET review_status='merge_failed',updated_at=NOW() WHERE review_id=?",
