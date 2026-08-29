@@ -298,6 +298,43 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     };
   }
 
+  async function markLegacyAlreadyPresent(req, review, plannerError) {
+    const metadata = review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {};
+    const updatedMetadata = {
+      ...metadata,
+      legacyNeedsRefit: false,
+      alreadyPresentConfirmedAt: new Date().toISOString(),
+      refittedWayIds: plannerError.wayId ? [plannerError.wayId] : [],
+    };
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query(`INSERT INTO osmchange.record_links(record_id,created_by,merge_plan_id,osm_status)
+        VALUES(?,?,?,'merged') ON CONFLICT(record_id) DO UPDATE SET osm_status='merged',updated_at=NOW()
+        RETURNING record_id`, [review.record_id, review.created_by, review.plan_id]);
+      await conn.query(`UPDATE osmchange.review_queue SET review_status='merged',source_metadata=?::jsonb,
+        reviewer_user_id=?,reviewed_at=COALESCE(reviewed_at,NOW()),updated_at=NOW() WHERE review_id=?`,
+      [JSON.stringify(updatedMetadata), req.authUserId, review.review_id]);
+      await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+        VALUES(?,'publication_skipped_existing_tactile',?,?,?::jsonb) RETURNING event_id AS id`, [review.plan_id,
+        req.authUserId, req.securityRequestId || null, JSON.stringify({ reviewId: review.review_id,
+          recordId: review.record_id, wayId: plannerError.wayId || null, tagKey: plannerError.tagKey || null,
+          osmSent: false, reason: "tactile_tag_already_present" })]);
+      await conn.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
+        VALUES(?,'merged_existing_osm_data',?,?::jsonb) RETURNING event_id AS id`, [review.review_id,
+        req.authUserId, JSON.stringify({ wayId: plannerError.wayId || null, tagKey: plannerError.tagKey || null,
+          osmSent: false })]);
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+    return { success: true, reviewId: review.review_id, status: "merged", osmSent: false,
+      alreadyPresent: true, wayId: plannerError.wayId || null, tagKey: plannerError.tagKey || null };
+  }
+
   async function executeUserPlan(req, plan, action) {
     const planId = plan.plan_id;
     const gate = await writeGate();
@@ -657,9 +694,17 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false, executionDeferred: true }); return;
             }
             try {
-              const executableReview = review.source_type === "legacy_record" && review.source_metadata && review.source_metadata.legacyNeedsRefit
-                ? await prepareLegacyReviewPlan(req, review)
-                : review;
+              let executableReview = review;
+              if (review.source_type === "legacy_record" && review.source_metadata && review.source_metadata.legacyNeedsRefit) {
+                try {
+                  executableReview = await prepareLegacyReviewPlan(req, review);
+                } catch (plannerError) {
+                  if (plannerError.message === "tactile_tag_already_present") {
+                    sendJson(res, 200, await markLegacyAlreadyPresent(req, review, plannerError)); return;
+                  }
+                  throw plannerError;
+                }
+              }
               const result = await withPlanLock(executableReview.plan_id, () => executeUserPlan(req, executableReview, "execute"));
               await saveReviewTransition("UPDATE osmchange.review_queue SET review_status='merged',updated_at=NOW() WHERE review_id=?",
                 [reviewId], reviewId, "merged", req.authUserId, { changesetId: result.executionResult?.changesetId || null });

@@ -100,6 +100,7 @@ function createLegacyReviewPlan(metadata, ways) {
       fullCoordinates: way.coordinates,
       tags: way.tags || {},
       relations: way.relations || [],
+      allowMissingTactile: true,
       side: isIndependentWalkway(way) ? null : inferRoadSide(fittingPoints, way),
       from,
       to,
