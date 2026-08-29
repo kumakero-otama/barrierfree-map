@@ -692,36 +692,54 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             sendJson(res, 200, { success: true, reviewId, status: "pending", osmSent: false }); return;
           }
           if (action === "approve") {
-            if (!['pending','merge_failed','approved'].includes(review.review_status)) {
-              sendJson(res, 409, { error: "review_not_approvable", status: review.review_status }); return;
-            }
-            await saveReviewTransition(`UPDATE osmchange.review_queue SET review_status='approved',rejection_reason=NULL,
-              reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [req.authUserId, reviewId],
-            reviewId, "approved", req.authUserId, { executeRequested: true });
-            if (!(await writesEnabled())) {
-              sendJson(res, 200, { success: true, reviewId, status: "approved", osmSent: false, executionDeferred: true }); return;
-            }
-            try {
-              let executableReview = review;
-              if (review.source_type === "legacy_record" && review.source_metadata && review.source_metadata.legacyNeedsRefit) {
-                try {
-                  executableReview = await prepareLegacyReviewPlan(req, review);
-                } catch (plannerError) {
-                  if (plannerError.message === "tactile_tag_already_present") {
-                    sendJson(res, 200, await markLegacyAlreadyPresent(req, review, plannerError)); return;
-                  }
-                  throw plannerError;
-                }
+            const approvalResult = await withPlanLock(`review:${reviewId}`, async () => {
+              // 待機中に別リクエストが完了し得るため、ロック取得後の状態を必ず読み直す。
+              const [freshRows] = await pool.query(`SELECT q.*,cp.operation_type,cp.created_by,cp.summary,cp.elements,cp.client_context
+                FROM osmchange.review_queue q JOIN osmchange.change_plans cp ON cp.plan_id=q.plan_id
+                WHERE q.review_id=? LIMIT 1`, [reviewId]);
+              const freshReview = freshRows[0];
+              if (!freshReview) throw new Error("review_not_found");
+              if (freshReview.review_status === "merged") {
+                const [links] = await pool.query(`SELECT merge_changeset_id FROM osmchange.record_links
+                  WHERE record_id=? LIMIT 1`, [freshReview.record_id]);
+                return { success: true, reviewId, status: "merged", osmSent: true, idempotent: true,
+                  changesetId: links[0]?.merge_changeset_id || null };
               }
-              const result = await withPlanLock(executableReview.plan_id, () => executeUserPlan(req, executableReview, "execute"));
-              await saveReviewTransition("UPDATE osmchange.review_queue SET review_status='merged',updated_at=NOW() WHERE review_id=?",
-                [reviewId], reviewId, "merged", req.authUserId, { changesetId: result.executionResult?.changesetId || null });
-              sendJson(res, 200, { ...result, reviewId, status: "merged" }); return;
-            } catch (executionError) {
-              await saveReviewTransition("UPDATE osmchange.review_queue SET review_status='merge_failed',updated_at=NOW() WHERE review_id=?",
-                [reviewId], reviewId, "merge_failed", req.authUserId, { error: executionError.message });
-              throw executionError;
-            }
+              if (!['pending','merge_failed','approved'].includes(freshReview.review_status)) {
+                const error = new Error("review_not_approvable");
+                error.status = 409;
+                error.reviewStatus = freshReview.review_status;
+                throw error;
+              }
+              await saveReviewTransition(`UPDATE osmchange.review_queue SET review_status='approved',rejection_reason=NULL,
+                reviewer_user_id=?,reviewed_at=NOW(),updated_at=NOW() WHERE review_id=?`, [req.authUserId, reviewId],
+              reviewId, "approved", req.authUserId, { executeRequested: true });
+              if (!(await writesEnabled())) {
+                return { success: true, reviewId, status: "approved", osmSent: false, executionDeferred: true };
+              }
+              try {
+                let executableReview = freshReview;
+                if (freshReview.source_type === "legacy_record" && freshReview.source_metadata && freshReview.source_metadata.legacyNeedsRefit) {
+                  try {
+                    executableReview = await prepareLegacyReviewPlan(req, freshReview);
+                  } catch (plannerError) {
+                    if (plannerError.message === "tactile_tag_already_present") {
+                      return await markLegacyAlreadyPresent(req, freshReview, plannerError);
+                    }
+                    throw plannerError;
+                  }
+                }
+                const result = await executeUserPlan(req, executableReview, "execute");
+                await saveReviewTransition("UPDATE osmchange.review_queue SET review_status='merged',updated_at=NOW() WHERE review_id=?",
+                  [reviewId], reviewId, "merged", req.authUserId, { changesetId: result.executionResult?.changesetId || null });
+                return { ...result, reviewId, status: "merged" };
+              } catch (executionError) {
+                await saveReviewTransition("UPDATE osmchange.review_queue SET review_status='merge_failed',updated_at=NOW() WHERE review_id=?",
+                  [reviewId], reviewId, "merge_failed", req.authUserId, { error: executionError.message });
+                throw executionError;
+              }
+            });
+            sendJson(res, 200, approvalResult); return;
           }
           sendJson(res, 404, { error: "review_action_not_found" }); return;
         }
