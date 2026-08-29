@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { createLegacyReviewPlan } = require("../server/osm/legacy_review_planner");
+const { createLegacyReviewPlan, boundaryPosition } = require("../server/osm/legacy_review_planner");
 const changesSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_changes.js"), "utf8");
 
 const footway = {
@@ -55,5 +55,9 @@ assert.throws(() => createLegacyReviewPlan({ rawPoints: [{ lat: 34, lng: 134 }] 
 assert.match(changesSource, /preliminary\.fitting\.wayIds\.map\(fetchOfficialWay\)/,
   "legacy publishing must refresh every selected Way from the official OSM API before planning");
 assert.match(changesSource, /createLegacyReviewPlan\(metadata, refreshedWays\)/);
+assert.match(changesSource, /freshReview\.source_type === "legacy_record" && freshReview\.source_metadata\)/,
+  "a failed legacy publication retry must always rebuild its plan from current OSM data");
+assert.equal(boundaryPosition({ kind: "node", index: 2 }), 2);
+assert.equal(boundaryPosition({ kind: "projection", segmentIndex: 1, fraction: 0.25 }), 1.25);
 
 console.log("osm_legacy_review_planner.test.js: OK");

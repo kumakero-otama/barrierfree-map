@@ -73,6 +73,13 @@ function isIndependentWalkway(way) {
     || String(way.tags?.footway || "").toLowerCase() === "sidewalk";
 }
 
+function boundaryPosition(boundary) {
+  if (!boundary || typeof boundary !== "object") return NaN;
+  if (boundary.kind === "node") return Number(boundary.index);
+  if (boundary.kind === "projection") return Number(boundary.segmentIndex) + Number(boundary.fraction);
+  return NaN;
+}
+
 function createLegacyReviewPlan(metadata, ways) {
   const rawPoints = normalizeRawPoints(metadata || {});
   const recordedPath = parseRecordedPath(metadata || {});
@@ -83,7 +90,9 @@ function createLegacyReviewPlan(metadata, ways) {
   const byId = new Map(ways.map((way) => [Number(way.id), way]));
   const routeWays = fitting.wayIds.map((wayId) => byId.get(Number(wayId)));
   if (routeWays.some((way) => !way)) throw new Error("legacy_route_way_missing");
-  const boundaryPoints = recordedPath.length >= 2 ? recordedPath : fittingPoints;
+  // 区間端点は旧フィット線ではなく実測GPSを優先する。旧フィット線は短い記録で
+  // 始点・終点が同一点へ潰れている場合があり、そのままでは長さ0の分割になる。
+  const boundaryPoints = fittingPoints;
   const segments = routeWays.map((way, index) => {
     const previous = routeWays[index - 1] || null;
     const next = routeWays[index + 1] || null;
@@ -105,9 +114,14 @@ function createLegacyReviewPlan(metadata, ways) {
       from,
       to,
     };
+  }).filter((segment) => {
+    const fromPosition = boundaryPosition(segment.from);
+    const toPosition = boundaryPosition(segment.to);
+    return Number.isFinite(fromPosition) && Number.isFinite(toPosition) && Math.abs(fromPosition - toPosition) >= 1e-6;
   });
+  if (!segments.length) throw new Error("zero_length_tactile_segment");
   const splitPlan = createSplitPlan({ segments }, { tactileValue: "yes" });
   return { fitting, segments, splitPlan };
 }
 
-module.exports = { createLegacyReviewPlan, parseRecordedPath, normalizeRawPoints, closestBoundary, sharedNodeBoundary, inferRoadSide };
+module.exports = { createLegacyReviewPlan, parseRecordedPath, normalizeRawPoints, closestBoundary, sharedNodeBoundary, inferRoadSide, boundaryPosition };
