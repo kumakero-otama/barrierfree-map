@@ -2,6 +2,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const createMatchHandler = require("./server/api/match_valhalla");
 const createCountHandler = require("./server/api/count");
 const createStatsHandler = require("./server/api/stats");
@@ -49,6 +50,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const UPLOADS_DIR = path.join(__dirname, "uploads");
 const LOG_DIR = path.join(__dirname, "logs");
 const SERVER_LOG = path.join(LOG_DIR, "server.csv");
+const CRUD_LOG = path.join(LOG_DIR, "crud.csv");
 let monthlyCounts = {};
 // カンマ区切りの許可 Origin 一覧を正規化して保持する。
 const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || "")
@@ -58,6 +60,34 @@ const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || "")
 
 const logger = createLogger(SERVER_LOG);
 const { appendLog } = logger;
+const crudLogger = createLogger(CRUD_LOG);
+
+// APIが実際に発火して応答したことを、本文・座標・トークンを含めず記録する。
+// HTTPメソッドをCRUDの4分類へ対応させ、βテスト中の失敗箇所を追跡できるようにする。
+function attachCrudLog(req, res) {
+  if (!req.url || req.method === "OPTIONS") return;
+  let pathname = "/";
+  try {
+    pathname = new URL(req.url, "http://localhost").pathname;
+  } catch {}
+  if (!pathname.startsWith("/api/") && !pathname.startsWith("/auth/") && !pathname.startsWith("/admin-auth/")) {
+    return;
+  }
+  const operation = ({ GET: "READ", POST: "CREATE", PUT: "UPDATE", PATCH: "UPDATE", DELETE: "DELETE" })[req.method] || "ACTION";
+  const requestId = crypto.randomUUID();
+  const startedAt = Date.now();
+  res.setHeader("X-Request-Id", requestId);
+  res.once("finish", () => {
+    crudLogger.appendLog(res.statusCode >= 500 ? "ERROR" : res.statusCode >= 400 ? "WARN" : "INFO", JSON.stringify({
+      requestId,
+      operation,
+      method: req.method,
+      path: pathname,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    }));
+  });
+}
 
 // console引数をログ保存しやすい文字列へ整形する。
 function formatMessage(args) {
@@ -402,6 +432,7 @@ const guardDevApi = createDevApiGuard({
 
 // API を先に振り分け、該当しないものだけ静的ファイル配信へフォールバックする。
 function handleRequest(req, res) {
+  attachCrudLog(req, res);
   const isCorsRequest = applyCorsHeaders(req, res);
   if (req.method === "OPTIONS" && isCorsRequest) {
     // preflight 応答は本文不要なので 204 で即終了する。
