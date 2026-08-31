@@ -78,8 +78,10 @@ function attachCrudLog(req, res) {
   const startedAt = Date.now();
   res.setHeader("X-Request-Id", requestId);
   res.once("finish", () => {
+    // セキュリティガードが同じ要求へ追跡IDを付けた場合は、応答ヘッダーと同じIDを使う。
+    const effectiveRequestId = req.securityRequestId || requestId;
     crudLogger.appendLog(res.statusCode >= 500 ? "ERROR" : res.statusCode >= 400 ? "WARN" : "INFO", JSON.stringify({
-      requestId,
+      requestId: effectiveRequestId,
       operation,
       method: req.method,
       path: pathname,
