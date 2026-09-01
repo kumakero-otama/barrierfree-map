@@ -101,9 +101,14 @@ function run() {
   assert.throws(() => createSplitPlan({ segments: [way({
     tags: { highway: "footway", tactile_paving: "yes" },
   })] }), /tactile_tag_already_present/, "既存の点字ブロックへ重複タグや不要な分割を作らない");
-  assert.throws(() => createSplitPlan({ segments: [way({
+  const missingTactile = createSplitPlan({ segments: [way({
     tags: { highway: "footway" },
-  })] }), /tactile_no_to_yes_required/, "値なしからの推測更新を止める");
+  })] });
+  assert.strictEqual(
+    missingTactile.ways[0].sections.find((section) => section.tactile).tags.tactile_paving,
+    "yes",
+    "タグ未設定の歩道も、OSMへ即時送信せず管理者が確認する変更候補にする"
+  );
   console.log("osm_split_planner: all tests passed");
 }
 run();

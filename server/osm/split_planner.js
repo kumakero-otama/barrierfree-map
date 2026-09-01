@@ -45,7 +45,9 @@ function resolveTactileTagStrategy(segment, tactileValue) {
   if (independentWalkway) {
     return {
       kind: "independent_walkway", side: null,
-      tags: { tactile_paving: tactileValue }, targetTagKey: "tactile_paving", allowMissing: false,
+      // 管理者確認キューへ送る段階では、OSMにタグが未設定でも候補を作る。
+      // 実送信は管理者承認後かつ最新Version再確認後に限られる。
+      tags: { tactile_paving: tactileValue }, targetTagKey: "tactile_paving", allowMissing: true,
     };
   }
   if (!highway) throw new Error("missing_highway_tag");
