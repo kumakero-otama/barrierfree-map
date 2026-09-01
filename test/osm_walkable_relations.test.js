@@ -43,4 +43,6 @@ assert.match(source, /if \(!forceRefresh && cached/,
   "record finalization must be able to bypass the server-side network cache");
 assert.match(source, /if \(options\.preferOfficial\)[\s\S]*fetchOsmMap/,
   "OSM publishing must be able to prefer the current official OSM map response");
+assert.match(source, /fetchOverpassFirstSuccessful\(hosts/,
+  "approval fallback must not wait for unavailable Overpass hosts one by one");
 console.log("osm_walkable_relations: mocked relation normalization passed; no OSM network used");

@@ -50,7 +50,7 @@ function fetchOverpass(host, query, callback) {
       });
     }
   );
-  req.setTimeout(30000, () => req.destroy(new Error("overpass_timeout")));
+  req.setTimeout(15000, () => req.destroy(new Error("overpass_timeout")));
   req.on("error", (err) => callback(new Error(`overpass_request_error:${err.message}`)));
   req.write(body);
   req.end();
@@ -80,7 +80,7 @@ function fetchOsmMap(lat, lng, radiusMeters, callback) {
       try { callback(null, normalizeOsmXml(raw)); } catch (error) { callback(error); }
     });
   });
-  req.setTimeout(30000, () => req.destroy(new Error("osm_map_timeout")));
+  req.setTimeout(15000, () => req.destroy(new Error("osm_map_timeout")));
   req.on("error", callback);
   req.end();
 }
@@ -153,6 +153,27 @@ function fetchOverpassWithFallback(hosts, query, callback) {
     fetchOverpass(hosts[index++], query, (error, payload) => error ? attempt(error) : callback(null, payload));
   };
   attempt();
+}
+
+// 公開承認画面では、1台ずつ待つと障害時に長時間画面を占有するため、
+// 複数の読取専用Overpassへ同時に問い合わせ、最初の成功だけを採用する。
+function fetchOverpassFirstSuccessful(hosts, query, callback) {
+  let finished = false;
+  let remaining = hosts.length;
+  let lastError = null;
+  for (const host of hosts) {
+    fetchOverpass(host, query, (error, payload) => {
+      if (finished) return;
+      if (!error) {
+        finished = true;
+        callback(null, payload);
+        return;
+      }
+      lastError = error;
+      remaining -= 1;
+      if (remaining === 0) callback(lastError || new Error("all_overpass_hosts_failed"));
+    });
+  }
 }
 
 function normalizeWays(payload) {
@@ -228,7 +249,7 @@ function fetchWalkableNetwork(centerLat, centerLng, radiusMeters = DEFAULT_RADIU
       fetchOsmMap(centerLat, centerLng, radius, (mapError, mapPayload) => {
         if (!mapError) return resolvePayload(mapPayload, "osm_map_read");
         const hosts = [...new Set([host, "overpass.kumi.systems", "overpass-api.de"])];
-        fetchOverpassWithFallback(hosts, buildQuery(centerLat, centerLng, radius), (error, payload) => {
+        fetchOverpassFirstSuccessful(hosts, buildQuery(centerLat, centerLng, radius), (error, payload) => {
           if (error) return reject(error);
           resolvePayload(payload, "overpass_fallback");
         });
