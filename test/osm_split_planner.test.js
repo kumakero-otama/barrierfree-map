@@ -109,6 +109,12 @@ function run() {
     "yes",
     "タグ未設定の歩道も、OSMへ即時送信せず管理者が確認する変更候補にする"
   );
+  const zeroConnectorIgnored = createSplitPlan({ segments: [
+    way({ from: { kind: "node", index: 1 }, to: { kind: "node", index: 1 } }),
+    way({ wayId: 101, from: { kind: "node", index: 0 }, to: { kind: "node", index: 1 } }),
+  ] });
+  assert.strictEqual(zeroConnectorIgnored.ways.length, 1,
+    "共有端点に触れただけの0長Wayは除外し、有効な隣接区間を確認候補に残す");
   console.log("osm_split_planner: all tests passed");
 }
 run();

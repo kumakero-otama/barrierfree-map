@@ -100,7 +100,7 @@ async function main() {
     }
   }
   console.log(JSON.stringify({ apply: options.apply, results }, null, 2));
-  await pool.end();
+  if (pool.pool && typeof pool.pool.end === "function") await pool.pool.end();
   if (results.some((item) => item.error)) process.exitCode = 1;
 }
 

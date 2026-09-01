@@ -80,9 +80,11 @@ function planWay(segment, counters, options) {
   const ranges = rawRanges.map((range) => {
     const from = normalizeBoundary(range.from, nodes, coordinates, options.nodeSnapFraction);
     const to = normalizeBoundary(range.to, nodes, coordinates, options.nodeSnapFraction);
-    if (Math.abs(from.position - to.position) < options.nodeSnapFraction) throw new Error("zero_length_tactile_segment");
     return { from, to, low: Math.min(from.position, to.position), high: Math.max(from.position, to.position) };
-  });
+  }).filter((range) => Math.abs(range.from.position - range.to.position) >= options.nodeSnapFraction);
+  // Wayの共有端点に触れただけの0長区間は経路から除外する。
+  // 全区間が0長なら安全に対象を確定できないため、従来どおり停止する。
+  if (!ranges.length) throw new Error("zero_length_tactile_segment");
   const from = ranges[0].from;
   const to = ranges[ranges.length - 1].to;
 
@@ -266,7 +268,15 @@ function createSplitPlan(input, options = {}) {
     nodeSnapFraction: Number(options.nodeSnapFraction) || DEFAULT_NODE_SNAP_FRACTION,
   };
   const counters = { node: 0, way: 0 };
-  const ways = mergedSegments.map((segment) => planWay(segment, counters, settings));
+  const ways = [];
+  for (const segment of mergedSegments) {
+    try {
+      ways.push(planWay(segment, counters, settings));
+    } catch (error) {
+      if (error.message !== "zero_length_tactile_segment") throw error;
+    }
+  }
+  if (!ways.length) throw new Error("zero_length_tactile_segment");
   const relationOperations = planRelationUpdates(normalizeRelations(mergedSegments), ways);
   const operations = [...ways.flatMap((way) => way.operations), ...relationOperations];
   return {
