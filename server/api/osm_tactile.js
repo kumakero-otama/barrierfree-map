@@ -104,7 +104,7 @@ function fetchOverpass(overpassHost, query, callback) {
     });
   });
 
-  req.setTimeout(30000, () => req.destroy(new Error("overpass_timeout")));
+  req.setTimeout(15000, () => req.destroy(new Error("overpass_timeout")));
 
   req.on("error", (err) => {
     callback(new Error(`overpass_request_error:${err.message}`));
@@ -205,6 +205,8 @@ function createOsmTactileWaysHandler({ sendJson }) {
   ].filter(Boolean))];
   const { pool } = createDbPool();
   const responseCache = new Map();
+  const FRESH_CACHE_MS = 5 * 60 * 1000;
+  const STALE_CACHE_MS = 24 * 60 * 60 * 1000;
   let rules;
   try {
     rules = loadRules();
@@ -344,7 +346,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const query = buildOverpassQuery(centerLat, centerLng, radiusMeters, rules);
       const cacheKey = `${centerLat.toFixed(2)}:${centerLng.toFixed(2)}:${radiusMeters}`;
       const cached = responseCache.get(cacheKey);
-      if (cached && Date.now() - cached.savedAt < 5 * 60 * 1000) {
+      if (cached && Date.now() - cached.savedAt < FRESH_CACHE_MS) {
         addStepByOwnership({ ...cached.payload, cached: true }, req.authUserId, { centerLat, centerLng, radiusMeters })
           .then((payload) => sendJson(res, 200, payload))
           .catch((dbError) => {
@@ -353,36 +355,11 @@ function createOsmTactileWaysHandler({ sendJson }) {
           });
         return;
       }
-      const tryHost = (index) => {
-        fetchOverpass(OVERPASS_HOSTS[index], query, async (err, overpassJson) => {
-        if (err) {
-          console.warn(`[osm_tactile] host failed ${OVERPASS_HOSTS[index]}:`, err.message);
-          if (index + 1 < OVERPASS_HOSTS.length) {
-            tryHost(index + 1);
-            return;
-          }
-          try {
-            const fallbackPayload = await addStepByOwnership({
-              success: true,
-              centerLat,
-              centerLng,
-              radiusKm: radiusMeters / 1000,
-              count: 0,
-              features: [],
-              cached: false,
-              osmUpstreamUnavailable: true,
-            }, req.authUserId, { centerLat, centerLng, radiusMeters });
-            // StepByの送信済み経路だけでも返せる場合は、取消し操作を継続可能にする。
-            if (fallbackPayload.features.length) {
-              sendJson(res, 200, fallbackPayload);
-              return;
-            }
-          } catch (dbError) {
-            console.warn("[osm_tactile] StepBy fallback lookup failed:", dbError.message);
-          }
-          sendJson(res, 502, { error: "osm_upstream_error", message: "all_overpass_hosts_failed" });
-          return;
-        }
+      let completed = false;
+      let remainingHosts = OVERPASS_HOSTS.length;
+      const finishWithPayload = async (overpassJson) => {
+        if (completed) return;
+        completed = true;
         // レスポンスは FeatureCollection ではなく features 配列中心で返し、既存フロント構造に合わせる。
         const featureCollection = toFeatureCollection(overpassJson, rules);
         const basePayload = {
@@ -401,9 +378,44 @@ function createOsmTactileWaysHandler({ sendJson }) {
           console.warn("[osm_tactile] StepBy ownership lookup skipped:", dbError.message);
           sendJson(res, 200, basePayload);
         }
-      });
       };
-      tryHost(0);
+      const finishWithoutUpstream = async () => {
+        if (completed) return;
+        completed = true;
+        const stale = responseCache.get(cacheKey);
+        if (stale && Date.now() - stale.savedAt < STALE_CACHE_MS) {
+          try {
+            sendJson(res, 200, await addStepByOwnership({ ...stale.payload, cached: true, stale: true,
+              osmUpstreamUnavailable: true }, req.authUserId, { centerLat, centerLng, radiusMeters }));
+          } catch (_) {
+            sendJson(res, 200, { ...stale.payload, cached: true, stale: true, osmUpstreamUnavailable: true });
+          }
+          return;
+        }
+        try {
+          const fallbackPayload = await addStepByOwnership({
+            success: true, centerLat, centerLng, radiusKm: radiusMeters / 1000,
+            count: 0, features: [], cached: false, osmUpstreamUnavailable: true,
+          }, req.authUserId, { centerLat, centerLng, radiusMeters });
+          sendJson(res, 200, fallbackPayload);
+        } catch (dbError) {
+          console.warn("[osm_tactile] StepBy fallback lookup failed:", dbError.message);
+          sendJson(res, 200, { success: true, centerLat, centerLng, radiusKm: radiusMeters / 1000,
+            count: 0, features: [], cached: false, osmUpstreamUnavailable: true });
+        }
+      };
+      // 1台ずつ最大30秒待たず、読取専用ミラーへ並行問い合わせして最初の成功を使う。
+      OVERPASS_HOSTS.forEach((host) => {
+        fetchOverpass(host, query, async (err, overpassJson) => {
+        if (err) {
+          console.warn(`[osm_tactile] host failed ${host}:`, err.message);
+          remainingHosts -= 1;
+          if (remainingHosts === 0) await finishWithoutUpstream();
+          return;
+        }
+        await finishWithPayload(overpassJson);
+      });
+      });
     } catch (err) {
       console.error("[osm_tactile] handler error:", err.message);
       sendJson(res, 500, { error: "osm_tactile_handler_error", message: err.message });
