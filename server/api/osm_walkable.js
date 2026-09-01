@@ -227,7 +227,8 @@ function fetchWalkableNetwork(centerLat, centerLng, radiusMeters = DEFAULT_RADIU
     if (options.preferOfficial) {
       fetchOsmMap(centerLat, centerLng, radius, (mapError, mapPayload) => {
         if (!mapError) return resolvePayload(mapPayload, "osm_map_read");
-        fetchOverpass(host, buildQuery(centerLat, centerLng, radius), (error, payload) => {
+        const hosts = [...new Set([host, "overpass.kumi.systems", "overpass-api.de"])];
+        fetchOverpassWithFallback(hosts, buildQuery(centerLat, centerLng, radius), (error, payload) => {
           if (error) return reject(error);
           resolvePayload(payload, "overpass_fallback");
         });

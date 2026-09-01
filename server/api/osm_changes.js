@@ -306,6 +306,27 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     };
   }
 
+  // 新規記録の承認時にも、保存時の古いWay Versionをそのまま使わず、
+  // PostgreSQLに保存した生GPSと経路から最新OSM上で変更案を作り直す。
+  async function prepareNewRecordReviewPlan(req, review) {
+    const [sessions] = await pool.query(`SELECT s.started_at,ST_AsGeoJSON(p.geom::geometry) AS path_geojson
+      FROM tactile.sessions s LEFT JOIN tactile.session_paths p ON p.session_id=s.session_id
+      WHERE s.session_id=? LIMIT 1`, [review.record_id]);
+    const [rawPoints] = await pool.query(`SELECT ST_Y(geom::geometry) AS lat,ST_X(geom::geometry) AS lng,
+      accuracy,ts FROM tactile.gps_raw WHERE session_id=? ORDER BY ts,id`, [review.record_id]);
+    if (!sessions[0]) throw new Error("record_not_found");
+    const sourceMetadata = {
+      ...(review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {}),
+      startedAt: sessions[0].started_at || null,
+      pathGeoJson: sessions[0].path_geojson || null,
+      rawPoints: rawPoints.map((point) => ({
+        lat: Number(point.lat), lng: Number(point.lng),
+        accuracy: point.accuracy == null ? null : Number(point.accuracy), ts: point.ts || null,
+      })),
+    };
+    return prepareLegacyReviewPlan(req, { ...review, source_metadata: sourceMetadata });
+  }
+
   async function markLegacyAlreadyPresent(req, review, plannerError) {
     const metadata = review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {};
     const updatedMetadata = {
@@ -720,9 +741,11 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               try {
                 let executableReview = freshReview;
                 // 失敗後の再送でも、以前のVersionを持つ変更案は再利用せず必ず再計画する。
-                if (freshReview.source_type === "legacy_record" && freshReview.source_metadata) {
+                if (["legacy_record", "new_record"].includes(freshReview.source_type)) {
                   try {
-                    executableReview = await prepareLegacyReviewPlan(req, freshReview);
+                    executableReview = freshReview.source_type === "new_record"
+                      ? await prepareNewRecordReviewPlan(req, freshReview)
+                      : await prepareLegacyReviewPlan(req, freshReview);
                   } catch (plannerError) {
                     if (plannerError.message === "tactile_tag_already_present") {
                       return await markLegacyAlreadyPresent(req, freshReview, plannerError);
@@ -1099,6 +1122,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
 
       sendJson(res, 404, { error: "not_found" });
     } catch (error) {
+      const osmReadUnavailable = /^(overpass_|osm_map_|osm_read_)/.test(String(error.message || ""));
       const clientErrors = new Set([
         "invalid_segments", "inconsistent_duplicate_way", "invalid_way_identity", "invalid_way_geometry",
         "invalid_boundary", "invalid_node_boundary", "invalid_projection_boundary",
@@ -1108,6 +1132,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         "tactile_no_to_yes_required", "tactile_tag_already_present",
       ]);
       const status = Number.isInteger(error.status) ? error.status
+        : osmReadUnavailable ? 503
         : error.message === "record_not_found_or_forbidden" ? 404
         : error.message === "record_already_linked" ? 409
         : ["osm_connection_required", "record_not_merged", "revert_not_executable", "osm_version_conflict"].includes(error.message) ? 409
@@ -1116,7 +1141,11 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         : error.message === "invalid_json" || clientErrors.has(error.message) ? 400
         : error.message === "body_too_large" ? 413 : 500;
       console.error("[osm_changes] request failed:", error.message);
-      sendJson(res, status, { error: status === 500 ? "osm_change_api_failed" : error.message, osmSent: false });
+      sendJson(res, status, {
+        error: osmReadUnavailable ? "osm_data_temporarily_unavailable"
+          : status === 500 ? "osm_change_api_failed" : error.message,
+        osmSent: false,
+      });
     }
   };
 }
