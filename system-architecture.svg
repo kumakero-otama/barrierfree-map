@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
   <title id="title">StepBy 現在のシステム構成</title>
-  <desc id="desc">正式版StepBy UI0の利用者端末、GitHub Pages、Google認証、Gmail通知、国土地理院航空写真、OpenStreetMap、Google Cloud、Node API、PostgreSQL審査キューの接続を示す構成図。</desc>
+  <desc id="desc">正式版StepBy UI0の利用者端末、GitHub Pages、Google認証、Gmail通知、Googleマップ航空写真リンク、OpenStreetMap、Google Cloud、Node API、PostgreSQL審査キューの接続を示す構成図。</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity=".14"/></filter>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0v6l9-3z" fill="#475569"/></marker>
@@ -73,7 +73,7 @@
   <rect x="95" y="755" width="240" height="105" rx="18" class="external"/>
   <text x="215" y="790" text-anchor="middle" class="boxTitle">Cloud Storage</text><text x="215" y="817" text-anchor="middle" class="body">日次バックアップ</text><text x="215" y="841" text-anchor="middle" class="small">DB＋uploads／30日保持</text>
   <rect x="395" y="735" width="555" height="125" rx="18" class="inner"/>
-  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・公開審査</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpass／国土地理院から読取</text><text x="672" y="823" text-anchor="middle" class="small">航空写真とOSMを並べ、新規＋旧328記録を1件ずつ確認</text><text x="672" y="846" text-anchor="middle" class="small">承認済み点字タグだけ送信・ゲストと本人限定情報はDBのみ</text>
+  <text x="672" y="770" text-anchor="middle" class="boxTitle">ブラウザフィッティング・公開審査</text><text x="672" y="798" text-anchor="middle" class="body">公式OSM／Overpassから読取・Googleマップへ外部リンク</text><text x="672" y="823" text-anchor="middle" class="small">OSM上の経路と記録地点の航空写真を、新規＋旧328記録ごとに確認</text><text x="672" y="846" text-anchor="middle" class="small">承認済み点字タグだけ送信・ゲストと本人限定情報はDBのみ</text>
   <rect x="1010" y="625" width="300" height="105" rx="18" class="inner"/>
   <text x="1160" y="660" text-anchor="middle" class="boxTitle">監視・管理画面</text><text x="1160" y="687" text-anchor="middle" class="body">稼働・容量・審査・API履歴</text><text x="1160" y="711" text-anchor="middle" class="small">kumakero.otama@gmail.com のみ審査可</text>
 
