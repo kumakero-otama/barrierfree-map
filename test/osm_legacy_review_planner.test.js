@@ -59,6 +59,10 @@ assert.match(changesSource, /\["legacy_record", "new_record"\]\.includes\(freshR
   "every approval retry must rebuild its plan from current OSM data");
 assert.match(changesSource, /prepareNewRecordReviewPlan\(req, freshReview\)/,
   "new records must be rebuilt from persisted raw GPS before publication");
+assert.match(changesSource, /official_review_way_fallback/,
+  "review approval must use current official Way data when the nearby Overpass read is unavailable");
+assert.match(changesSource, /Promise\.allSettled\(\[\.\.\.ids\]\.map\(fetchOfficialWay\)\)/,
+  "the fallback must refresh stored Way IDs through the official OSM API");
 assert.equal(boundaryPosition({ kind: "node", index: 2 }), 2);
 assert.equal(boundaryPosition({ kind: "projection", segmentIndex: 1, fraction: 0.25 }), 1.25);
 

@@ -191,6 +191,24 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       }));
   }
 
+  // Overpassが混雑していても、審査時点で特定済みのWayはOSM公式APIから
+  // 直接読み直せる。Versionと形状は必ず最新版を使い、保存済みの古い
+  // Wayデータをそのまま送信することはしない。
+  async function fetchReviewCandidateWays(review) {
+    const metadata = review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {};
+    const context = review.client_context && typeof review.client_context === "object" ? review.client_context : {};
+    const ids = new Set([
+      ...(Array.isArray(metadata.refittedWayIds) ? metadata.refittedWayIds : []),
+      ...(Array.isArray(context.fitting?.wayIds) ? context.fitting.wayIds : []),
+      ...(Array.isArray(review.elements) ? review.elements
+        .filter((element) => element?.elementType === "way" && element?.action !== "create")
+        .map((element) => element.osmId) : []),
+    ].map(Number).filter((id) => Number.isSafeInteger(id) && id > 0));
+    if (!ids.size) return [];
+    const results = await Promise.allSettled([...ids].map(fetchOfficialWay));
+    return results.filter((result) => result.status === "fulfilled").map((result) => result.value);
+  }
+
   async function withPlanLock(planId, operation) {
     const conn = await pool.getConnection();
     try {
@@ -228,10 +246,22 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       lng: sum.lng + point.lng / points.length,
     }), { lat: 0, lng: 0 });
     // OSM公開直前は遅延し得るOverpassより公式map APIを優先し、最新Versionと形状で計画する。
-    const network = await fetchWalkableNetwork(center.lat, center.lng, 1000, undefined, {
-      forceRefresh: true,
-      preferOfficial: true,
-    });
+    let network;
+    try {
+      network = await fetchWalkableNetwork(center.lat, center.lng, 1000, undefined, {
+        forceRefresh: true,
+        preferOfficial: true,
+      });
+    } catch (networkError) {
+      const officialCandidates = await fetchReviewCandidateWays(review);
+      if (!officialCandidates.length) throw networkError;
+      network = { ways: officialCandidates, source: "official_review_way_fallback" };
+      console.warn("[osm_changes] nearby network unavailable; using current official review Way data", {
+        reviewId: review.review_id,
+        candidateWayCount: officialCandidates.length,
+        cause: networkError.message,
+      });
+    }
     const preliminary = createLegacyReviewPlan(metadata, network.ways);
     const officialRouteWays = await Promise.all(preliminary.fitting.wayIds.map(fetchOfficialWay));
     const officialById = new Map(officialRouteWays.map((way) => [Number(way.id), way]));
@@ -244,6 +274,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       osmWriteRequested: true,
       reviewRequired: true,
       planner: "legacy_browser_refit_v1",
+      osmReadSource: network.source,
       recordId: review.record_id,
       sourcePlanId: review.plan_id,
       fitting: {
