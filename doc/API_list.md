@@ -16,15 +16,16 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 | GET | `/api/config` | 不要 | クライアント初期化用設定を取得 |
 | GET | `/api/count` | 不要 | マップマッチング月次カウントを取得 |
 | GET | `/api/stats` | 不要 | 総ユーザー数・総点字ブロック記録距離・総道情報件数を取得 |
-| GET | `/api/match` | 不要 | 1点マップマッチング（Valhalla locate） |
+| GET | `/api/match` | 不要 | 旧1点マップマッチング（Valhalla診断互換。正式UI0では未使用） |
 | POST | `/api/session/start` | 必要 | セッション開始 |
+| POST | `/api/session/point` | 必要 | 画面遷移中のGPS生座標を追記（フィッティングなし） |
 | POST | `/api/session/end` | 必要 | セッション終了 |
 | POST | `/api/session/cancel` | 必要 | セッション関連データを削除 |
 | POST | `/api/session/deactivate` | 必要 | セッションを論理無効化 |
 | POST | `/api/session/memo` | 必要 | セッションメモを更新 |
 | GET | `/api/records` | 条件付き | 保存済み経路一覧を取得 |
 | GET | `/api/tactile-ranking` | 不要 | 指定期間の点字ブロック記録距離ランキングを取得 |
-| POST | `/api/trace` | 不要 | Valhalla `trace_attributes` を呼び出し |
+| POST | `/api/trace` | 不要 | ブラウザ確定経路を保存（旧Valhalla診断互換を含む） |
 | GET | `/api/osm-tactile-ways` | 不要 | Overpass経由で点字ブロック関連地物を取得 |
 | GET | `/api/post-tags` | 不要 | 投稿タグ一覧を取得 |
 | POST | `/api/post-tags` | 不要 | 投稿タグを追加 |
@@ -92,7 +93,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
   - `405`, `500`, `503`
 
 #### `GET /api/match`
-- 概要: 1点マップマッチング（Valhalla locate）
+- 概要: 旧1点マップマッチング（Valhalla locate）。診断互換用で、正式UI0の通常記録では使用しない
 - 主なクエリ:
   - 必須: `lat`, `lng`
   - 任意: `prevLat`, `prevLng`, `sessionId`, `sessionUuid`, `userId`, `deviceUuid`, `seq`, `record=1`
@@ -112,6 +113,12 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 - 主なレスポンス:
   - `200`: `success`, `sessionId` など
   - `400`, `401`, `500`
+
+#### `POST /api/session/point`
+- 概要: 点字ブロック記録中に道情報投稿画面へ移動した場合も、GPS生座標を`gps_raw`へ追記する
+- 認証: 必須。対象セッションの所有者だけが追加可能
+- 本文: `sessionId`, `lat`, `lng`, 任意の`accuracy`, `recordedAt`
+- 補足: フィッティングやValhalla呼出しは行わない。正式UI0へ戻った後、ブラウザ内で経路を確定する
 
 #### `POST /api/session/end`
 - 概要: セッション終了
@@ -181,7 +188,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
   - `405`, `500`, `503`
 
 #### `POST /api/trace`
-- 概要: Valhalla `trace_attributes` を呼び出し
+- 概要: 正式UI0では`source=browser`の確定経路・Way列・生座標を保存する。`osmPreview`のない旧診断要求のみValhalla `trace_attributes`を呼び出す
 - リクエストBody:
   - 必須: `shape[]`
   - 任意: `userId`, `sessionId`, `source`, `costing`, `shape_match`, `filters`

@@ -69,10 +69,12 @@
 ### `server/api/session.js`
 - エンドポイント:
   - `POST /api/session/start`
+  - `POST /api/session/point`
   - `POST /api/session/end`
   - `POST /api/session/cancel`
 - 主な役割:
   - セッション開始・終了の記録（`tactile.sessions`）
+  - 別画面で記録を継続している間のGPS生座標追記（`tactile.gps_raw`）
   - キャンセル時の関連データ削除
     - `tactile.session_path_edges`
     - `tactile.session_paths`
@@ -104,6 +106,7 @@
   - 月次使用回数をカウント
   - 条件が揃うとセッション点を保存
   - `record=1` のときリアルタイム点を `gps_raw/gps_matched` に保存
+- 正式UI0はこの保存経路を使用せず、`POST /api/session/point`で生座標だけを保存します。
 - 依存:
   - 環境変数 `VALHALLA_HOST`, `VALHALLA_PORT`
   - DB（保存系）
@@ -111,7 +114,8 @@
 ### `server/api/trace.js`
 - エンドポイント: `POST /api/trace`
 - 主な役割:
-  - Valhalla `/trace_attributes` を呼び出し、マッチング結果を返却
+  - 正式UI0の`source=browser`では、ブラウザが確定した経路・Way列と生座標を保存
+  - `osmPreview`のない旧診断リクエストではValhalla `/trace_attributes`を呼び出す
   - `sessionId` 付きなら `tactile.session_paths` と `tactile.session_path_edges` を更新
   - セッションがキャンセル済みなら保存をスキップ
 

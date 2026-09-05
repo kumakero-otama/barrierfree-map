@@ -57,7 +57,7 @@
   <text x="672" y="473" text-anchor="middle" class="boxTitle">Node.js バックエンド</text>
   <text x="672" y="498" text-anchor="middle" class="small">systemd: stepby-dev.service（内部名）／mainブランチ</text>
   <rect x="425" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="548" text-anchor="middle" class="body">認証・プロフィール</text><text x="545" y="570" text-anchor="middle" class="small">利用者はGoogle認証のみ</text>
-  <rect x="680" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="548" text-anchor="middle" class="body">記録・タグAPI</text><text x="800" y="570" text-anchor="middle" class="small">raw・PRO・道情報</text>
+  <rect x="680" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="548" text-anchor="middle" class="body">記録・タグAPI</text><text x="800" y="570" text-anchor="middle" class="small">画面遷移中もGPS raw追記</text>
   <rect x="425" y="606" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="632" text-anchor="middle" class="body">OSM変更API</text><text x="545" y="654" text-anchor="middle" class="small">分割・公開・取消し</text>
   <rect x="680" y="606" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="632" text-anchor="middle" class="body">審査・安全API</text><text x="800" y="654" text-anchor="middle" class="small">承認・保留・却下・監査・競合停止</text>
 

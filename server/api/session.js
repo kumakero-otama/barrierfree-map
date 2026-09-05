@@ -43,7 +43,7 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
     );
   }
 
-  // /api/session/{start|end|cancel|deactivate|memo} を1つのハンドラで振り分ける。
+  // /api/session/{start|point|end|cancel|deactivate|memo} を1つのハンドラで振り分ける。
   return async function handleSession(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.pathname.split("/").pop();
@@ -72,6 +72,10 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
         await handleSessionStart(req, data, res);
         return;
       }
+      if (action === "point") {
+        await handleSessionPoint(req, data, res);
+        return;
+      }
       if (action === "end") {
         await handleSessionEnd(req, data, res);
         return;
@@ -92,6 +96,58 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
       sendJson(res, 404, { error: "unknown_action" });
     });
   };
+
+  // 別画面へ移動している間も、Valhallaを介さずGPS生座標だけを追記する。
+  // フィッティング済み座標とWayは、記録終了時にブラウザ版の結果で確定する。
+  async function handleSessionPoint(req, data, res) {
+    const sessionId = data.sessionId || data.sessionUuid;
+    const lat = Number(data.lat);
+    const lng = Number(data.lng);
+    const accuracy = data.accuracy == null ? null : Number(data.accuracy);
+    const recordedAt = data.recordedAt || new Date().toISOString();
+    if (!sessionId) {
+      sendJson(res, 400, { error: "missing_session_id" });
+      return;
+    }
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+        !Number.isFinite(lng) || lng < -180 || lng > 180 ||
+        (accuracy !== null && (!Number.isFinite(accuracy) || accuracy < 0))) {
+      sendJson(res, 400, { error: "invalid_gps_point" });
+      return;
+    }
+    if (!pool) {
+      sendJson(res, 200, { success: true, sessionId, dbDisabled: true });
+      return;
+    }
+    try {
+      const userId = await resolveAuthenticatedUserId(req, pool);
+      if (!userId) {
+        sendJson(res, 401, { error: "unauthorized" });
+        return;
+      }
+      if (canceledSessionIds && canceledSessionIds.has(sessionId)) {
+        sendJson(res, 409, { error: "session_canceled" });
+        return;
+      }
+      const [owned] = await pool.query(
+        "SELECT session_id FROM tactile.sessions WHERE session_id=? AND user_id=? LIMIT 1",
+        [sessionId, userId]
+      );
+      if (!owned[0]) {
+        sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+        return;
+      }
+      await pool.query(
+        `INSERT INTO tactile.gps_raw(session_id,ts,geom,accuracy)
+         VALUES(?,?,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,?)`,
+        [sessionId, recordedAt, lng, lat, accuracy]
+      );
+      sendJson(res, 200, { success: true, sessionId, stored: true });
+    } catch (err) {
+      sessionLogger.appendLog("ERROR", `SESSION_POINT_DB_ERROR[${sessionId}]: ${err.message}`);
+      sendJson(res, 500, { error: "session_point_failed" });
+    }
+  }
 
   // セッション開始時刻を作成/更新する。
   async function handleSessionStart(req, data, res) {

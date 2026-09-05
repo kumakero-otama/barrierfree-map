@@ -113,7 +113,8 @@ paths:
   /api/match:
     get:
       tags: [Match]
-      summary: 1点マップマッチング（Valhalla locate）
+      summary: 旧Valhalla 1点マップマッチング（診断互換用）
+      description: 正式UI0の通常記録フローでは使用しません。
       parameters:
         - in: query
           name: lat
@@ -218,6 +219,44 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/session/point:
+    post:
+      tags: [Session]
+      summary: 画面遷移中のGPS生座標を追記
+      description: 道情報投稿画面などで記録を継続するため、生座標だけを保存します。フィッティングは正式UI0へ戻った後にブラウザ内JavaScriptで行います。
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, lat, lng]
+              properties:
+                sessionId: { type: string }
+                lat: { type: number, format: double, minimum: -90, maximum: 90 }
+                lng: { type: number, format: double, minimum: -180, maximum: 180 }
+                accuracy: { type: number, format: double, minimum: 0, nullable: true }
+                recordedAt: { type: string, format: date-time }
+      responses:
+        '200':
+          description: GPS生座標を保存
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionSuccess' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: session_not_found_or_forbidden
+        '409':
+          description: session_canceled
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -516,7 +555,8 @@ paths:
   /api/trace:
     post:
       tags: [Trace]
-      summary: Valhalla trace_attributes を呼び出し
+      summary: ブラウザ確定経路の保存（旧Valhalla診断互換を含む）
+      description: 正式UI0は source=browser と osmPreview を送り、生座標・フィット結果・Way列を保存します。osmPreviewがない旧診断リクエストだけValhallaを使用します。
       requestBody:
         required: true
         content:
@@ -530,6 +570,7 @@ paths:
                 source:
                   type: string
                   default: valhalla
+                  enum: [browser, valhalla]
                 costing:
                   type: string
                   default: pedestrian
@@ -550,7 +591,7 @@ paths:
                       type: { type: string }
       responses:
         '200':
-          description: OK (Valhallaレスポンス)
+          description: 保存結果または旧Valhalla診断レスポンス
           content:
             application/json:
               schema:
