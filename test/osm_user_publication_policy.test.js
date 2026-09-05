@@ -17,8 +17,8 @@ assert.match(tactileSource, /stepby_record_id = String\(record\.record_id\)/,
   "all users need a record id for read-only detail display");
 assert.match(tactileSource, /stepby_owner_user_id = Number\(record\.created_by\)/,
   "detail cards need the real owner while deletion remains owner-only");
-assert.match(tactileSource, /OVERPASS_HOSTS\.forEach/,
-  "OSM display mirrors must be queried concurrently");
+assert.match(tactileSource, /const tryHost = \(index\)[\s\S]{0,900}?tryHost\(index \+ 1\)/,
+  "OSM display mirrors must be queried one at a time after failure");
 assert.match(tactileSource, /STALE_CACHE_MS/,
   "a temporary upstream failure must be able to use the last successful display cache");
 assert.match(tactileSource, /osmUpstreamUnavailable: true/,

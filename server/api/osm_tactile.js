@@ -104,7 +104,8 @@ function fetchOverpass(overpassHost, query, callback) {
     });
   });
 
-  req.setTimeout(15000, () => req.destroy(new Error("overpass_timeout")));
+  // Overpass QL側の25秒制限より先にStepByが切断しないよう、30秒待つ。
+  req.setTimeout(30000, () => req.destroy(new Error("overpass_timeout")));
 
   req.on("error", (err) => {
     callback(new Error(`overpass_request_error:${err.message}`));
@@ -205,7 +206,8 @@ function createOsmTactileWaysHandler({ sendJson }) {
   ].filter(Boolean))];
   const { pool } = createDbPool();
   const responseCache = new Map();
-  const FRESH_CACHE_MS = 5 * 60 * 1000;
+  // 点字ブロック表示は即時性より安定性を優先し、同じ地域への再問い合わせを抑える。
+  const FRESH_CACHE_MS = 30 * 60 * 1000;
   const STALE_CACHE_MS = 24 * 60 * 60 * 1000;
   let rules;
   try {
@@ -356,7 +358,6 @@ function createOsmTactileWaysHandler({ sendJson }) {
         return;
       }
       let completed = false;
-      let remainingHosts = OVERPASS_HOSTS.length;
       const finishWithPayload = async (overpassJson) => {
         if (completed) return;
         completed = true;
@@ -404,18 +405,27 @@ function createOsmTactileWaysHandler({ sendJson }) {
             count: 0, features: [], cached: false, osmUpstreamUnavailable: true });
         }
       };
-      // 1台ずつ最大30秒待たず、読取専用ミラーへ並行問い合わせして最初の成功を使う。
-      OVERPASS_HOSTS.forEach((host) => {
-        fetchOverpass(host, query, async (err, overpassJson) => {
-        if (err) {
-          console.warn(`[osm_tactile] host failed ${host}:`, err.message);
-          remainingHosts -= 1;
-          if (remainingHosts === 0) await finishWithoutUpstream();
+      // 公共Overpassへ不要な同時負荷を掛けない。失敗した場合だけ次のミラーへ進む。
+      const tryHost = (index) => {
+        if (index >= OVERPASS_HOSTS.length) {
+          finishWithoutUpstream().catch((error) => {
+            console.error("[osm_tactile] fallback response failed:", error.message);
+          });
           return;
         }
-        await finishWithPayload(overpassJson);
-      });
-      });
+        const host = OVERPASS_HOSTS[index];
+        fetchOverpass(host, query, (err, overpassJson) => {
+          if (err) {
+            console.warn(`[osm_tactile] host failed ${host}:`, err.message);
+            tryHost(index + 1);
+            return;
+          }
+          finishWithPayload(overpassJson).catch((error) => {
+            console.error("[osm_tactile] response build failed:", error.message);
+          });
+        });
+      };
+      tryHost(0);
     } catch (err) {
       console.error("[osm_tactile] handler error:", err.message);
       sendJson(res, 500, { error: "osm_tactile_handler_error", message: err.message });

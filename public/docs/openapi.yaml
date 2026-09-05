@@ -611,6 +611,7 @@ paths:
     get:
       tags: [OSM]
       summary: Overpass経由で点字ブロック関連地物を取得
+      description: 公共Overpassミラーを失敗時だけ順次試行し、各30秒待機します。同一地域の成功結果は30分、障害時利用は24時間までキャッシュします。
       parameters:
         - in: query
           name: centerLat

@@ -8,6 +8,7 @@
 
 - 公開中の正式版はUI0です。通常のフィッティングではValhallaを使わず、ブラウザ内でOSM道路網へフィッティングします。
 - 記録中に道情報投稿画面へ移動しても、`POST /api/session/point`でGPS生座標だけを継続保存します。マップへ戻った後に点列を復元してブラウザ内でフィッティングし、旧`/api/match?record=1`は使用しません。
+- OSM点字ブロック表示は、公共Overpassを同時呼出しせず失敗時だけ順次切替します。各読取を30秒待ち、同一地域を30分キャッシュし、上流障害時は24時間以内の保存結果を利用します。
 - UI0のフロントエンドはGitHub Pages、APIとDBはGoogle Cloudの`stepby-dev-1`で稼働しています。VM・サービス・DBの`dev`を含む名前は移行前から継続する内部識別子です。
 - フロントエンドは`StepBy/main`のUI0、バックエンドの公開・再現基準は`barrierfree-map/main`です。今後のバックエンド開発は`dev`で行い、確認後にmainへ昇格します。
 - UI0のOSM送信先は本番OpenStreetMapです。編集はサーバーで認証したStepBy専用OSMアカウント（表示名 `StepBy`）から行います。

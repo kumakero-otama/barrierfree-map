@@ -208,6 +208,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
   - `200`: `success`, `centerLat`, `centerLng`, `radiusKm`, `count`, `features[]`
   - `400`: `invalid_center`
   - `405`, `500`, `502`
+- 安定化: Overpassミラーを順次試行（各30秒）し、同一地域の結果を30分キャッシュする。全ミラーが失敗しても24時間以内のキャッシュまたはStepBy保存経路を返す
 
 #### `GET /api/post-tags`
 - 概要: 投稿タグ一覧を取得
