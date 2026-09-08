@@ -50,7 +50,8 @@ function fetchOverpass(host, query, callback) {
       });
     }
   );
-  req.setTimeout(15000, () => req.destroy(new Error("overpass_timeout")));
+  // Overpass QLの25秒制限より先にStepBy側が切断しない。
+  req.setTimeout(30000, () => req.destroy(new Error("overpass_timeout")));
   req.on("error", (err) => callback(new Error(`overpass_request_error:${err.message}`)));
   req.write(body);
   req.end();

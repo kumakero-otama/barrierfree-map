@@ -17,6 +17,24 @@ const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
 const ELEMENT_TYPES = new Set(["node", "way", "relation"]);
 const ACTION_TYPES = new Set(["create", "modify", "delete"]);
 
+function distanceMeters(a, b) {
+  const toRad = (value) => value * Math.PI / 180;
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const dLat = lat2 - lat1;
+  const dLng = toRad(b.lng - a.lng);
+  const value = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(Math.max(0, 1 - value)));
+}
+
+// 承認対象の短い記録に対して都市全体1kmを取得しない。全GPS点を覆う距離に
+// 150mの余白を加え、公式OSM map APIの5万Node制限に達しにくくする。
+function reviewNetworkRadius(points, center) {
+  const farthest = points.reduce((max, point) => Math.max(max, distanceMeters(center, point)), 0);
+  return Math.round(Math.min(1000, Math.max(200, farthest + 150)));
+}
+
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -245,10 +263,11 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       lat: sum.lat + point.lat / points.length,
       lng: sum.lng + point.lng / points.length,
     }), { lat: 0, lng: 0 });
+    const networkRadius = reviewNetworkRadius(points, center);
     // OSM公開直前は遅延し得るOverpassより公式map APIを優先し、最新Versionと形状で計画する。
     let network;
     try {
-      network = await fetchWalkableNetwork(center.lat, center.lng, 1000, undefined, {
+      network = await fetchWalkableNetwork(center.lat, center.lng, networkRadius, undefined, {
         forceRefresh: true,
         preferOfficial: true,
       });
@@ -275,6 +294,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       reviewRequired: true,
       planner: "legacy_browser_refit_v1",
       osmReadSource: network.source,
+      osmReadRadiusMeters: networkRadius,
       recordId: review.record_id,
       sourcePlanId: review.plan_id,
       fitting: {
@@ -1182,3 +1202,4 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
 }
 
 module.exports = createOsmChangesHandler;
+module.exports.reviewNetworkRadius = reviewNetworkRadius;

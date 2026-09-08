@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createLegacyReviewPlan, boundaryPosition } = require("../server/osm/legacy_review_planner");
+const { reviewNetworkRadius } = require("../server/api/osm_changes");
 const changesSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_changes.js"), "utf8");
 
 const footway = {
@@ -63,7 +64,21 @@ assert.match(changesSource, /official_review_way_fallback/,
   "review approval must use current official Way data when the nearby Overpass read is unavailable");
 assert.match(changesSource, /Promise\.allSettled\(\[\.\.\.ids\]\.map\(fetchOfficialWay\)\)/,
   "the fallback must refresh stored Way IDs through the official OSM API");
+assert.match(changesSource, /const networkRadius = reviewNetworkRadius\(points, center\)/,
+  "review approval must limit nearby OSM reads to the recorded trace extent");
+assert.match(changesSource, /fetchWalkableNetwork\(center\.lat, center\.lng, networkRadius/,
+  "review approval must not request a fixed 1km network for every short trace");
 assert.equal(boundaryPosition({ kind: "node", index: 2 }), 2);
 assert.equal(boundaryPosition({ kind: "projection", segmentIndex: 1, fraction: 0.25 }), 1.25);
+assert.equal(reviewNetworkRadius([
+  { lat: 34, lng: 134 },
+  { lat: 34, lng: 134.0002 },
+], { lat: 34, lng: 134.0001 }), 200,
+"a short review trace must use the safe minimum instead of a fixed 1km radius");
+assert.equal(reviewNetworkRadius([
+  { lat: 34, lng: 134 },
+  { lat: 34, lng: 134.03 },
+], { lat: 34, lng: 134.015 }), 1000,
+"a long review trace must remain capped at 1km");
 
 console.log("osm_legacy_review_planner.test.js: OK");

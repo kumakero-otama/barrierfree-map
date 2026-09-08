@@ -457,7 +457,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 # OSM公開審査API（2026-08-25更新）
 
 - `GET /api/osm/reviews?status=pending&source=all&q=&from=&to=`: 管理者のGoogleメールを確認し、状態・新規／既存・記録者／ID・期間で絞り込んだ審査対象とGPS・経路・変更案を取得
-- `POST /api/osm/reviews/:reviewId/approve`: 承認を追記監査へ保存し、安全条件が揃う場合だけOSMへ送信
+- `POST /api/osm/reviews/:reviewId/approve`: 承認を追記監査へ保存し、記録全点を覆う200〜1000mの必要最小範囲から最新OSM道路を再取得して、安全条件が揃う場合だけOSMへ送信
 - `POST /api/osm/reviews/:reviewId/reject`: 却下理由を保存。OSM送信なし
 - `POST /api/osm/reviews/:reviewId/hold`: 管理者メモとともに保留
 - `POST /api/osm/reviews/:reviewId/memo`: 審査状態を変えず管理者メモを保存
