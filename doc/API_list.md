@@ -461,6 +461,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 - `POST /api/osm/reviews/:reviewId/reject`: 却下理由を保存。OSM送信なし
 - `POST /api/osm/reviews/:reviewId/hold`: 管理者メモとともに保留
 - `POST /api/osm/reviews/:reviewId/memo`: 審査状態を変えず管理者メモを保存
+- `POST /api/osm/reviews/:reviewId/refit`: PostgreSQLに残る生GPSを最新OSM道路へ再マップマッチングし、OSMへ送信せず変更案だけを更新。新旧の変更案と操作は追記監査へ保存
 - `POST /api/osm/reviews/:reviewId/reopen`: 却下記録を確認待ちへ戻す
 - `POST /api/osm/reviews/:reviewId/retry-notification`: その記録の審査通知を再送
 - `POST /api/osm/review-notifications/retry`: 失敗・未送信の通知を最大20件再試行

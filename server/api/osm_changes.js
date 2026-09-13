@@ -253,7 +253,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     }
   }
 
-  async function prepareLegacyReviewPlan(req, review) {
+  async function prepareLegacyReviewPlan(req, review, options = {}) {
+    const previewOnly = options.previewOnly === true;
     const metadata = review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {};
     const points = (Array.isArray(metadata.rawPoints) ? metadata.rawPoints : [])
       .map((point) => ({ lat: Number(point.lat), lng: Number(point.lng) }))
@@ -289,8 +290,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     const replacementPlanId = crypto.randomUUID();
     const summary = `StepBy旧記録の点字ブロック公開（${metadata.startedAt || review.record_id}）`;
     const context = {
-      previewOnly: false,
-      osmWriteRequested: true,
+      previewOnly,
+      osmWriteRequested: !previewOnly,
       reviewRequired: true,
       planner: "legacy_browser_refit_v1",
       osmReadSource: network.source,
@@ -327,6 +328,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           sourcePlanId: review.plan_id,
           wayIds: prepared.fitting.wayIds,
           splitSummary: prepared.splitPlan.summary,
+          previewOnly,
         })]);
       await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
         VALUES(?,'legacy_plan_superseded',?,?,?::jsonb) RETURNING event_id AS id`, [review.plan_id,
@@ -339,7 +341,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       await conn.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
         VALUES(?,'legacy_refitted',?,?::jsonb) RETURNING event_id AS id`, [review.review_id, req.authUserId,
         JSON.stringify({ replacementPlanId, sourcePlanId: review.plan_id, wayIds: prepared.fitting.wayIds,
-          splitSummary: prepared.splitPlan.summary })]);
+          splitSummary: prepared.splitPlan.summary, previewOnly })]);
       await conn.commit();
     } catch (error) {
       await conn.rollback();
@@ -359,7 +361,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
 
   // 新規記録の承認時にも、保存時の古いWay Versionをそのまま使わず、
   // PostgreSQLに保存した生GPSと経路から最新OSM上で変更案を作り直す。
-  async function prepareNewRecordReviewPlan(req, review) {
+  async function prepareNewRecordReviewPlan(req, review, options = {}) {
     const [sessions] = await pool.query(`SELECT s.started_at,ST_AsGeoJSON(p.geom::geometry) AS path_geojson
       FROM tactile.sessions s LEFT JOIN tactile.session_paths p ON p.session_id=s.session_id
       WHERE s.session_id=? LIMIT 1`, [review.record_id]);
@@ -375,7 +377,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         accuracy: point.accuracy == null ? null : Number(point.accuracy), ts: point.ts || null,
       })),
     };
-    return prepareLegacyReviewPlan(req, { ...review, source_metadata: sourceMetadata });
+    return prepareLegacyReviewPlan(req, { ...review, source_metadata: sourceMetadata }, options);
   }
 
   async function markLegacyAlreadyPresent(req, review, plannerError) {
@@ -762,6 +764,38 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               reviewer_user_id=NULL,reviewed_at=NULL,updated_at=NOW() WHERE review_id=?`, [reviewId],
             reviewId, "reopened", req.authUserId);
             sendJson(res, 200, { success: true, reviewId, status: "pending", osmSent: false }); return;
+          }
+          if (action === "refit") {
+            if (!["new_record", "legacy_record"].includes(review.source_type)) {
+              sendJson(res, 400, { error: "review_refit_not_supported" }); return;
+            }
+            if (review.review_status === "merged") {
+              sendJson(res, 409, { error: "merged_review_cannot_be_refitted" }); return;
+            }
+            const refittedReview = await withPlanLock(`review:${reviewId}`, async () => {
+              const [freshRows] = await pool.query(`SELECT q.*,cp.operation_type,cp.created_by,cp.summary,cp.elements,cp.client_context
+                FROM osmchange.review_queue q JOIN osmchange.change_plans cp ON cp.plan_id=q.plan_id
+                WHERE q.review_id=? LIMIT 1`, [reviewId]);
+              const freshReview = freshRows[0];
+              if (!freshReview) throw new Error("review_not_found");
+              if (freshReview.review_status === "merged") {
+                const error = new Error("merged_review_cannot_be_refitted");
+                error.status = 409;
+                throw error;
+              }
+              return freshReview.source_type === "new_record"
+                ? prepareNewRecordReviewPlan(req, freshReview, { previewOnly: true })
+                : prepareLegacyReviewPlan(req, freshReview, { previewOnly: true });
+            });
+            sendJson(res, 200, {
+              success: true,
+              reviewId,
+              status: review.review_status,
+              osmSent: false,
+              planId: refittedReview.plan_id,
+              fitting: refittedReview.client_context?.fitting || null,
+            });
+            return;
           }
           if (action === "approve") {
             const approvalResult = await withPlanLock(`review:${reviewId}`, async () => {

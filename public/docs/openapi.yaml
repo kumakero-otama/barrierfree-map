@@ -1685,6 +1685,14 @@ paths:
         - { in: path, name: reviewId, required: true, schema: { type: string, format: uuid } }
       responses:
         '200': { description: メモ保存済み }
+  /api/osm/reviews/{reviewId}/refit:
+    post:
+      summary: 保存済み生GPSを最新OSM道路へ再マップマッチングし、未送信の変更案を更新
+      parameters:
+        - { in: path, name: reviewId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 変更案更新済み。osmSentは常にfalse }
+        '409': { description: OSM公開済み記録は再処理不可 }
   /api/osm/reviews/{reviewId}/retry-notification:
     post:
       summary: 指定記録の管理者通知を再送
