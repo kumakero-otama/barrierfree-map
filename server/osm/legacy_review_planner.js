@@ -80,6 +80,32 @@ function boundaryPosition(boundary) {
   return NaN;
 }
 
+// GPS点同士を直線で結ばず、分割対象の最新OSM Wayを投影端点で切り出して
+// 連結し、管理画面の緑線に使う経路を作る。
+function createFittedPath(segments) {
+  const path = [];
+  const append = (coordinate) => {
+    if (!Array.isArray(coordinate) || coordinate.length < 2) return;
+    const normalized = [Number(coordinate[0]), Number(coordinate[1])];
+    if (!normalized.every(Number.isFinite)) return;
+    const last = path.at(-1);
+    if (!last || last[0] !== normalized[0] || last[1] !== normalized[1]) path.push(normalized);
+  };
+  for (const segment of segments) {
+    const from = boundaryPosition(segment.from);
+    const to = boundaryPosition(segment.to);
+    const forward = to >= from;
+    append(segment.from.coordinate);
+    const interior = (segment.fullCoordinates || []).filter((_, index) => forward
+      ? index > from && index < to
+      : index < from && index > to);
+    if (!forward) interior.reverse();
+    interior.forEach(append);
+    append(segment.to.coordinate);
+  }
+  return path;
+}
+
 function createLegacyReviewPlan(metadata, ways) {
   const rawPoints = normalizeRawPoints(metadata || {});
   const recordedPath = parseRecordedPath(metadata || {});
@@ -121,7 +147,7 @@ function createLegacyReviewPlan(metadata, ways) {
   });
   if (!segments.length) throw new Error("zero_length_tactile_segment");
   const splitPlan = createSplitPlan({ segments }, { tactileValue: "yes" });
-  return { fitting, segments, splitPlan };
+  return { fitting, segments, splitPlan, fittedPath: createFittedPath(segments) };
 }
 
-module.exports = { createLegacyReviewPlan, parseRecordedPath, normalizeRawPoints, closestBoundary, sharedNodeBoundary, inferRoadSide, boundaryPosition };
+module.exports = { createLegacyReviewPlan, parseRecordedPath, normalizeRawPoints, closestBoundary, sharedNodeBoundary, inferRoadSide, boundaryPosition, createFittedPath };

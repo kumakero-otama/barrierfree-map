@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { createLegacyReviewPlan, boundaryPosition } = require("../server/osm/legacy_review_planner");
+const { createLegacyReviewPlan, boundaryPosition, createFittedPath } = require("../server/osm/legacy_review_planner");
 const { reviewNetworkRadius } = require("../server/api/osm_changes");
 const changesSource = fs.readFileSync(path.join(__dirname, "../server/api/osm_changes.js"), "utf8");
 
@@ -80,5 +80,14 @@ assert.equal(reviewNetworkRadius([
   { lat: 34, lng: 134.03 },
 ], { lat: 34, lng: 134.015 }), 1000,
 "a long review trace must remain capped at 1km");
+assert.deepEqual(createFittedPath([{
+  fullCoordinates: [[0, 0], [1, 0], [2, 0], [3, 0]],
+  from: { kind: "projection", segmentIndex: 0, fraction: 0.5, coordinate: [0.5, 0] },
+  to: { kind: "projection", segmentIndex: 2, fraction: 0.5, coordinate: [2.5, 0] },
+}]), [[0.5, 0], [1, 0], [2, 0], [2.5, 0]],
+"the displayed fitted line must follow current OSM Way coordinates");
+assert.match(changesSource, /refittedPathGeoJson/, "refitted GeoJSON must be persisted for the green review line");
+assert.match(changesSource, /COALESCE\(q\.source_metadata->>'refittedPathGeoJson'/,
+  "the review API must prefer the latest refitted line over the previously stored path");
 
 console.log("osm_legacy_review_planner.test.js: OK");

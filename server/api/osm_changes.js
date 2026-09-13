@@ -312,6 +312,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       legacyNeedsRefit: false,
       refittedAt: new Date().toISOString(),
       refittedWayIds: prepared.fitting.wayIds,
+      refittedPathGeoJson: JSON.stringify({ type: "LineString", coordinates: prepared.fittedPath }),
     };
     const conn = await pool.getConnection();
     try {
@@ -710,7 +711,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           const [rows] = await pool.query(`SELECT q.review_id,q.record_id,q.plan_id,q.source_type,q.source_record_id,
               q.review_status,q.rejection_reason,q.admin_note,q.source_metadata,q.created_at,q.reviewed_at,
               COALESCE(q.source_metadata->>'username',u.username) username,
-              COALESCE(ST_AsGeoJSON(p.geom::geometry),q.source_metadata->>'pathGeoJson') path_geojson,cp.elements,cp.client_context,
+              COALESCE(q.source_metadata->>'refittedPathGeoJson',ST_AsGeoJSON(p.geom::geometry),q.source_metadata->>'pathGeoJson') path_geojson,cp.elements,cp.client_context,
               (SELECT details->>'error' FROM osmchange.review_events re WHERE re.review_id=q.review_id AND re.event_type='merge_failed' ORDER BY re.event_id DESC LIMIT 1) last_error,
               (SELECT status FROM osmchange.review_notifications rn WHERE rn.review_id=q.review_id ORDER BY rn.created_at DESC LIMIT 1) notification_status,
               COALESCE((SELECT jsonb_agg(jsonb_build_object('lat',ST_Y(g.geom::geometry),'lng',ST_X(g.geom::geometry),
