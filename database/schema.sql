@@ -803,6 +803,19 @@ CREATE TABLE roadinfo.road_info_point_tag (
     tag_id bigint NOT NULL
 );
 
+-- 旧StepByから移した道情報の重複登録を防ぐ対応表。
+CREATE TABLE roadinfo.legacy_point_imports (
+    source_system text NOT NULL,
+    source_point_id bigint NOT NULL,
+    point_id bigint NOT NULL REFERENCES roadinfo.road_info_point(id),
+    source_status text NOT NULL,
+    requires_review boolean DEFAULT false NOT NULL,
+    review_reason text,
+    imported_at timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY (source_system, source_point_id),
+    UNIQUE (point_id)
+);
+
 
 --
 -- Name: road_info_tag; Type: TABLE; Schema: roadinfo; Owner: -
