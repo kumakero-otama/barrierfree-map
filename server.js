@@ -22,6 +22,7 @@ const createOsmOAuthHandler = require("./server/api/osm_oauth");
 const createProStatusHandler = require("./server/api/pro_status");
 const createTactileTagsHandler = require("./server/api/tactile_tags");
 const createClientLogsHandler = require("./server/api/client_logs");
+const { createChangelogViewsHandler } = require("./server/api/changelog_views");
 const createTactileRankingHandler = require("./server/api/tactile_ranking");
 const createHealthHandler = require("./server/api/health");
 const createAdminDatabaseHandler = require("./server/api/admin_database");
@@ -415,6 +416,7 @@ const handleClientLogs = createClientLogsHandler({
   sendJson,
   LOG_DIR,
 });
+const handleChangelogViews = createChangelogViewsHandler({ sendJson });
 
 const handleTactileRanking = createTactileRankingHandler({
   sendJson,
@@ -485,6 +487,10 @@ function handleRequest(req, res) {
   }
   if (req.url && req.url.startsWith("/api/session")) {
     handleSession(req, res);
+    return;
+  }
+  if (req.url && req.url.startsWith("/api/changelog-views")) {
+    handleChangelogViews(req, res);
     return;
   }
   if (req.url && req.url.startsWith("/api/config")) {

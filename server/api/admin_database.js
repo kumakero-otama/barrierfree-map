@@ -5,6 +5,11 @@ const { createDbPool } = require("../db");
 const { ensureReviewSchema } = require("../osm/review_queue");
 
 const TABLES = Object.freeze({
+  "login.changelog_item_views": {
+    label: "ユーザー別チェンジログ表示履歴",
+    rows: `SELECT user_id,item_id,changelog_version,language,item_text,content_hash,first_displayed_at
+             FROM login.changelog_item_views ORDER BY first_displayed_at DESC LIMIT ?`,
+  },
   "tactile.sessions": {
     label: "点字ブロック記録セッション",
     rows: `SELECT session_id,user_id,started_at,ended_at,is_active
