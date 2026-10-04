@@ -2122,4 +2122,16 @@ ALTER TABLE ONLY tactile.sessions
 -- PostgreSQL database dump complete
 --
 
+-- 利用者へ実際に表示したチェンジログの項目単位履歴。
+CREATE TABLE IF NOT EXISTS login.changelog_item_views (
+    user_id bigint NOT NULL REFERENCES login.users(user_id) ON DELETE CASCADE,
+    item_id character varying(128) NOT NULL,
+    changelog_version character varying(32) NOT NULL,
+    language character varying(12) NOT NULL,
+    item_text text NOT NULL,
+    content_hash character(64) NOT NULL,
+    first_displayed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (user_id, item_id)
+);
+
 \unrestrict 27enVynhlASMC7ef0PhaIirEMtmg6JflTjqakbfLNPCHBvCOZicbSsT83Vm360i

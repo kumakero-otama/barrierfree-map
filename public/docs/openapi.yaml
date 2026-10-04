@@ -25,6 +25,7 @@ tags:
   - name: ProStatus
   - name: Tactile
   - name: ClientLogs
+  - name: Changelog
 
 paths:
   /api/config:
@@ -839,6 +840,58 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/changelog-views:
+    get:
+      tags: [Changelog]
+      summary: ログインユーザーへ表示済みのチェンジログ項目を取得
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '503':
+          description: database_unavailable
+    post:
+      tags: [Changelog]
+      summary: 表示したチェンジログ項目と本文をユーザー単位で記録
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, language, items]
+              properties:
+                version: { type: string }
+                language: { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [itemId, text]
+                    properties:
+                      itemId: { type: string }
+                      text: { type: string }
+      responses:
+        '200':
+          description: Recorded
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '503':
+          description: database_unavailable
 
   /api/pro-status:
     get:
