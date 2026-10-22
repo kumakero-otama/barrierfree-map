@@ -5,6 +5,7 @@ const { replay, projectToSegment, inferWaySide } = require("../fitting/browser_m
 const { createSplitPlan } = require("../osm/split_planner");
 const { ensureRecordLinkSchema } = require("../osm/record_links");
 const { ensureReviewSchema, enqueueReview } = require("../osm/review_queue");
+const { requireGuardedAdmin } = require("../security/admin_authorization");
 
 function readJson(req) {
   return new Promise((resolve, reject) => { let body = ""; req.on("data", (chunk) => { body += chunk; if (body.length > 32768) reject(new Error("payload_too_large")); });
@@ -50,6 +51,7 @@ function createRecordReplayHandler({ sendJson }) {
 
   return async function handle(req, res) {
     if (process.env.NODE_ENV !== "development") return sendJson(res, 404, { error: "not_found" });
+    if (!requireGuardedAdmin(req, res, sendJson)) return;
     try {
       await ensureSchema();
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);

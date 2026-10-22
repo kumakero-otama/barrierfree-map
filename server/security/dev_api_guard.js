@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const path = require("path");
 const { extractBearerToken, verifyAccessToken } = require("../auth_token");
 const { createLogger } = require("../logger");
+const { assertSecurityConfiguration } = require("./security_config");
 
 const WINDOW_MS = 60 * 1000;
 const counters = new Map();
@@ -46,9 +47,10 @@ function consumeRateLimit(key, limit) {
 }
 
 function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSession = () => false }) {
+  const securityConfig = assertSecurityConfiguration();
   const securityLogger = createLogger(path.join(logDir, "dev_api_security.csv"));
-  const adminKey = process.env.DEV_ADMIN_KEY || "";
-  const tokenSecretConfigured = String(process.env.ACCESS_TOKEN_SECRET || "").length >= 32;
+  const adminKey = securityConfig.adminKey;
+  const tokenSecretConfigured = true;
   const allowedOriginSet = new Set(allowedOrigins || []);
 
   function log(label, req, details = {}) {
@@ -64,7 +66,6 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
   }
 
   return function guardDevApi(req, res) {
-    if (process.env.NODE_ENV !== "development") return true;
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     const pathname = url.pathname;
     const isApi = pathname.startsWith("/api/") || pathname.startsWith("/auth/");
@@ -152,6 +153,7 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
       }
       if (verifyAdminSession(req)) {
         req.authUserId = "admin-session";
+        req.stepByAdminAuthorized = true;
         log("ADMIN_SESSION_ALLOWED", req);
         return true;
       }
@@ -168,6 +170,7 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
         sendJson(res, 403, { error: "admin_required", requestId: req.securityRequestId });
         return false;
       }
+      req.stepByAdminAuthorized = true;
       const rate = consumeRateLimit(`admin-api:${ip}:${req.authUserId}`, 60);
       if (!rate.allowed) {
         res.setHeader("Retry-After", String(rate.retryAfterSeconds));

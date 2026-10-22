@@ -3,6 +3,26 @@ const { createLogger } = require("../logger");
 const { resolveAuthenticatedUserId } = require("../auth_user");
 const path = require("path");
 
+// PostgreSQL の UUID 列へ渡す前に、外部入力を正規形の UUID 文字列へ限定する。
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeSessionId(data) {
+  const value = data && (data.sessionId || data.sessionUuid);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function validateSessionId(sessionId, sendJson, res) {
+  if (!sessionId) {
+    sendJson(res, 400, { error: "missing_session_id" });
+    return false;
+  }
+  if (!UUID_PATTERN.test(sessionId)) {
+    sendJson(res, 400, { error: "invalid_session_id" });
+    return false;
+  }
+  return true;
+}
+
 // セッション開始・終了・キャンセル・論理削除・メモ更新を集約した API を作る。
 function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds }) {
   const dbResult = createDbPool();
@@ -95,11 +115,10 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
   // セッション開始時刻を作成/更新する。
   async function handleSessionStart(req, data, res) {
-    const sessionId = data.sessionId || data.sessionUuid;
+    const sessionId = normalizeSessionId(data);
     const startedAt = data.startedAt || new Date().toISOString();
 
-    if (!sessionId) {
-      sendJson(res, 400, { error: "missing_session_id" });
+    if (!validateSessionId(sessionId, sendJson, res)) {
       return;
     }
 
@@ -117,15 +136,20 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
       sessionLogger.appendLog("SESSION_START", `${sessionId},user_id=${userId},${startedAt}`);
 
-      await pool.query(
+      const [result] = await pool.query(
         `INSERT INTO tactile.sessions (session_id, user_id, started_at, ended_at)
          VALUES (?, ?, ?, NULL)
          ON CONFLICT (session_id) DO UPDATE
-           SET user_id = EXCLUDED.user_id,
-               started_at = EXCLUDED.started_at
+           SET started_at = EXCLUDED.started_at
+           WHERE tactile.sessions.user_id = EXCLUDED.user_id
          RETURNING session_id`,
         [sessionId, userId, startedAt]
       );
+      // 同一IDが別ユーザーに属する場合、所有者を書き換えず競合として終了する。
+      if (!result || (result.affectedRows || result.rowCount || 0) < 1) {
+        sendJson(res, 409, { error: "session_id_conflict" });
+        return;
+      }
       sendJson(res, 200, { success: true, sessionId });
     } catch (err) {
       sessionLogger.appendLog("ERROR", `SESSION_START_DB_ERROR[${sessionId}]: ${err.message}`);
@@ -135,11 +159,10 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
   // セッション終了時刻を更新する。
   async function handleSessionEnd(req, data, res) {
-    const sessionId = data.sessionId || data.sessionUuid;
+    const sessionId = normalizeSessionId(data);
     const endedAt = data.endedAt || new Date().toISOString();
 
-    if (!sessionId) {
-      sendJson(res, 400, { error: "missing_session_id" });
+    if (!validateSessionId(sessionId, sendJson, res)) {
       return;
     }
 
@@ -162,10 +185,15 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
         "UPDATE tactile.sessions SET ended_at = ? WHERE session_id = ? AND user_id = ?",
         [endedAt, sessionId, userId]
       );
+      const updated = result.affectedRows || 0;
+      if (updated < 1) {
+        sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+        return;
+      }
       sendJson(res, 200, {
         success: true,
         sessionId,
-        updated: result.affectedRows || 0,
+        updated,
       });
     } catch (err) {
       sessionLogger.appendLog("ERROR", `SESSION_END_DB_ERROR[${sessionId}]: ${err.message}`);
@@ -175,10 +203,9 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
   // キャンセル対象セッションの関連データをまとめて削除する。
   async function handleSessionCancel(req, data, res) {
-    const sessionId = data.sessionId || data.sessionUuid;
+    const sessionId = normalizeSessionId(data);
 
-    if (!sessionId) {
-      sendJson(res, 400, { error: "missing_session_id" });
+    if (!validateSessionId(sessionId, sendJson, res)) {
       return;
     }
 
@@ -193,31 +220,33 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
         sendJson(res, 401, { error: "unauthorized" });
         return;
       }
-      if (canceledSessionIds) {
-        // 別 API からの後追い保存を止めるため、先にキャンセル済み集合へ登録する。
-        canceledSessionIds.add(sessionId);
-      }
-      if (deletedSessionKeys) {
-        deletedSessionKeys.add(`${sessionId}:${userId}`);
-      }
-      sessionLogger.appendLog("SESSION_CANCEL", `${sessionId},user_id=${userId}`);
-
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
         const [targetRows] = await conn.query(
-          "SELECT session_id, user_id FROM tactile.sessions WHERE session_id = ? AND user_id = ? LIMIT 1",
+          "SELECT session_id, user_id FROM tactile.sessions WHERE session_id = ? AND user_id = ? LIMIT 1 FOR UPDATE",
           [sessionId, userId]
         );
         if (!Array.isArray(targetRows) || targetRows.length < 1) {
           throw new Error("session_not_found_or_forbidden");
         }
+        // 所有者確認後にだけキャンセル状態を共有し、他人のIDによる保存妨害を防ぐ。
+        if (canceledSessionIds) {
+          canceledSessionIds.add(sessionId);
+        }
+        if (deletedSessionKeys) {
+          deletedSessionKeys.add(`${sessionId}:${userId}`);
+        }
+        sessionLogger.appendLog("SESSION_CANCEL", `${sessionId},user_id=${userId}`);
         // 関連データを順に消し、最後に sessions 本体を削除して整合性を保つ。
         await conn.query("DELETE FROM tactile.session_path_edges WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.session_paths WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
         await conn.query("DELETE FROM tactile.gps_raw WHERE session_id = ?", [sessionId]);
-        await conn.query("DELETE FROM tactile.sessions WHERE session_id = ?", [sessionId]);
+        await conn.query(
+          "DELETE FROM tactile.sessions WHERE session_id = ? AND user_id = ?",
+          [sessionId, userId]
+        );
         await refreshUserTactileLength(conn, userId);
         await conn.commit();
       } catch (err) {
@@ -240,10 +269,9 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
   // セッションを論理無効化し、一覧表示などから除外できるようにする。
   async function handleSessionDeactivate(req, data, res) {
-    const sessionId = data.sessionId || data.sessionUuid;
+    const sessionId = normalizeSessionId(data);
 
-    if (!sessionId) {
-      sendJson(res, 400, { error: "missing_session_id" });
+    if (!validateSessionId(sessionId, sendJson, res)) {
       return;
     }
 
@@ -297,11 +325,10 @@ function createSessionHandler({ sendJson, deletedSessionKeys, canceledSessionIds
 
   // セッションメモを上書き更新する。
   async function handleSessionMemo(req, data, res) {
-    const sessionId = data.sessionId || data.sessionUuid;
+    const sessionId = normalizeSessionId(data);
     const memo = typeof data.memo === "string" ? data.memo : null;
 
-    if (!sessionId) {
-      sendJson(res, 400, { error: "missing_session_id" });
+    if (!validateSessionId(sessionId, sendJson, res)) {
       return;
     }
     if (memo == null) {

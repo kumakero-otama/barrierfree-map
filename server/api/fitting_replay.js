@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { createDbPool } = require("../db");
 const { fetchWalkableNetwork } = require("./osm_walkable");
 const { replay, distanceMeters } = require("../fitting/browser_matcher");
+const { requireGuardedAdmin } = require("../security/admin_authorization");
 
 const MAX_BODY_BYTES = 32 * 1024;
 
@@ -100,6 +101,7 @@ function createFittingReplayHandler({ sendJson }) {
   }
   return async function handle(req, res) {
     if (process.env.NODE_ENV !== "development") return sendJson(res, 404, { error: "not_found" });
+    if (!requireGuardedAdmin(req, res, sendJson)) return;
     if (!pool) return sendJson(res, 503, { error: "database_unavailable", message: error && error.message });
     try {
       await ensureSchema();

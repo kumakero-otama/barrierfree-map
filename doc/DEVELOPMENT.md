@@ -4,7 +4,7 @@
 
 ## 必要なソフトウェア
 
-- Node.js 18以上
+- Node.js 20以上
 - npm（`npm ci`が使えること）
 - PostgreSQL 16
 - PostGIS 3

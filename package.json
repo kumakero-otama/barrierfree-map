@@ -2,6 +2,9 @@
   "name": "barrierfree-map",
   "version": "1.28.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node scripts/run-tests.js",
@@ -9,8 +12,11 @@
   },
   "dependencies": {
     "google-auth-library": "^10.6.1",
-    "nodemailer": "^9.0.5",
+    "nodemailer": "^10.2.0",
     "pg": "^8.18.0",
     "yaml": "^2.5.0"
+  },
+  "overrides": {
+    "brace-expansion": "^2.1.7"
   }
 }

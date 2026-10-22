@@ -1,3 +1,8 @@
+const { assertSecurityConfiguration } = require("./server/security/security_config");
+
+// 認証鍵が未設定・短すぎる状態では、APIを待ち受ける前に安全側へ停止する。
+assertSecurityConfiguration();
+
 const http = require("http");
 const https = require("https");
 const fs = require("fs");

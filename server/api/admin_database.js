@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
+const { requireGuardedAdmin } = require("../security/admin_authorization");
 const { createDbPool } = require("../db");
 const { ensureReviewSchema } = require("../osm/review_queue");
 
@@ -196,6 +197,7 @@ function createAdminDatabaseHandler({ sendJson }) {
 
   return async function handleAdminDatabase(req, res) {
     if (process.env.NODE_ENV !== "development") return sendJson(res, 404, { error: "not_found" });
+    if (!requireGuardedAdmin(req, res, sendJson)) return;
     try {
       await ensureSchema();
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);

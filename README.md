@@ -5,7 +5,7 @@ StepBy UI0の正式バックエンド実装です。2026-08-29以降は、この
 ## 現在の構成
 
 - フロントエンド: GitHub Pages上の別リポジトリ[`StepBy`](https://github.com/kumakero-otama/StepBy)
-- API: Google Compute Engine上のNode.js 18
+- API: Google Compute Engine上のNode.js 18.19.1（現行稼働環境）。このdevブランチの次回反映前にNode.js 20以上へ更新が必要
 - HTTPS: Caddyから`127.0.0.1:3100`のNode.jsへリバースプロキシ
 - DB: 同じGCE VM上のPostgreSQL 16＋PostGIS
 - 認証: Google OpenID Connect。一般利用者に個人OSMアカウントは要求しない

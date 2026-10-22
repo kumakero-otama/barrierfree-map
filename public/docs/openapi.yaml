@@ -199,8 +199,8 @@ paths:
             schema:
               type: object
               properties:
-                sessionId: { type: string }
-                sessionUuid: { type: string }
+                sessionId: { type: string, format: uuid }
+                sessionUuid: { type: string, format: uuid }
                 startedAt: { type: string, format: date-time }
       responses:
         '200':
@@ -219,6 +219,11 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: session_id_conflict（同じIDが別ユーザーに属する）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -236,8 +241,8 @@ paths:
             schema:
               type: object
               properties:
-                sessionId: { type: string }
-                sessionUuid: { type: string }
+                sessionId: { type: string, format: uuid }
+                sessionUuid: { type: string, format: uuid }
                 endedAt: { type: string, format: date-time }
       responses:
         '200':
@@ -260,6 +265,11 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: session_not_found_or_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -277,8 +287,8 @@ paths:
             schema:
               type: object
               properties:
-                sessionId: { type: string }
-                sessionUuid: { type: string }
+                sessionId: { type: string, format: uuid }
+                sessionUuid: { type: string, format: uuid }
       responses:
         '200':
           description: OK
@@ -325,8 +335,8 @@ paths:
             schema:
               type: object
               properties:
-                sessionId: { type: string }
-                sessionUuid: { type: string }
+                sessionId: { type: string, format: uuid }
+                sessionUuid: { type: string, format: uuid }
       responses:
         '200':
           description: OK
@@ -373,8 +383,8 @@ paths:
               type: object
               required: [memo]
               properties:
-                sessionId: { type: string }
-                sessionUuid: { type: string }
+                sessionId: { type: string, format: uuid }
+                sessionUuid: { type: string, format: uuid }
                 memo:
                   type: string
                   description: 保存するメモ文字列。空文字も指定可能
@@ -398,7 +408,7 @@ paths:
                       memo: { type: string }
                       dbDisabled: { type: boolean, example: true }
         '400':
-          description: invalid_json / missing_session_id / missing_memo
+          description: invalid_json / missing_session_id / invalid_session_id / missing_memo
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -758,6 +768,8 @@ paths:
         - 既存タグコードはそのまま利用
         - 未登録コードは `roadinfo.road_info_tag` に新規作成
         - 解決されたタグは `roadinfo.road_info_point_tag` に紐付け（重複は無視）
+        - 既存ポイントへのコメント・タグ・画像の追記は、ポイント状態の変更とは別の権限として扱います
+        - 既存ポイントの状態変更（完了タグによる `inactive` を含む）は、作成者本人または環境変数で明示したGoogle管理者だけが実行できます
         - 完了タグ（code: `complete` / `completed` / `done` / `resolved` / `inactive` または label_ja: `完了`）が含まれる場合、対象ポイントの `roadinfo.road_info_point.status` は `inactive` に更新されます
         - `status = deleted` を指定した場合は、タグ解決・note追加・media追加を行わず、対象ポイントの `roadinfo.road_info_point.status` 更新だけを実行します
         また、投稿成功時に対象ポイントの `roadinfo.road_info_point.updated_at` を更新します。
@@ -826,6 +838,11 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: point_state_forbidden（作成者または明示管理者ではないユーザーによる状態変更）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404':
           description: point_not_found
           content:

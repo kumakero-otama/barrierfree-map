@@ -20,7 +20,7 @@ git rev-parse HEAD
 
 - Google Compute Engine `e2-micro`
 - Ubuntu 24.04 LTS
-- Node.js 18.19.1
+- Node.js 20以上
 - npm
 - PostgreSQL 16.14
 - PostGIS
@@ -58,7 +58,7 @@ sudo apt install -y nodejs npm postgresql postgresql-contrib postgis \
   postgresql-16-postgis-3 caddy curl ca-certificates git
 ```
 
-ディストリビューションのNode.jsが18未満の場合は、信頼できる公式配布手段でNode.js 18を導入してください。
+ディストリビューションのNode.jsが20未満の場合は、信頼できる公式配布手段でNode.js 20以上を導入してください。
 
 ## 5. アプリ用ユーザーと配置
 

@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { createDbPool } = require("../db");
 const { extractBearerToken, verifyAccessToken } = require("../auth_token");
+const { requireGuardedAdmin } = require("../security/admin_authorization");
 const { resolvedServiceAccountConfig } = require("../osm/service_account_client");
 const { ensureServiceAccountSchema } = require("../osm/service_account_store");
 
@@ -472,6 +473,7 @@ function createOsmOAuthHandler({ sendJson, fetchImpl = global.fetch }) {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     try {
       if (req.method === "GET" && requestUrl.pathname === "/auth/osm/status") return await handleStatus(req, res);
+      if (requestUrl.pathname.startsWith("/api/admin/") && !requireGuardedAdmin(req, res, sendJson)) return;
       if (req.method === "GET" && requestUrl.pathname === "/api/admin/osm-service-account/status") return await handleServiceStatus(req, res);
       if (req.method === "POST" && requestUrl.pathname === "/api/admin/osm-service-account/start") return await handleServiceStart(req, res);
       if (req.method === "POST" && requestUrl.pathname === "/auth/osm/start") return await handleStart(req, res, requestUrl);

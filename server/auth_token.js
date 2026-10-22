@@ -1,7 +1,15 @@
 const crypto = require("crypto");
 
-// アクセストークン署名に使う共有秘密鍵。未設定時は開発用の既定値を使う。
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "change-this-dev-access-token-secret";
+const { MIN_SECRET_LENGTH } = require("./security/security_config");
+
+// アクセストークン署名鍵は固定値へフォールバックさせない。
+function getAccessTokenSecret() {
+  const secret = String(process.env.ACCESS_TOKEN_SECRET || "");
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error("security_configuration_error:ACCESS_TOKEN_SECRET_missing_or_too_short");
+  }
+  return secret;
+}
 // アクセストークンの有効期限秒数。環境変数が不正な場合は 7 日を採用する。
 const ACCESS_TOKEN_EXPIRES_IN_SECONDS = Number.parseInt(process.env.ACCESS_TOKEN_EXPIRES_IN_SECONDS, 10) || (60 * 60 * 24 * 7);
 
@@ -22,7 +30,7 @@ function base64urlDecode(input) {
 // 「header.payload」文字列へ HMAC-SHA256 署名を付与し、検証用シグネチャを作る。
 function signTokenSegment(segment) {
   return base64urlEncode(
-    crypto.createHmac("sha256", ACCESS_TOKEN_SECRET).update(segment).digest()
+    crypto.createHmac("sha256", getAccessTokenSecret()).update(segment).digest()
   );
 }
 

@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const { createDbPool } = require("../db");
 const { resolveAuthenticatedUserId } = require("../auth_user");
 const { loadRoadInfoConfig } = require("../road_info_config");
+const { isRoadInfoAdmin, isPointOwner } = require("../road_info_authorization");
 
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "uploads", "road_info_media");
 // これらのコードは「問題解決済み」とみなし、ポイント状態も inactive へ寄せる。
@@ -595,12 +596,14 @@ function createRoadInfoHandler({ sendJson }) {
 
         let pointId = null;
         let pointOwnerUserId = userId;
+        let currentPointStatus = "active";
         if (hasExistingPointId) {
           const [pointRows] = await conn.query(
-            `SELECT id, created_by
+            `SELECT id, created_by, status
              FROM roadinfo.road_info_point
              WHERE id = ? AND status <> 'deleted'
-             LIMIT 1`,
+             LIMIT 1
+             FOR UPDATE`,
             [pointIdFromBody]
           );
           if (!Array.isArray(pointRows) || pointRows.length < 1) {
@@ -608,6 +611,7 @@ function createRoadInfoHandler({ sendJson }) {
           }
           pointId = pointIdFromBody;
           pointOwnerUserId = Number(pointRows[0].created_by) || null;
+          currentPointStatus = String(pointRows[0].status || "active");
         } else {
           const [pointResult] = await conn.query(
             `INSERT INTO roadinfo.road_info_point (geom, status, created_by)
@@ -646,6 +650,17 @@ function createRoadInfoHandler({ sendJson }) {
           nextStatus = "inactive";
         }
 
+        // コメント・タグ・画像の追記は他ユーザーにも許可する一方、地図から消える状態変更は
+        // 作成者または環境変数で明示した管理者だけに限定する。
+        const changesPointState = hasExistingPointId && nextStatus && nextStatus !== currentPointStatus;
+        let stateChangeAsAdmin = false;
+        if (changesPointState && !isPointOwner(pointOwnerUserId, userId)) {
+          stateChangeAsAdmin = await isRoadInfoAdmin(conn, userId);
+          if (!stateChangeAsAdmin) {
+            throw new Error("point_state_forbidden");
+          }
+        }
+
         let noteId = null;
         if (!deleteOnly) {
           const [noteResult] = await conn.query(
@@ -670,13 +685,23 @@ function createRoadInfoHandler({ sendJson }) {
         }
 
         if (nextStatus) {
-          await conn.query(
-            `UPDATE roadinfo.road_info_point
-             SET status = ?,
-                 updated_at = NOW()
-             WHERE id = ?`,
-            [nextStatus, pointId]
-          );
+          // 所有者の場合は created_by もSQL条件に含め、検査と更新の間の競合を防ぐ。
+          const [statusResult] = stateChangeAsAdmin
+            ? await conn.query(
+                `UPDATE roadinfo.road_info_point
+                 SET status = ?, updated_at = NOW()
+                 WHERE id = ?`,
+                [nextStatus, pointId]
+              )
+            : await conn.query(
+                `UPDATE roadinfo.road_info_point
+                 SET status = ?, updated_at = NOW()
+                 WHERE id = ? AND created_by = ?`,
+                [nextStatus, pointId, userId]
+              );
+          if (changesPointState && (!statusResult || Number(statusResult.affectedRows) !== 1)) {
+            throw new Error("point_state_forbidden");
+          }
         } else {
           await conn.query(
             `UPDATE roadinfo.road_info_point
@@ -717,6 +742,10 @@ function createRoadInfoHandler({ sendJson }) {
         }
         if (err.message === "point_not_found") {
           sendJson(res, 404, { error: "point_not_found" });
+          return;
+        }
+        if (err.message === "point_state_forbidden") {
+          sendJson(res, 403, { error: "point_state_forbidden" });
           return;
         }
         if (["invalid_image_data", "invalid_image_type", "image_too_large"].includes(err.message)) {

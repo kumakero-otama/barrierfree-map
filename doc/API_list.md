@@ -111,7 +111,9 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
   - 任意: `sessionId`, `sessionUuid`, `startedAt`
 - 主なレスポンス:
   - `200`: `success`, `sessionId` など
-  - `400`, `401`, `500`
+  - `400`: UUID形式不正など
+  - `409`: 同じ `sessionId` が別ユーザーに属する（所有者は変更しない）
+  - `401`, `500`
 
 #### `POST /api/session/end`
 - 概要: セッション終了
@@ -120,7 +122,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
   - 任意: `sessionId`, `sessionUuid`, `endedAt`
 - 主なレスポンス:
   - `200`: `success`, `sessionId`, `updated` など
-  - `400`, `401`, `500`
+  - `400`, `401`, `404`, `500`
 
 #### `POST /api/session/cancel`
 - 概要: セッション関連データを削除
@@ -237,11 +239,14 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
   - 任意: `pointId`, `lat`, `lng`, `detail`, `tagIds[]`, `status`, `images[]`
 - 補足:
   - 未登録の `tagIds` は自動作成される
+  - 既存ポイントへのコメント・タグ・画像の追記と、ポイント状態の変更は権限を分離する
+  - 既存ポイントの状態変更（完了タグによる `inactive` を含む）は、作成者本人または `ROAD_INFO_ADMIN_EMAILS` に明示したGoogle管理者だけが実行できる
+  - 権限のない状態変更は `403 point_state_forbidden`。所有者による更新は同一トランザクション内でロックし、SQLの `created_by` 条件でも検査する
   - 完了系タグが含まれる場合、対象ポイントの `status` は `inactive` に更新される
   - `status = deleted` 指定時は status 更新のみ行い、note / media / tag の追加は行わない
 - 主なレスポンス:
   - `201`: `success`, `pointId`, `noteId`, `tagsCount`, `createdTags[]`, `mediaCount`
-  - `400`, `401`, `404`, `405`, `500`, `503`
+  - `400`, `401`, `403`, `404`, `405`, `500`, `503`
 
 ### ProStatus / Tactile
 

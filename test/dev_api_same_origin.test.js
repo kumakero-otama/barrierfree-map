@@ -26,4 +26,10 @@ const foreignRes = response();
 assert.strictEqual(guard(foreignReq, foreignRes), false);
 assert.strictEqual(foreignRes.status, 403);
 assert.strictEqual(foreignRes.payload.error, "origin_not_allowed");
+
+process.env.NODE_ENV = "production";
+const productionForeignRes = response();
+assert.strictEqual(guard(foreignReq, productionForeignRes), false);
+assert.strictEqual(productionForeignRes.status, 403);
+assert.strictEqual(productionForeignRes.payload.error, "origin_not_allowed");
 console.log("same-origin admin requests allowed; foreign origins rejected");
