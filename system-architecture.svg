@@ -54,7 +54,7 @@
   <text x="215" y="480" text-anchor="middle" class="boxTitle">Caddy</text><text x="215" y="508" text-anchor="middle" class="body">HTTPS・TLS</text><text x="215" y="532" text-anchor="middle" class="small">公開443 → localhost:3100</text>
 
   <rect x="395" y="435" width="555" height="265" rx="20" class="inner"/>
-  <text x="672" y="473" text-anchor="middle" class="boxTitle">Node.js バックエンド</text>
+  <text x="672" y="473" text-anchor="middle" class="boxTitle">Node.js 20.19.5 バックエンド</text>
   <text x="672" y="498" text-anchor="middle" class="small">systemd: stepby-dev.service（内部名）／mainブランチ</text>
   <rect x="425" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="545" y="548" text-anchor="middle" class="body">認証・プロフィール</text><text x="545" y="570" text-anchor="middle" class="small">利用者はGoogle認証のみ</text>
   <rect x="680" y="522" width="240" height="68" rx="12" fill="#f0fdfa" stroke="#5eead4"/><text x="800" y="548" text-anchor="middle" class="body">記録・タグAPI</text><text x="800" y="570" text-anchor="middle" class="small">raw・PRO・道情報</text>
