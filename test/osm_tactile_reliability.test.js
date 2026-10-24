@@ -17,6 +17,8 @@ assert.match(source, /const inFlightRequests = new Map\(\)/,
   "duplicate requests for the same area must be coalesced");
 assert.match(source, /HOST_FAILURE_COOLDOWN_MS = 2 \* 60 \* 1000/,
   "recently failed mirrors must be skipped briefly");
+assert.match(source, /availableHosts\.length === 0[\s\S]{0,180}?all_overpass_hosts_cooling_down/,
+  "when all mirrors just failed, repeated reads must fall back immediately instead of waiting again");
 assert.doesNotMatch(source, /["']overpass\.kumi\.systems["']/,
   "the retired kumi hostname must not duplicate the private.coffee backend");
 assert.match(source, /process\.env\.OVERPASS_HOST/,

@@ -375,9 +375,13 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const fetchAndCache = () => new Promise((resolve, reject) => {
         const now = Date.now();
         const availableHosts = OVERPASS_HOSTS.filter((host) => now - (hostFailures.get(host) || 0) >= HOST_FAILURE_COOLDOWN_MS);
-        // 全ホストがクールダウン中なら、最も早く再試行可能になる1台だけを試す。
-        const hosts = availableHosts.length ? availableHosts : [...OVERPASS_HOSTS]
-          .sort((a, b) => (hostFailures.get(a) || 0) - (hostFailures.get(b) || 0)).slice(0, 1);
+        // 全ホストが直前に失敗している間は再接続を繰り返さず、すぐクライアントへ
+        // フォールバックを促す。これにより同じ12秒待ちを画面更新のたびに重ねない。
+        if (availableHosts.length === 0) {
+          reject(new Error("all_overpass_hosts_cooling_down"));
+          return;
+        }
+        const hosts = availableHosts;
         const tryHost = (index) => {
           if (index >= hosts.length) {
             reject(new Error("all_overpass_hosts_failed"));
