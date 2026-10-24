@@ -116,6 +116,46 @@ async function run() {
   assert.strictEqual(ended.status, 200, JSON.stringify(ended.body));
   const [endedRows] = await pool.query("SELECT ended_at FROM tactile.sessions WHERE session_id=? LIMIT 1", [recordId]);
   assert.ok(endedRows[0].ended_at, "recording session must be finalized");
+
+  const rawOnlyRecordId = crypto.randomUUID();
+  const rawOnlyStarted = await request("/api/session/start", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ sessionId: rawOnlyRecordId, startedAt: new Date().toISOString() }),
+  });
+  assert.strictEqual(rawOnlyStarted.status, 200, JSON.stringify(rawOnlyStarted.body));
+  const rawOnlyTrace = await request("/api/trace", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      sessionId: rawOnlyRecordId,
+      source: "browser_raw",
+      raw_points: [
+        { lat: 35.001, lon: 139.001, accuracy: 8 },
+        { lat: 35.0012, lon: 139.0012, accuracy: 9 },
+      ],
+    }),
+  });
+  assert.strictEqual(rawOnlyTrace.status, 200, JSON.stringify(rawOnlyTrace.body));
+  assert.strictEqual(rawOnlyTrace.body.source, "browser_raw");
+  assert.strictEqual(rawOnlyTrace.body.matchingPending, true);
+  const [rawOnlyRows] = await pool.query(
+    `SELECT sp.source,
+            (SELECT COUNT(*)::int FROM tactile.gps_raw WHERE session_id=?) raw_count,
+            (SELECT COUNT(*)::int FROM tactile.gps_matched WHERE session_id=?) matched_count,
+            (SELECT COUNT(*)::int FROM tactile.way_snapshots WHERE record_id=?) snapshot_count
+       FROM tactile.session_paths sp WHERE sp.session_id=?`,
+    [rawOnlyRecordId, rawOnlyRecordId, rawOnlyRecordId, rawOnlyRecordId]
+  );
+  assert.deepStrictEqual(rawOnlyRows[0], {
+    source: "browser_raw", raw_count: 2, matched_count: 0, snapshot_count: 0,
+  });
+  const rawOnlyEnded = await request("/api/session/end", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ sessionId: rawOnlyRecordId, endedAt: new Date().toISOString() }),
+  });
+  assert.strictEqual(rawOnlyEnded.status, 200, JSON.stringify(rawOnlyEnded.body));
   const oauthStatus = await request("/auth/osm/status", { headers });
   assert.strictEqual(oauthStatus.status, 200, JSON.stringify(oauthStatus.body));
   assert.strictEqual(oauthStatus.body.configured, true);

@@ -248,6 +248,77 @@ function createTraceHandler({ sendJson, canceledSessionIds }) {
       const logPrefix = `[Trace][User:${userId} / IP:${ip}]`;
       console.log(`${logPrefix} Received ${requestData.shape?.length || 0} points`);
 
+      if (source === "browser_raw") {
+        const rawPoints = Array.isArray(requestData.raw_points) ? requestData.raw_points : [];
+        const validRawPoints = rawPoints.map((point) => ({
+          lat: Number(point && point.lat), lon: Number(point && point.lon),
+          accuracy: point && point.accuracy !== null ? Number(point.accuracy) : null,
+        })).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon) &&
+          point.lat >= -90 && point.lat <= 90 && point.lon >= -180 && point.lon <= 180 &&
+          (point.accuracy === null || (Number.isFinite(point.accuracy) && point.accuracy >= 0)));
+        if (!sessionId || validRawPoints.length < 2 || validRawPoints.length > 5000 ||
+            validRawPoints.length !== rawPoints.length) {
+          sendJson(res, 400, { error: "invalid_browser_raw_trace" });
+          return;
+        }
+        if (!pool || !req.authUserId) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+        try {
+          const [ownedSessions] = await pool.query(
+            "SELECT session_id FROM tactile.sessions WHERE session_id = ? AND user_id = ? LIMIT 1",
+            [sessionId, req.authUserId]
+          );
+          if (!Array.isArray(ownedSessions) || !ownedSessions.length) {
+            sendJson(res, 404, { error: "session_not_found_or_forbidden" });
+            return;
+          }
+          if (canceledSessionIds && canceledSessionIds.has(sessionId)) {
+            sendJson(res, 409, { error: "session_canceled" });
+            return;
+          }
+
+          // マップマッチング不能でも現地記録を失わない。生座標の線はStepBy内だけで保持し、
+          // Way snapshotを作らないことでOSM変更案への自動昇格を防ぐ。
+          const rawPathData = {
+            matched_points: validRawPoints.map((point) => ({ lat: point.lat, lon: point.lon })),
+            edges: [],
+          };
+          await persistSessionPath(pool, sessionId, "browser_raw", rawPathData, logPrefix);
+          const conn = await pool.getConnection();
+          try {
+            await conn.beginTransaction();
+            await conn.query("DELETE FROM tactile.gps_raw WHERE session_id = ?", [sessionId]);
+            await conn.query("DELETE FROM tactile.gps_matched WHERE session_id = ?", [sessionId]);
+            await conn.query("DELETE FROM tactile.way_snapshots WHERE record_id = ?", [sessionId]);
+            for (const point of validRawPoints) {
+              await conn.query(
+                "INSERT INTO tactile.gps_raw (session_id, ts, geom, accuracy) VALUES (?, NOW(), ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
+                [sessionId, point.lon, point.lat, point.accuracy]
+              );
+            }
+            await conn.commit();
+          } catch (pointSaveError) {
+            await conn.rollback();
+            throw pointSaveError;
+          } finally {
+            conn.release();
+          }
+          sendJson(res, 200, {
+            ...rawPathData,
+            source: "browser_raw",
+            persisted: true,
+            matchingPending: true,
+            osmSent: false,
+          });
+        } catch (error) {
+          console.error(`${logPrefix} browser_raw_trace_save_error:`, error.message);
+          sendJson(res, 500, { error: "browser_raw_trace_save_failed" });
+        }
+        return;
+      }
+
       if (source === "browser") {
         const matchedPoints = Array.isArray(requestData.matched_points) ? requestData.matched_points : [];
         const rawPoints = Array.isArray(requestData.raw_points) ? requestData.raw_points : [];
