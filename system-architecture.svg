@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180" role="img" aria-labelledby="title desc">
   <title id="title">StepBy 現在のシステム構成</title>
-  <desc id="desc">正式版StepBy UI0の利用者端末、GitHub Pages、Google認証、Gmail通知、国土地理院航空写真、OpenStreetMap、Google Cloud、Node API、PostgreSQL審査キューの接続を示す構成図。</desc>
+  <desc id="desc">正式版StepBy UI0の利用者端末、GitHub Pages、Google認証、Gmail通知、国土地理院航空写真、OpenStreetMap、Google Cloud、Node API、PostgreSQL審査キューの接続と、開発中・未デプロイのOSM点字ブロック区画キャッシュを示す構成図。</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity=".14"/></filter>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0v6l9-3z" fill="#475569"/></marker>
@@ -9,12 +9,12 @@
     <style>
       text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;fill:#18212d}
       .title{font-size:34px;font-weight:800}.subtitle{font-size:15px;fill:#64748b}.section{font-size:21px;font-weight:800}.boxTitle{font-size:22px;font-weight:800}.body{font-size:15px}.small{font-size:13px;fill:#536173}.tiny{font-size:12px;fill:#64748b}.label{font-size:12px;font-weight:700;fill:#334155}
-      .card{fill:#fff;stroke:#667085;stroke-width:1.6}.cloud{fill:#edfdf9;stroke:#0f9f8f;stroke-width:2.4}.external{fill:#fff8ed;stroke:#e07a22;stroke-width:1.8}.db{fill:#f5f3ff;stroke:#8b5cf6;stroke-width:1.8}.inner{fill:#fff;stroke:#9aa8b8;stroke-width:1.3}.line{fill:none;stroke:#475569;stroke-width:2.5;marker-end:url(#arrow)}.lineGreen{fill:none;stroke:#0f9f8f;stroke-width:3;marker-end:url(#arrowGreen)}.lineOrange{fill:none;stroke:#e07a22;stroke-width:2.7;marker-end:url(#arrowOrange)}.pill{fill:#dcfce7;stroke:#22c55e}
+      .card{fill:#fff;stroke:#667085;stroke-width:1.6}.cloud{fill:#edfdf9;stroke:#0f9f8f;stroke-width:2.4}.external{fill:#fff8ed;stroke:#e07a22;stroke-width:1.8}.db{fill:#f5f3ff;stroke:#8b5cf6;stroke-width:1.8}.inner{fill:#fff;stroke:#9aa8b8;stroke-width:1.3}.dev{fill:#fffbeb;stroke:#d97706;stroke-width:2;stroke-dasharray:9 6}.line{fill:none;stroke:#475569;stroke-width:2.5;marker-end:url(#arrow)}.lineGreen{fill:none;stroke:#0f9f8f;stroke-width:3;marker-end:url(#arrowGreen)}.lineOrange{fill:none;stroke:#e07a22;stroke-width:2.7;marker-end:url(#arrowOrange)}.pill{fill:#dcfce7;stroke:#22c55e}.pillDev{fill:#fef3c7;stroke:#d97706}
     </style>
   </defs>
-  <rect width="1600" height="1000" fill="#fff"/>
+  <rect width="1600" height="1180" fill="#fff"/>
   <text x="55" y="55" class="title">StepBy 現在のシステム構成</text>
-  <text x="55" y="83" class="subtitle">2026年8月29日時点　UI0を正式公開し、OSM公開前の管理者審査・メール通知を運用　緑＝StepBy／Google Cloud　橙＝外部サービス</text>
+  <text x="55" y="83" class="subtitle">本番UI0の稼働構成と、2026年10月24日時点の未デプロイ開発構成　緑＝本番StepBy／Google Cloud　橙＝外部サービス・開発中</text>
 
   <!-- top services -->
   <rect x="55" y="125" width="300" height="130" rx="20" class="card" filter="url(#shadow)"/>
@@ -45,7 +45,7 @@
   <text x="1000" y="168" text-anchor="middle" class="label">認証</text>
 
   <!-- cloud current development -->
-  <rect x="55" y="345" width="1490" height="555" rx="24" class="cloud" filter="url(#shadow)"/>
+  <rect x="55" y="345" width="1490" height="735" rx="24" class="cloud" filter="url(#shadow)"/>
   <text x="85" y="382" class="section">Google Cloud 本番環境（正式UI0接続）</text>
   <rect x="1248" y="359" width="265" height="34" rx="17" class="pill"/><text x="1380" y="381" text-anchor="middle" class="label">ブラウザフィッティング・稼働中</text>
   <text x="85" y="408" class="small">Compute Engine: stepby-dev-1／固定IP／us-west1　公開HTTPS: stepby-api-8-229-191-182.sslip.io</text>
@@ -81,6 +81,16 @@
   <path d="M800 295v25H40v177h55" class="lineGreen"/><text x="470" y="310" class="label">正式UI0稼働</text>
   <path d="M910 435c0-90 475-80 475-180" class="lineOrange"/><text x="1190" y="332" class="label">読取／専用トークン／OSM編集</text>
 
-  <text x="55" y="952" class="small">UI0の保存はDBと審査待ち登録まで。Google利用者の承認済み記録だけを専用OSMアカウントで送り、ゲスト記録は送らない。</text>
-  <text x="1545" y="978" text-anchor="end" class="tiny">構成変更時はこのSVGとタスクリストを同時更新する</text>
+  <!-- development-only tactile tile cache; not connected to production yet -->
+  <rect x="90" y="885" width="1420" height="160" rx="18" class="dev"/>
+  <text x="120" y="917" class="section">OSM点字ブロック区画キャッシュ（開発中・未デプロイ）</text>
+  <rect x="1165" y="896" width="315" height="32" rx="16" class="pillDev"/><text x="1322" y="917" text-anchor="middle" class="label">本番UI0・本番API・本番DBには未反映</text>
+  <rect x="120" y="942" width="290" height="76" rx="12" class="inner"/><text x="265" y="970" text-anchor="middle" class="body">UI0 IndexedDB</text><text x="265" y="994" text-anchor="middle" class="small">z15タイル／点字ブロック区画を端末保存</text>
+  <rect x="475" y="942" width="290" height="76" rx="12" class="inner"/><text x="620" y="970" text-anchor="middle" class="body">Node.js 読取API</text><text x="620" y="994" text-anchor="middle" class="small">GET /api/osm-tactile-tiles</text>
+  <rect x="830" y="942" width="290" height="76" rx="12" class="db"/><text x="975" y="970" text-anchor="middle" class="body">PostgreSQL</text><text x="975" y="994" text-anchor="middle" class="small">osmcache.tactile_tiles</text>
+  <rect x="1185" y="942" width="290" height="76" rx="12" class="external"/><text x="1330" y="970" text-anchor="middle" class="body">Overpass API</text><text x="1330" y="994" text-anchor="middle" class="small">OSM点字ブロック情報の読取のみ</text>
+  <path d="M475 980h-65" class="lineOrange"/><path d="M830 980h-65" class="lineOrange"/><path d="M1185 980h-65" class="lineOrange"/>
+
+  <text x="55" y="1125" class="small">本番UI0の保存はDBと審査待ち登録まで。Google利用者の承認済み記録だけを専用OSMアカウントで送り、ゲスト記録は送らない。</text>
+  <text x="1545" y="1152" text-anchor="end" class="tiny">構成変更時はこのSVGとタスクリストを同時更新する</text>
 </svg>
