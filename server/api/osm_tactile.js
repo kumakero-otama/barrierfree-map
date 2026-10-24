@@ -61,14 +61,14 @@ function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
   const bbox = [centerLat - latDelta, centerLng - lngDelta, centerLat + latDelta, centerLng + lngDelta]
     .map((value) => value.toFixed(7)).join(",");
   const selectors = rules.elementTypes
-    .map((elementType) => `${elementType}["tactile_paving"~"^(${valueRegex})$"](${bbox});`)
+    .map((elementType) => `${elementType}["tactile_paving"~"^(${valueRegex})$"];`)
     .join("\n");
   return `
-[out:json][timeout:25];
+[out:json][timeout:25][bbox:${bbox}];
 (
 ${selectors}
 );
-out meta geom;
+out meta geom qt;
 `;
 }
 
