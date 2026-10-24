@@ -497,7 +497,7 @@ function handleRequest(req, res) {
     handleTrace(req, res);
     return;
   }
-  if (req.url && req.url.startsWith("/api/osm-tactile-ways")) {
+  if (req.url && (req.url.startsWith("/api/osm-tactile-ways") || req.url.startsWith("/api/osm-tactile-tiles"))) {
     handleOsmTactileWays(req, res);
     return;
   }

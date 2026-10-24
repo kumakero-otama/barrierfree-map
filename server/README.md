@@ -123,6 +123,17 @@
   - OSMレスポンスをGeoJSON `FeatureCollection` に整形して返却
 - フロント地図の「OSM点字ブロック表示」トグルで利用されます。
 
+### OSM点字ブロック区画API
+
+- エンドポイント: `GET /api/osm-tactile-tiles?tiles=15/x/y,15/x/y`
+- 各タイルの `status` は `success`（データあり）、`empty`（取得成功・対象なし）、`error`（取得失敗）です。
+- 複数タイルの一部だけ失敗した場合は `partial: true`、すべて失敗した場合は
+  `success: false, partial: false, allFailed: true` を返します。
+- `error` は「点字ブロックが存在しない」という意味ではありません。フロントエンドは
+  `error` タイルを空タイルとして保存せず、既存キャッシュを維持して後で再試行してください。
+- PostgreSQLのキャッシュ用テーブルを作成できない場合も、プロセス内メモリキャッシュへ
+  フォールバックして読取APIを継続します。
+
 ### `server/api/post_tags.js`
 - エンドポイント:
   - `GET /api/post-tags`（タグ一覧）

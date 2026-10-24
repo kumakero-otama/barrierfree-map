@@ -11,6 +11,7 @@ const { ensureRecordLinkSchema } = require("../osm/record_links");
 const { createServiceAccountOsmClient, resolvedServiceAccountConfig } = require("../osm/service_account_client");
 const { ensureOptOutSchema, findOptOutMatch } = require("../osm/opt_out");
 const { ensureReviewSchema, enqueueReview, queueNotification, deliverNotification, retryFailedNotifications, isReviewAdmin } = require("../osm/review_queue");
+const { invalidateTactileTiles } = require("../osm/tactile_tile_invalidation");
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const OPERATION_TYPES = new Set(["merge", "delete", "revert"]);
@@ -423,14 +424,23 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
            WHERE merge_plan_id=?`, [executionResult.changesetId, planId]
         );
       }
+      const tactileTileInvalidation = await invalidateTactileTiles({ pool, elements: plan.elements });
       const clearedWalkableCacheEntries = clearWalkableNetworkCache();
       await appendAudit(planId, "osm_read_cache_invalidated", req, {
         attemptId,
         requestedAction: action,
         clearedWalkableCacheEntries,
+        tactileTileInvalidation,
         reason: "osm_write_succeeded",
       });
-      return { success: true, planId, attemptId, osmSent: true, executionResult };
+      return {
+        success: true,
+        planId,
+        attemptId,
+        osmSent: true,
+        executionResult,
+        invalidatedTactileTileIds: tactileTileInvalidation.tileIds,
+      };
     } catch (executionError) {
       await appendAudit(planId, "execution_failed", req, {
         attemptId, requestedAction: action, error: executionError.message,
@@ -1045,7 +1055,23 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
                  WHERE merge_plan_id=?`, [executionResult.changesetId, planId]
               );
             }
-            sendJson(res, 200, { success: true, planId, attemptId, osmSent: true, executionResult });
+            const tactileTileInvalidation = await invalidateTactileTiles({ pool, elements: plan.elements });
+            const clearedWalkableCacheEntries = clearWalkableNetworkCache();
+            await appendAudit(planId, "osm_read_cache_invalidated", req, {
+              attemptId,
+              requestedAction: action,
+              clearedWalkableCacheEntries,
+              tactileTileInvalidation,
+              reason: "osm_write_succeeded",
+            });
+            sendJson(res, 200, {
+              success: true,
+              planId,
+              attemptId,
+              osmSent: true,
+              executionResult,
+              invalidatedTactileTileIds: tactileTileInvalidation.tileIds,
+            });
           } catch (executionError) {
             await appendAudit(planId, "execution_failed", req, {
               attemptId, requestedAction: action, error: executionError.message,

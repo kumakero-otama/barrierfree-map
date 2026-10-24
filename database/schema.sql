@@ -2134,4 +2134,25 @@ CREATE TABLE IF NOT EXISTS login.changelog_item_views (
     PRIMARY KEY (user_id, item_id)
 );
 
+-- OSM点字ブロック表示用の公開タイルキャッシュ。
+-- 利用者固有情報や秘密情報は保存せず、点字ブロック地物と空区画だけを共有する。
+CREATE SCHEMA IF NOT EXISTS osmcache;
+
+CREATE TABLE IF NOT EXISTS osmcache.tactile_tiles (
+    tile_id text PRIMARY KEY,
+    zoom smallint NOT NULL,
+    tile_x integer NOT NULL,
+    tile_y integer NOT NULL,
+    fetched_at timestamp with time zone NOT NULL,
+    last_accessed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    osm_base_at timestamp with time zone,
+    status text NOT NULL CHECK (status IN ('success','empty')),
+    features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    feature_count integer DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS tactile_tiles_last_accessed_idx
+    ON osmcache.tactile_tiles(last_accessed_at);
+
 \unrestrict 27enVynhlASMC7ef0PhaIirEMtmg6JflTjqakbfLNPCHBvCOZicbSsT83Vm360i
