@@ -5,6 +5,11 @@ const yaml = require("yaml");
 const { createDbPool } = require("../db");
 
 const RULES_PATH = path.join(__dirname, "..", "..", "config", "osm_tactile_rules.yaml");
+const OVERPASS_QUERY_TIMEOUT_SECONDS = 10;
+const OVERPASS_REQUEST_TIMEOUT_MS = 12000;
+const CACHE_FRESH_MS = 30 * 60 * 1000;
+const CACHE_STALE_MS = 24 * 60 * 60 * 1000;
+const HOST_FAILURE_COOLDOWN_MS = 2 * 60 * 1000;
 
 // 正規表現で安全に扱えるよう、設定値のメタ文字をエスケープする。
 function escapeRegexValue(value) {
@@ -64,7 +69,7 @@ function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
     .map((elementType) => `${elementType}["tactile_paving"~"^(${valueRegex})$"];`)
     .join("\n");
   return `
-[out:json][timeout:25][bbox:${bbox}];
+[out:json][timeout:${OVERPASS_QUERY_TIMEOUT_SECONDS}][bbox:${bbox}];
 (
 ${selectors}
 );
@@ -104,7 +109,7 @@ function fetchOverpass(overpassHost, query, callback) {
     });
   });
 
-  req.setTimeout(30000, () => req.destroy(new Error("overpass_timeout")));
+  req.setTimeout(OVERPASS_REQUEST_TIMEOUT_MS, () => req.destroy(new Error("overpass_timeout")));
 
   req.on("error", (err) => {
     callback(new Error(`overpass_request_error:${err.message}`));
@@ -200,11 +205,12 @@ function createOsmTactileWaysHandler({ sendJson }) {
   const OVERPASS_HOSTS = [...new Set([
     process.env.OVERPASS_HOST,
     "overpass-api.de",
-    "overpass.kumi.systems",
     "overpass.private.coffee",
   ].filter(Boolean))];
   const { pool } = createDbPool();
   const responseCache = new Map();
+  const inFlightRequests = new Map();
+  const hostFailures = new Map();
   let rules;
   try {
     rules = loadRules();
@@ -344,7 +350,8 @@ function createOsmTactileWaysHandler({ sendJson }) {
       const query = buildOverpassQuery(centerLat, centerLng, radiusMeters, rules);
       const cacheKey = `${centerLat.toFixed(2)}:${centerLng.toFixed(2)}:${radiusMeters}`;
       const cached = responseCache.get(cacheKey);
-      if (cached && Date.now() - cached.savedAt < 5 * 60 * 1000) {
+      const cacheAgeMs = cached ? Date.now() - cached.savedAt : Infinity;
+      if (cached && cacheAgeMs < CACHE_FRESH_MS) {
         addStepByOwnership({ ...cached.payload, cached: true }, req.authUserId, { centerLat, centerLng, radiusMeters })
           .then((payload) => sendJson(res, 200, payload))
           .catch((dbError) => {
@@ -353,36 +360,42 @@ function createOsmTactileWaysHandler({ sendJson }) {
           });
         return;
       }
-      const tryHost = (index) => {
-        fetchOverpass(OVERPASS_HOSTS[index], query, async (err, overpassJson) => {
+
+      // Overpassが一時的に混雑していても、過去24時間以内の表示データがあれば即座に返す。
+      // バックグラウンド更新は同じ検索範囲につき1本だけにまとめる。
+      const servePayload = (basePayload, cachedValue) => {
+        addStepByOwnership({ ...basePayload, cached: cachedValue }, req.authUserId, { centerLat, centerLng, radiusMeters })
+          .then((payload) => sendJson(res, 200, payload))
+          .catch((dbError) => {
+            console.warn("[osm_tactile] StepBy ownership lookup skipped:", dbError.message);
+            sendJson(res, 200, { ...basePayload, cached: cachedValue });
+          });
+      };
+
+      const fetchAndCache = () => new Promise((resolve, reject) => {
+        const now = Date.now();
+        const availableHosts = OVERPASS_HOSTS.filter((host) => now - (hostFailures.get(host) || 0) >= HOST_FAILURE_COOLDOWN_MS);
+        // 全ホストがクールダウン中なら、最も早く再試行可能になる1台だけを試す。
+        const hosts = availableHosts.length ? availableHosts : [...OVERPASS_HOSTS]
+          .sort((a, b) => (hostFailures.get(a) || 0) - (hostFailures.get(b) || 0)).slice(0, 1);
+        const tryHost = (index) => {
+          if (index >= hosts.length) {
+            reject(new Error("all_overpass_hosts_failed"));
+            return;
+          }
+          const host = hosts[index];
+          fetchOverpass(host, query, (err, overpassJson) => {
         if (err) {
-          console.warn(`[osm_tactile] host failed ${OVERPASS_HOSTS[index]}:`, err.message);
-          if (index + 1 < OVERPASS_HOSTS.length) {
+          hostFailures.set(host, Date.now());
+          console.warn(`[osm_tactile] host failed ${host}:`, err.message);
+          if (index + 1 < hosts.length) {
             tryHost(index + 1);
             return;
           }
-          try {
-            const fallbackPayload = await addStepByOwnership({
-              success: true,
-              centerLat,
-              centerLng,
-              radiusKm: radiusMeters / 1000,
-              count: 0,
-              features: [],
-              cached: false,
-              osmUpstreamUnavailable: true,
-            }, req.authUserId, { centerLat, centerLng, radiusMeters });
-            // StepByの送信済み経路だけでも返せる場合は、取消し操作を継続可能にする。
-            if (fallbackPayload.features.length) {
-              sendJson(res, 200, fallbackPayload);
-              return;
-            }
-          } catch (dbError) {
-            console.warn("[osm_tactile] StepBy fallback lookup failed:", dbError.message);
-          }
-          sendJson(res, 502, { error: "osm_upstream_error", message: "all_overpass_hosts_failed" });
+          reject(err);
           return;
         }
+        hostFailures.delete(host);
         // レスポンスは FeatureCollection ではなく features 配列中心で返し、既存フロント構造に合わせる。
         const featureCollection = toFeatureCollection(overpassJson, rules);
         const basePayload = {
@@ -395,15 +408,46 @@ function createOsmTactileWaysHandler({ sendJson }) {
           cached: false,
         };
         responseCache.set(cacheKey, { savedAt: Date.now(), payload: basePayload });
-        try {
-          sendJson(res, 200, await addStepByOwnership(basePayload, req.authUserId, { centerLat, centerLng, radiusMeters }));
-        } catch (dbError) {
-          console.warn("[osm_tactile] StepBy ownership lookup skipped:", dbError.message);
-          sendJson(res, 200, basePayload);
-        }
+        resolve(basePayload);
       });
-      };
-      tryHost(0);
+        };
+        tryHost(0);
+      });
+
+      let inFlight = inFlightRequests.get(cacheKey);
+      if (!inFlight) {
+        inFlight = fetchAndCache().finally(() => inFlightRequests.delete(cacheKey));
+        inFlightRequests.set(cacheKey, inFlight);
+      }
+
+      if (cached && cacheAgeMs < CACHE_STALE_MS) {
+        // stale-while-revalidate: 表示を待たせず、更新結果は次回以降に利用する。
+        inFlight.catch((error) => console.warn("[osm_tactile] background refresh failed:", error.message));
+        servePayload(cached.payload, true);
+        return;
+      }
+
+      inFlight.then((basePayload) => servePayload(basePayload, false)).catch(async () => {
+        try {
+          const fallbackPayload = await addStepByOwnership({
+            success: true,
+            centerLat,
+            centerLng,
+            radiusKm: radiusMeters / 1000,
+            count: 0,
+            features: [],
+            cached: false,
+            osmUpstreamUnavailable: true,
+          }, req.authUserId, { centerLat, centerLng, radiusMeters });
+          if (fallbackPayload.features.length) {
+            sendJson(res, 200, fallbackPayload);
+            return;
+          }
+        } catch (dbError) {
+          console.warn("[osm_tactile] StepBy fallback lookup failed:", dbError.message);
+        }
+        sendJson(res, 502, { error: "osm_upstream_error", message: "all_overpass_hosts_failed" });
+      });
     } catch (err) {
       console.error("[osm_tactile] handler error:", err.message);
       sendJson(res, 500, { error: "osm_tactile_handler_error", message: err.message });
