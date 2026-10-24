@@ -27,6 +27,7 @@ StepBy UI0の正式バックエンド実装です。2026-08-29以降は、この
 - 設定例: [`.env.example`](.env.example)、[`config.dev.example.yaml`](config.dev.example.yaml)
 - API一覧: [`doc/API_list.md`](doc/API_list.md)、[`public/docs/openapi.yaml`](public/docs/openapi.yaml)
 - OSM処理と安全条件: [`doc/osm_change_api.md`](doc/osm_change_api.md)
+- OSM点字ブロック区画キャッシュ仕様: [`doc/osm-tactile-tile-cache-spec.md`](doc/osm-tactile-tile-cache-spec.md)
 - 現行仕様: [`doc/stepby-current-spec-and-tasks.md`](doc/stepby-current-spec-and-tasks.md)
 - 文書索引: [`doc/README.md`](doc/README.md)
 

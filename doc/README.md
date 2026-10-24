@@ -1,6 +1,6 @@
 # 文書索引
 
-最終整理日: 2026-08-29
+最終整理日: 2026-10-24
 
 ## 現行仕様・提出時に参照する文書
 
@@ -12,6 +12,7 @@
 - [`API_list.md`](API_list.md): API一覧
 - [`../public/docs/openapi.yaml`](../public/docs/openapi.yaml): OpenAPI
 - [`osm_change_api.md`](osm_change_api.md): OSM変更・取消し・監査・安全条件
+- [`osm-tactile-tile-cache-spec.md`](osm-tactile-tile-cache-spec.md): 表示地図中心の区画取得、端末・サーバーキャッシュ、変更履歴
 - [`osm-community-consultation-draft.md`](osm-community-consultation-draft.md): コミュニティ説明内容
 - [`cloud-incident-and-rollback-runbook.md`](cloud-incident-and-rollback-runbook.md): 障害対応と復元
 - [`existing-data-migration-audit.md`](existing-data-migration-audit.md): 既存データ移行の別計画
