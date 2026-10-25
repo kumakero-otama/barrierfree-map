@@ -17,6 +17,8 @@ assert.match(source, /await connection\.beginTransaction\(\)/,
   "snapshot replacement must be transactional");
 assert.match(source, /DELETE FROM osmcache\.local_tactile_tiles WHERE snapshot_id<>\?/,
   "obsolete snapshot rows must be removed only inside the replacement transaction");
+assert.match(source, /RETURNING tile_id/,
+  "snapshot upsert must name the table primary key for PostgreSQL compatibility");
 assert.doesNotMatch(source, /(access_token|password|cookie)/i,
   "the public local snapshot importer must not process secrets");
 

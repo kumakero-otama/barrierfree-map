@@ -93,7 +93,8 @@ if (!apply) process.exit(0);
            snapshot_id=EXCLUDED.snapshot_id,source_url=EXCLUDED.source_url,
            imported_at=CURRENT_TIMESTAMP,status=EXCLUDED.status,
            features=EXCLUDED.features,feature_count=EXCLUDED.feature_count,
-           updated_at=CURRENT_TIMESTAMP`,
+           updated_at=CURRENT_TIMESTAMP
+         RETURNING tile_id`,
         [tile.tileId, tile.zoom, tile.tileX, tile.tileY, bundle.snapshotId,
           bundle.sourceUrl, tile.status, JSON.stringify(tile.features), tile.features.length]
       );
