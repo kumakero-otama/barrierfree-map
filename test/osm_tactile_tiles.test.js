@@ -89,6 +89,14 @@ assert.match(source, /tileMemoryCache\.set\(tile\.id, entry\);[\s\S]{0,180}?ensu
   "runtime schema creation failures must retain the in-memory fallback");
 assert.match(schemaSource, /CREATE TABLE IF NOT EXISTS osmcache\.tactile_tiles/,
   "the persistent public tile cache must be reproducible from schema.sql");
+assert.match(schemaSource, /CREATE TABLE IF NOT EXISTS osmcache\.local_tactile_tiles/,
+  "the bounded local snapshot provider must be reproducible from schema.sql");
+assert.match(source, /async function readLocalTileProvider\(tile\)/,
+  "the API must support a bounded local snapshot provider");
+assert.match(source, /const localEntry = await readLocalTileProvider\(tile\)/,
+  "a dynamic-cache miss must consult the local provider before public Overpass");
+assert.match(source, /source: "local_snapshot"/,
+  "responses and safe logs must identify the local provider");
 assert.doesNotMatch(schemaSource, /osmcache\.tactile_tiles[\s\S]{0,900}?(memo|access_token|cookie)/i,
   "the public tile cache must not contain private notes or credentials");
 assert.match(source, /tile_response tileId=\$\{result\.tile\.id\} source=\$\{result\.source\}/,

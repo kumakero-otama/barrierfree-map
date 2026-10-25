@@ -29,6 +29,9 @@ const pool = { query: async (sql, params) => { queries.push({ sql, params }); re
   assert.strictEqual(result.persistentInvalidated, true);
   assert.match(queries[0].sql, /DELETE FROM osmcache\.tactile_tiles WHERE tile_id IN/);
   assert.deepStrictEqual(queries[0].params, affected);
+  assert.match(queries[1].sql, /DELETE FROM osmcache\.local_tactile_tiles WHERE tile_id IN/,
+    "OSM publish/revert must remove an outdated local snapshot tile");
+  assert.deepStrictEqual(queries[1].params, affected);
 
   const fallback = await invalidateTactileTiles({
     pool: { query: async () => { throw new Error("ddl_missing"); } },

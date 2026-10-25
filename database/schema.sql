@@ -2155,4 +2155,20 @@ CREATE TABLE IF NOT EXISTS osmcache.tactile_tiles (
 CREATE INDEX IF NOT EXISTS tactile_tiles_last_accessed_idx
     ON osmcache.tactile_tiles(last_accessed_at);
 
+-- 公開Overpassに依存せず限定地域を表示する、事前抽出済みの読取専用タイル。
+-- 動的キャッシュとは分離し、再投入時にsnapshot単位で安全に差し替える。
+CREATE TABLE IF NOT EXISTS osmcache.local_tactile_tiles (
+    tile_id text PRIMARY KEY,
+    zoom smallint NOT NULL,
+    tile_x integer NOT NULL,
+    tile_y integer NOT NULL,
+    snapshot_id text NOT NULL,
+    source_url text NOT NULL,
+    imported_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    status text NOT NULL CHECK (status IN ('success','empty')),
+    features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    feature_count integer DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
 \unrestrict 27enVynhlASMC7ef0PhaIirEMtmg6JflTjqakbfLNPCHBvCOZicbSsT83Vm360i

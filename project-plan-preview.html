@@ -499,7 +499,7 @@
           <a class="architecture-link" href="system-architecture.svg" target="_blank" rel="noopener">SVGを別画面で拡大表示 →</a>
         </div>
         <a href="system-architecture.svg" target="_blank" rel="noopener"><img class="architecture-frame" src="system-architecture.svg" alt="StepByとbarrierfree-mapの現在のシステム構成図"></a>
-        <p class="architecture-rule"><strong>2026年10月25日から本番稼働：</strong>OSM点字ブロック表示は、表示中の地図中心を基準にz15区画で順次取得し、UI0のIndexedDBへ区画単位で保存します。Node.jsの読取専用 <code>GET /api/osm-tactile-tiles</code> がPostgreSQLの <code>osmcache.tactile_tiles</code> を再利用し、未取得・期限切れ区画だけをOverpass APIから読み取ります。Overpassには書き込みません。障害時は従来の半径APIへ自動的に切り替えます。</p>
+        <p class="architecture-rule"><strong>2026年10月25日から本番稼働：</strong>OSM点字ブロック表示は、表示中の地図中心を基準にz15区画で順次取得し、UI0のIndexedDBへ区画単位で保存します。Node.jsの読取専用 <code>GET /api/osm-tactile-tiles</code> は、PostgreSQLの動的キャッシュ <code>osmcache.tactile_tiles</code> を最優先し、次にGeofabrik中国地方PBFから事前抽出した岡山市限定の読取専用provider <code>osmcache.local_tactile_tiles</code> を参照します。どちらにもない区画だけを公開Overpass APIから読み取ります。StepByローカルproviderとOverpassには書き込みません。</p>
         <p class="architecture-rule"><strong>更新ルール：</strong>フロント、API、ポート、PM2、Tailscale、DB、コンテナ、外部サービスまたは認証方式を変更した作業では、この構成図も同時に更新します。秘密情報は掲載しません。</p>
       </section>
 

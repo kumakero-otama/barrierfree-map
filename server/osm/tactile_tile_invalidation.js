@@ -59,6 +59,9 @@ async function invalidateTactileTiles({ pool, elements }) {
   try {
     const placeholders = tileIds.map(() => "?").join(",");
     await pool.query(`DELETE FROM osmcache.tactile_tiles WHERE tile_id IN (${placeholders})`, tileIds);
+    // StepByによるOSM更新後に古い地域スナップショットを表示しない。
+    // 次のスナップショット投入までは通常の公開Overpass fallbackへ戻す。
+    await pool.query(`DELETE FROM osmcache.local_tactile_tiles WHERE tile_id IN (${placeholders})`, tileIds);
     return { tileIds, memoryInvalidated: true, persistentInvalidated: true };
   } catch (error) {
     return { tileIds, memoryInvalidated: true, persistentInvalidated: false, error: error.message || "tile_cache_invalidation_failed" };

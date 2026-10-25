@@ -327,6 +327,19 @@ function createOsmTactileWaysHandler({ sendJson }) {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )`);
         await pool.query("CREATE INDEX IF NOT EXISTS tactile_tiles_last_accessed_idx ON osmcache.tactile_tiles(last_accessed_at)");
+        await pool.query(`CREATE TABLE IF NOT EXISTS osmcache.local_tactile_tiles (
+          tile_id TEXT PRIMARY KEY,
+          zoom SMALLINT NOT NULL,
+          tile_x INTEGER NOT NULL,
+          tile_y INTEGER NOT NULL,
+          snapshot_id TEXT NOT NULL,
+          source_url TEXT NOT NULL,
+          imported_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          status TEXT NOT NULL CHECK (status IN ('success','empty')),
+          features JSONB NOT NULL DEFAULT '[]'::jsonb,
+          feature_count INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`);
       })().catch((error) => {
         tileCacheSchemaReady = null;
         throw error;
@@ -539,6 +552,32 @@ function createOsmTactileWaysHandler({ sendJson }) {
     }
   }
 
+  // 公開Overpassが不安定な場合でも、事前検証した地域スナップショットを
+  // 読み取り専用のローカルproviderとして返す。動的キャッシュを常に優先する。
+  async function readLocalTileProvider(tile) {
+    try {
+      await ensureTileCacheSchema();
+      const [rows] = await pool.query(
+        `SELECT tile_id,snapshot_id,source_url,imported_at,status,features,feature_count
+           FROM osmcache.local_tactile_tiles WHERE tile_id=?`,
+        [tile.id]
+      );
+      if (!rows.length) return null;
+      const row = rows[0];
+      return {
+        savedAt: new Date(row.imported_at).getTime(),
+        osmBaseAt: null,
+        status: row.status,
+        features: Array.isArray(row.features) ? row.features : [],
+        provider: "stepby_local_snapshot",
+        snapshotId: row.snapshot_id,
+      };
+    } catch (error) {
+      console.warn("[osm_tactile_tiles] local provider read skipped:", error.message);
+      return null;
+    }
+  }
+
   async function writeTileCache(tile, entry) {
     tileMemoryCache.set(tile.id, entry);
     try {
@@ -622,6 +661,19 @@ function createOsmTactileWaysHandler({ sendJson }) {
         refreshTile(tile).catch((error) => console.warn(`[osm_tactile_tiles] refresh failed ${tile.id}:`, error.message));
       }
       return { tile, entry: cached, cached: true, stale: true, source: "stale", overpassWaitMs: 0, queueDepth: overpassQueue.length };
+    }
+
+    const localEntry = await readLocalTileProvider(tile);
+    if (localEntry) {
+      return {
+        tile,
+        entry: localEntry,
+        cached: true,
+        stale: false,
+        source: "local_snapshot",
+        overpassWaitMs: 0,
+        queueDepth: 0,
+      };
     }
 
     const previousFailure = tileFailures.get(tile.id);
@@ -721,6 +773,8 @@ function createOsmTactileWaysHandler({ sendJson }) {
         status: result.entry.status,
         fetchedAt: new Date(result.entry.savedAt).toISOString(),
         osmBaseAt: result.entry.osmBaseAt,
+        provider: result.entry.provider || "overpass_cache",
+        snapshotId: result.entry.snapshotId || null,
         cached: result.cached,
         stale: result.stale,
         features: result.entry.features.map((feature) => {
