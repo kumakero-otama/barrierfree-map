@@ -34,4 +34,13 @@ assert.match(source, /out meta geom qt;/,
 assert.doesNotMatch(source, /\[\"tactile_paving\"~[^\n]+\]\(\$\{bbox\}\)/,
   "selectors must reuse the global bbox instead of repeating it");
 
+assert.match(source, /overallTimer = setTimeout\([\s\S]{0,220}?finish\(error\);[\s\S]{0,100}?req\.destroy\(error\)/,
+  "Overpass reads must have an overall DNS/connect/response deadline");
+assert.match(source, /if \(settled\) return;[\s\S]{0,100}?settled = true/,
+  "late response and error events must not invoke the callback twice");
+assert.match(source, /if \(overallTimer\) clearTimeout\(overallTimer\)/,
+  "the overall deadline must be cleared after every completed request");
+assert.match(source, /elapsedMs=\$\{elapsedMs\} timeoutMs=\$\{requestTimeoutMs\}/,
+  "host logs must make the enforced overall deadline observable");
+
 console.log("OSM tactile reads use bounded queries, quadtile output, sequential fallback, and cache");

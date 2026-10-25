@@ -141,6 +141,14 @@ out meta geom qt;
 // Overpass API へ POST して JSON レスポンスを受け取る。
 function fetchOverpass(overpassHost, query, callback, requestTimeoutMs = OVERPASS_REQUEST_TIMEOUT_MS) {
   const body = `data=${encodeURIComponent(query)}`;
+  let settled = false;
+  let overallTimer = null;
+  const finish = (error, payload) => {
+    if (settled) return;
+    settled = true;
+    if (overallTimer) clearTimeout(overallTimer);
+    callback(error, payload);
+  };
   const options = {
     hostname: overpassHost,
     path: "/api/interpreter",
@@ -159,21 +167,28 @@ function fetchOverpass(overpassHost, query, callback, requestTimeoutMs = OVERPAS
     });
     res.on("end", () => {
       if (res.statusCode < 200 || res.statusCode >= 300) {
-        callback(new Error(`overpass_status_${res.statusCode || 0}`));
+        finish(new Error(`overpass_status_${res.statusCode || 0}`));
         return;
       }
       try {
-        callback(null, JSON.parse(raw));
+        finish(null, JSON.parse(raw));
       } catch (err) {
-        callback(new Error(`overpass_parse_error:${err.message}`));
+        finish(new Error(`overpass_parse_error:${err.message}`));
       }
     });
+    res.on("error", (error) => finish(new Error(`overpass_response_error:${error.message}`)));
   });
 
+  // ソケット確立前のDNS・接続待ちも含む絶対期限を、request作成直後から計る。
+  overallTimer = setTimeout(() => {
+    const error = new Error("overpass_timeout");
+    finish(error);
+    req.destroy(error);
+  }, requestTimeoutMs);
   req.setTimeout(requestTimeoutMs, () => req.destroy(new Error("overpass_timeout")));
 
   req.on("error", (err) => {
-    callback(new Error(`overpass_request_error:${err.message}`));
+    finish(new Error(`overpass_request_error:${err.message}`));
   });
   req.write(body);
   req.end();
@@ -373,14 +388,17 @@ function createOsmTactileWaysHandler({ sendJson }) {
           return;
         }
         const host = hosts[index];
+        const hostStartedAt = Date.now();
         fetchOverpass(host, query, (error, payload) => {
+          const elapsedMs = Date.now() - hostStartedAt;
           if (error) {
             hostFailures.set(host, Date.now());
-            console.warn(`[osm_tactile] host failed ${host}:`, error.message);
+            console.warn(`[osm_tactile] host failed ${host} elapsedMs=${elapsedMs} timeoutMs=${requestTimeoutMs}:`, error.message);
             tryHost(index + 1);
             return;
           }
           hostFailures.delete(host);
+          console.info(`[osm_tactile] host completed ${host} elapsedMs=${elapsedMs} timeoutMs=${requestTimeoutMs}`);
           resolve(payload);
         }, requestTimeoutMs);
       };
@@ -847,3 +865,4 @@ module.exports.parseTileId = parseTileId;
 module.exports.buildOverpassQueryForBbox = buildOverpassQueryForBbox;
 module.exports.TACTILE_TILE_ZOOM = TACTILE_TILE_ZOOM;
 module.exports.summarizeTileStatuses = summarizeTileStatuses;
+module.exports.fetchOverpass = fetchOverpass;
