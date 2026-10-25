@@ -27,7 +27,7 @@ assert.match(source, /const tryHost = \(index\)[\s\S]{0,900}?tryHost\(index \+ 1
   "Overpass mirrors must be attempted sequentially after failure");
 assert.doesNotMatch(source, /OVERPASS_HOSTS\.forEach/,
   "one screen refresh must not fan out to every Overpass mirror at once");
-assert.match(source, /\[out:json\]\[timeout:\$\{OVERPASS_QUERY_TIMEOUT_SECONDS\}\]\[bbox:\$\{bboxString\}\]/,
+assert.match(source, /\[out:json\]\[timeout:\$\{queryTimeoutSeconds\}\]\[bbox:\$\{bboxString\}\]/,
   "each Overpass query must be spatially bounded once at the global level");
 assert.match(source, /out meta geom qt;/,
   "Overpass output must retain ownership metadata while using faster quadtile ordering");

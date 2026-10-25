@@ -17,6 +17,11 @@ const TILE_CACHE_FRESH_MS = 24 * 60 * 60 * 1000;
 const TILE_CACHE_STALE_MS = 30 * 24 * 60 * 60 * 1000;
 const TILE_CACHE_UNUSED_RETENTION_DAYS = 90;
 const TILE_CACHE_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const TILE_HTTP_WAIT_MS = 1800;
+const TILE_FAILURE_COOLDOWN_MS = 30 * 1000;
+const TILE_OVERPASS_QUERY_TIMEOUT_SECONDS = 4;
+const TILE_OVERPASS_REQUEST_TIMEOUT_MS = 4500;
+const TILE_BACKGROUND_QUEUE_LIMIT = 8;
 const OVERPASS_MAX_CONCURRENCY = Math.max(1, Number.parseInt(process.env.OVERPASS_MAX_CONCURRENCY, 10) || 1);
 
 // Web Mercatorの固定タイルIDを検証し、Overpassで使うbboxへ変換する。
@@ -41,6 +46,20 @@ function parseTileId(value) {
       east: longitude(x + 1),
       north: latitude(y),
     },
+  };
+}
+
+function summarizeTileStatuses(responseTiles) {
+  const successfulTileCount = responseTiles.filter((tile) => tile.status === "success" || tile.status === "empty").length;
+  const pendingTileCount = responseTiles.filter((tile) => tile.status === "pending").length;
+  const errorTileCount = responseTiles.filter((tile) => tile.status === "error").length;
+  const unresolvedTileCount = pendingTileCount + errorTileCount;
+  return {
+    success: successfulTileCount > 0,
+    partial: successfulTileCount > 0 && unresolvedTileCount > 0,
+    pending: pendingTileCount > 0,
+    allPending: pendingTileCount === responseTiles.length,
+    allFailed: errorTileCount === responseTiles.length,
   };
 }
 
@@ -101,7 +120,7 @@ function buildOverpassQuery(centerLat, centerLng, radiusMeters, rules) {
   }, rules);
 }
 
-function buildOverpassQueryForBbox(bbox, rules) {
+function buildOverpassQueryForBbox(bbox, rules, queryTimeoutSeconds = OVERPASS_QUERY_TIMEOUT_SECONDS) {
   const tactileRule = rules.matchers.find((matcher) => matcher.key === "tactile_paving");
   const valueRegex = (tactileRule ? tactileRule.values : ["yes", "both", "contrasted"])
     .map(escapeRegexValue).join("|");
@@ -111,7 +130,7 @@ function buildOverpassQueryForBbox(bbox, rules) {
     .map((elementType) => `${elementType}["tactile_paving"~"^(${valueRegex})$"];`)
     .join("\n");
   return `
-[out:json][timeout:${OVERPASS_QUERY_TIMEOUT_SECONDS}][bbox:${bboxString}];
+[out:json][timeout:${queryTimeoutSeconds}][bbox:${bboxString}];
 (
 ${selectors}
 );
@@ -120,7 +139,7 @@ out meta geom qt;
 }
 
 // Overpass API へ POST して JSON レスポンスを受け取る。
-function fetchOverpass(overpassHost, query, callback) {
+function fetchOverpass(overpassHost, query, callback, requestTimeoutMs = OVERPASS_REQUEST_TIMEOUT_MS) {
   const body = `data=${encodeURIComponent(query)}`;
   const options = {
     hostname: overpassHost,
@@ -151,7 +170,7 @@ function fetchOverpass(overpassHost, query, callback) {
     });
   });
 
-  req.setTimeout(OVERPASS_REQUEST_TIMEOUT_MS, () => req.destroy(new Error("overpass_timeout")));
+  req.setTimeout(requestTimeoutMs, () => req.destroy(new Error("overpass_timeout")));
 
   req.on("error", (err) => {
     callback(new Error(`overpass_request_error:${err.message}`));
@@ -255,6 +274,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
   const hostFailures = new Map();
   const tileMemoryCache = new Map();
   const tileInFlightRequests = new Map();
+  const tileFailures = new Map();
   const overpassQueue = [];
   let activeOverpassRequests = 0;
   let tileCacheSchemaReady = null;
@@ -339,7 +359,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
     });
   }
 
-  function fetchOverpassFromHosts(query) {
+  function fetchOverpassFromHosts(query, requestTimeoutMs = OVERPASS_REQUEST_TIMEOUT_MS) {
     return withOverpassSlot(() => new Promise((resolve, reject) => {
       const now = Date.now();
       const hosts = OVERPASS_HOSTS.filter((host) => now - (hostFailures.get(host) || 0) >= HOST_FAILURE_COOLDOWN_MS);
@@ -362,7 +382,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
           }
           hostFailures.delete(host);
           resolve(payload);
-        });
+        }, requestTimeoutMs);
       };
       tryHost(0);
     }));
@@ -474,7 +494,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
       ensureTileCacheSchema()
         .then(() => pool.query("UPDATE osmcache.tactile_tiles SET last_accessed_at=CURRENT_TIMESTAMP WHERE tile_id=?", [tile.id]))
         .catch((error) => console.warn("[osm_tactile_tiles] last_access update skipped:", error.message));
-      return memory;
+      return { entry: memory, source: "memory" };
     }
     try {
       await ensureTileCacheSchema();
@@ -483,7 +503,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
            FROM osmcache.tactile_tiles WHERE tile_id=?`,
         [tile.id]
       );
-      if (!rows.length) return null;
+      if (!rows.length) return { entry: null, source: "miss" };
       const row = rows[0];
       const entry = {
         savedAt: new Date(row.fetched_at).getTime(),
@@ -494,10 +514,10 @@ function createOsmTactileWaysHandler({ sendJson }) {
       tileMemoryCache.set(tile.id, entry);
       pool.query("UPDATE osmcache.tactile_tiles SET last_accessed_at=CURRENT_TIMESTAMP WHERE tile_id=?", [tile.id])
         .catch((error) => console.warn("[osm_tactile_tiles] last_access update skipped:", error.message));
-      return entry;
+      return { entry, source: "db" };
     } catch (error) {
       console.warn("[osm_tactile_tiles] persistent cache read skipped:", error.message);
-      return memory || null;
+      return { entry: memory || null, source: memory ? "memory" : "miss" };
     }
   }
 
@@ -529,9 +549,11 @@ function createOsmTactileWaysHandler({ sendJson }) {
   function refreshTile(tile) {
     let inFlight = tileInFlightRequests.get(tile.id);
     if (inFlight) return inFlight;
+    const startedAt = Date.now();
+    const queueDepthAtStart = overpassQueue.length + activeOverpassRequests;
     inFlight = (async () => {
-      const query = buildOverpassQueryForBbox(tile.bbox, rules);
-      const overpassJson = await fetchOverpassFromHosts(query);
+      const query = buildOverpassQueryForBbox(tile.bbox, rules, TILE_OVERPASS_QUERY_TIMEOUT_SECONDS);
+      const overpassJson = await fetchOverpassFromHosts(query, TILE_OVERPASS_REQUEST_TIMEOUT_MS);
       const features = toFeatureCollection(overpassJson, rules).features;
       const osmBaseRaw = overpassJson && overpassJson.osm3s && overpassJson.osm3s.timestamp_osm_base;
       const entry = {
@@ -541,31 +563,101 @@ function createOsmTactileWaysHandler({ sendJson }) {
         features,
       };
       await writeTileCache(tile, entry);
+      tileFailures.delete(tile.id);
       return entry;
-    })().finally(() => tileInFlightRequests.delete(tile.id));
+    })().catch((error) => {
+      tileFailures.set(tile.id, { failedAt: Date.now(), error: error.message || "osm_upstream_error" });
+      throw error;
+    }).finally(() => tileInFlightRequests.delete(tile.id));
+    inFlight.startedAt = startedAt;
+    inFlight.queueDepthAtStart = queueDepthAtStart;
     tileInFlightRequests.set(tile.id, inFlight);
     return inFlight;
   }
 
+  function waitForRefresh(inFlight) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      };
+      const timer = setTimeout(() => finish({ state: "pending" }), TILE_HTTP_WAIT_MS);
+      inFlight.then(
+        (entry) => finish({ state: "success", entry }),
+        (error) => finish({ state: "error", error })
+      );
+    });
+  }
+
   async function resolveTile(tile) {
-    const cached = await readTileCache(tile);
+    const cacheResult = await readTileCache(tile);
+    const cached = cacheResult.entry;
     const ageMs = cached ? Date.now() - cached.savedAt : Infinity;
     if (cached && ageMs < TILE_CACHE_FRESH_MS) {
-      return { tile, entry: cached, cached: true, stale: false };
+      return { tile, entry: cached, cached: true, stale: false, source: cacheResult.source, overpassWaitMs: 0, queueDepth: 0 };
     }
-    if (cached && ageMs < TILE_CACHE_STALE_MS) {
-      refreshTile(tile).catch((error) => console.warn(`[osm_tactile_tiles] refresh failed ${tile.id}:`, error.message));
-      return { tile, entry: cached, cached: true, stale: true };
+    if (cached) {
+      if (tileInFlightRequests.has(tile.id) || tileInFlightRequests.size < TILE_BACKGROUND_QUEUE_LIMIT) {
+        refreshTile(tile).catch((error) => console.warn(`[osm_tactile_tiles] refresh failed ${tile.id}:`, error.message));
+      }
+      return { tile, entry: cached, cached: true, stale: true, source: "stale", overpassWaitMs: 0, queueDepth: overpassQueue.length };
     }
-    try {
-      return { tile, entry: await refreshTile(tile), cached: false, stale: false };
-    } catch (error) {
-      if (cached) return { tile, entry: cached, cached: true, stale: true, refreshError: error.message };
-      return { tile, error: error.message || "osm_upstream_error" };
+
+    const previousFailure = tileFailures.get(tile.id);
+    const failureAgeMs = previousFailure ? Date.now() - previousFailure.failedAt : Infinity;
+    if (previousFailure && failureAgeMs < TILE_FAILURE_COOLDOWN_MS) {
+      return {
+        tile,
+        error: previousFailure.error,
+        retryAfterMs: TILE_FAILURE_COOLDOWN_MS - failureAgeMs,
+        source: "error",
+        overpassWaitMs: 0,
+        queueDepth: overpassQueue.length,
+      };
     }
+
+    let inFlight = tileInFlightRequests.get(tile.id);
+    if (!inFlight && tileInFlightRequests.size >= TILE_BACKGROUND_QUEUE_LIMIT) {
+      return {
+        tile,
+        pending: true,
+        retryAfterMs: 2000,
+        source: "pending",
+        overpassWaitMs: 0,
+        queueDepth: tileInFlightRequests.size,
+      };
+    }
+    inFlight = inFlight || refreshTile(tile);
+    const waited = await waitForRefresh(inFlight);
+    const overpassWaitMs = Date.now() - inFlight.startedAt;
+    if (waited.state === "success") {
+      return { tile, entry: waited.entry, cached: false, stale: false, source: "fresh", overpassWaitMs, queueDepth: inFlight.queueDepthAtStart };
+    }
+    if (waited.state === "error") {
+      return {
+        tile,
+        error: waited.error.message || "osm_upstream_error",
+        retryAfterMs: TILE_FAILURE_COOLDOWN_MS,
+        source: "error",
+        overpassWaitMs,
+        queueDepth: inFlight.queueDepthAtStart,
+      };
+    }
+    return {
+      tile,
+      pending: true,
+      retryAfterMs: 2000,
+      source: "pending",
+      overpassWaitMs,
+      queueDepth: inFlight.queueDepthAtStart,
+    };
   }
 
   async function handleOsmTactileTiles(req, res, url) {
+    const responseStartedAt = Date.now();
     startTileCacheCleanup();
     const requested = String(url.searchParams.get("tiles") || "").split(",").map((value) => value.trim()).filter(Boolean);
     const unique = [...new Set(requested)];
@@ -604,7 +696,8 @@ function createOsmTactileWaysHandler({ sendJson }) {
       console.warn("[osm_tactile_tiles] ownership lookup skipped:", error.message);
     }
     const responseTiles = resolved.map((result) => {
-      if (!result.entry) return { tileId: result.tile.id, status: "error", error: result.error || "osm_upstream_error", features: [] };
+      if (result.pending) return { tileId: result.tile.id, status: "pending", retryAfterMs: result.retryAfterMs, features: [] };
+      if (!result.entry) return { tileId: result.tile.id, status: "error", error: result.error || "osm_upstream_error", retryAfterMs: result.retryAfterMs, features: [] };
       return {
         tileId: result.tile.id,
         status: result.entry.status,
@@ -619,12 +712,16 @@ function createOsmTactileWaysHandler({ sendJson }) {
         }),
       };
     });
-    const successfulTileCount = responseTiles.filter((tile) => tile.status !== "error").length;
-    const failedTileCount = responseTiles.length - successfulTileCount;
+    const responseMs = Date.now() - responseStartedAt;
+    resolved.forEach((result) => {
+      console.info(
+        `[osm_tactile_tiles] tile_response tileId=${result.tile.id} source=${result.source} ` +
+        `responseMs=${responseMs} overpassWaitMs=${result.overpassWaitMs || 0} queueDepth=${result.queueDepth || 0}`
+      );
+    });
+    const statusSummary = summarizeTileStatuses(responseTiles);
     sendJson(res, 200, {
-      success: successfulTileCount > 0,
-      partial: successfulTileCount > 0 && failedTileCount > 0,
-      allFailed: successfulTileCount === 0,
+      ...statusSummary,
       zoom: TACTILE_TILE_ZOOM,
       tiles: responseTiles,
     });
@@ -749,3 +846,4 @@ module.exports = createOsmTactileWaysHandler;
 module.exports.parseTileId = parseTileId;
 module.exports.buildOverpassQueryForBbox = buildOverpassQueryForBbox;
 module.exports.TACTILE_TILE_ZOOM = TACTILE_TILE_ZOOM;
+module.exports.summarizeTileStatuses = summarizeTileStatuses;

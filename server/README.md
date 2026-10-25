@@ -126,11 +126,16 @@
 ### OSM点字ブロック区画API
 
 - エンドポイント: `GET /api/osm-tactile-tiles?tiles=15/x/y,15/x/y`
-- 各タイルの `status` は `success`（データあり）、`empty`（取得成功・対象なし）、`error`（取得失敗）です。
+- 各タイルの `status` は `success`（データあり）、`empty`（取得成功・対象なし）、`pending`（裏で取得中）、`error`（取得失敗）です。
+- キャッシュ未取得時は最大1.8秒だけ待ちます。未完了なら`pending`と`retryAfterMs`を返し、同じ取得処理はサーバー内で継続します。
+- z15の小区画取得はOverpass QL 4秒、1ホスト約4.5秒、2ホスト合計約9秒を上限とします。
+- cold tileのバックグラウンド処理はサーバー全体で最大8件です。満杯の場合は新しい取得を開始せず、即座に`pending`を返します。既に同じタイルを取得中なら、その処理を共有します。
 - 複数タイルの一部だけ失敗した場合は `partial: true`、すべて失敗した場合は
   `success: false, partial: false, allFailed: true` を返します。
 - `error` は「点字ブロックが存在しない」という意味ではありません。フロントエンドは
   `error` タイルを空タイルとして保存せず、既存キャッシュを維持して後で再試行してください。
+- `pending`も永続キャッシュへ保存せず、`retryAfterMs`以降に同じタイルを再取得してください。全件取得中の場合は
+  `success: false, partial: false, pending: true, allPending: true, allFailed: false`です。
 - PostgreSQLのキャッシュ用テーブルを作成できない場合も、プロセス内メモリキャッシュへ
   フォールバックして読取APIを継続します。
 
