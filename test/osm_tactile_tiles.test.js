@@ -97,6 +97,10 @@ assert.match(source, /const localEntry = await readLocalTileProvider\(tile\)/,
   "a dynamic-cache miss must consult the local provider before public Overpass");
 assert.match(source, /source: "local_snapshot"/,
   "responses and safe logs must identify the local provider");
+assert.match(source, /savedAt: Date\.now\(\)/,
+  "a local snapshot must be fresh when served so clients do not refetch it forever");
+assert.match(source, /snapshotImportedAt/,
+  "snapshot import time must remain separate from the client cache fetch time");
 assert.doesNotMatch(schemaSource, /osmcache\.tactile_tiles[\s\S]{0,900}?(memo|access_token|cookie)/i,
   "the public tile cache must not contain private notes or credentials");
 assert.match(source, /tile_response tileId=\$\{result\.tile\.id\} source=\$\{result\.source\}/,

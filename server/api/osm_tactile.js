@@ -564,13 +564,20 @@ function createOsmTactileWaysHandler({ sendJson }) {
       );
       if (!rows.length) return null;
       const row = rows[0];
+      const snapshotImportedAt = new Date(row.imported_at);
       return {
-        savedAt: new Date(row.imported_at).getTime(),
+        // imported_at は元データの投入日時であり、この応答を端末が取得した
+        // 時刻ではない。古い投入日時を端末キャッシュ時刻にすると、24時間を
+        // 過ぎたsnapshotをUIが毎回期限切れと判断し、再取得を繰り返してしまう。
+        savedAt: Date.now(),
         osmBaseAt: null,
         status: row.status,
         features: Array.isArray(row.features) ? row.features : [],
         provider: "stepby_local_snapshot",
         snapshotId: row.snapshot_id,
+        snapshotImportedAt: Number.isNaN(snapshotImportedAt.getTime())
+          ? null
+          : snapshotImportedAt.toISOString(),
       };
     } catch (error) {
       console.warn("[osm_tactile_tiles] local provider read skipped:", error.message);
@@ -775,6 +782,7 @@ function createOsmTactileWaysHandler({ sendJson }) {
         osmBaseAt: result.entry.osmBaseAt,
         provider: result.entry.provider || "overpass_cache",
         snapshotId: result.entry.snapshotId || null,
+        snapshotImportedAt: result.entry.snapshotImportedAt || null,
         cached: result.cached,
         stale: result.stale,
         features: result.entry.features.map((feature) => {
