@@ -88,7 +88,7 @@
   <rect x="120" y="942" width="290" height="76" rx="12" class="inner"/><text x="265" y="970" text-anchor="middle" class="body">UI0 IndexedDB</text><text x="265" y="994" text-anchor="middle" class="small">z15タイル／点字ブロック区画を端末保存</text>
   <rect x="475" y="942" width="290" height="76" rx="12" class="inner"/><text x="620" y="970" text-anchor="middle" class="body">Node.js 読取API</text><text x="620" y="994" text-anchor="middle" class="small">GET /api/osm-tactile-tiles</text>
   <rect x="830" y="942" width="290" height="76" rx="12" class="db"/><text x="975" y="970" text-anchor="middle" class="body">PostgreSQL</text><text x="975" y="991" text-anchor="middle" class="small">動的キャッシュ＋岡山市ローカルsnapshot</text><text x="975" y="1009" text-anchor="middle" class="small">osmcache.tactile_tiles／local_tactile_tiles</text>
-  <rect x="1185" y="942" width="290" height="76" rx="12" class="external"/><text x="1330" y="970" text-anchor="middle" class="body">公開Overpass API</text><text x="1330" y="994" text-anchor="middle" class="small">ローカル未収録区画だけのfallback読取</text>
+  <rect x="1185" y="942" width="290" height="76" rx="12" class="external"/><text x="1330" y="970" text-anchor="middle" class="body">Overpass読取API</text><text x="1330" y="992" text-anchor="middle" class="small">armd-01.sakura.ne.jpを最優先</text><text x="1330" y="1010" text-anchor="middle" class="small">失敗時のみ公開ミラーへ切替</text>
   <path d="M475 980h-65" class="lineOrange"/><path d="M830 980h-65" class="lineOrange"/><path d="M1185 980h-65" class="lineOrange"/>
 
   <text x="55" y="1125" class="small">本番UI0の保存はDBと審査待ち登録まで。Google利用者の承認済み記録だけを専用OSMアカウントで送り、ゲスト記録は送らない。</text>

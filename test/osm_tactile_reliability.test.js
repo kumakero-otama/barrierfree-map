@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 
 const source = fs.readFileSync(path.resolve(__dirname, "../server/api/osm_tactile.js"), "utf8");
+const envExample = fs.readFileSync(path.resolve(__dirname, "../.env.example"), "utf8");
 
 assert.match(source, /OVERPASS_REQUEST_TIMEOUT_MS = 12000/,
   "a congested Overpass host must not block the UI for 30 seconds");
@@ -23,6 +24,8 @@ assert.doesNotMatch(source, /["']overpass\.kumi\.systems["']/,
   "the retired kumi hostname must not duplicate the private.coffee backend");
 assert.match(source, /process\.env\.OVERPASS_HOST/,
   "an explicitly configured Overpass host must remain supported");
+assert.match(envExample, /^OVERPASS_HOST=armd-01\.sakura\.ne\.jp$/m,
+  "the permitted StepBy Overpass server must be the production default");
 assert.match(source, /const tryHost = \(index\)[\s\S]{0,900}?tryHost\(index \+ 1\)/,
   "Overpass mirrors must be attempted sequentially after failure");
 assert.doesNotMatch(source, /OVERPASS_HOSTS\.forEach/,

@@ -499,7 +499,7 @@
           <a class="architecture-link" href="system-architecture.svg" target="_blank" rel="noopener">SVGを別画面で拡大表示 →</a>
         </div>
         <a href="system-architecture.svg" target="_blank" rel="noopener"><img class="architecture-frame" src="system-architecture.svg" alt="StepByとbarrierfree-mapの現在のシステム構成図"></a>
-        <p class="architecture-rule"><strong>2026年10月25日から本番稼働：</strong>OSM点字ブロック表示は、表示中の地図中心を基準にz15区画で順次取得し、UI0のIndexedDBへ区画単位で保存します。Node.jsの読取専用 <code>GET /api/osm-tactile-tiles</code> は、PostgreSQLの動的キャッシュ <code>osmcache.tactile_tiles</code> を最優先し、次にGeofabrik中国地方PBFから事前抽出した岡山市限定の読取専用provider <code>osmcache.local_tactile_tiles</code> を参照します。どちらにもない区画だけを公開Overpass APIから読み取ります。StepByローカルproviderとOverpassには書き込みません。</p>
+        <p class="architecture-rule"><strong>2026年10月31日更新：</strong>OSM点字ブロック表示は、表示中の地図中心を基準にz15区画で順次取得し、UI0のIndexedDBへ区画単位で保存します。Node.jsの読取専用 <code>GET /api/osm-tactile-tiles</code> は、PostgreSQLの動的キャッシュ <code>osmcache.tactile_tiles</code> を最優先し、次にGeofabrik中国地方PBFから事前抽出した岡山市限定の読取専用provider <code>osmcache.local_tactile_tiles</code> を参照します。どちらにもない区画は、使用許可済みの <code>armd-01.sakura.ne.jp</code> へ最初に問い合わせ、失敗した場合だけ公開Overpassミラーへ順次切り替えます。StepByローカルproviderとOverpassには書き込みません。</p>
         <p class="architecture-rule"><strong>更新ルール：</strong>フロント、API、ポート、PM2、Tailscale、DB、コンテナ、外部サービスまたは認証方式を変更した作業では、この構成図も同時に更新します。秘密情報は掲載しません。</p>
       </section>
 

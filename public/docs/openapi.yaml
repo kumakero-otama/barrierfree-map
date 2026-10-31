@@ -581,6 +581,7 @@ paths:
     get:
       tags: [OSM]
       summary: Overpass経由で点字ブロック関連地物を取得
+      description: 使用許可済みのarmd-01.sakura.ne.jpを最初に利用し、失敗時だけ公開Overpassミラーへ順次切り替えます。同一地域の成功結果は30分、障害時利用は24時間までキャッシュします。
       parameters:
         - in: query
           name: centerLat

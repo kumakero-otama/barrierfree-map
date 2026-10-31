@@ -97,7 +97,7 @@ Secret Managerには、シェルが読み込める`KEY='value'`形式のテキ�
 - `OSM_WRITES_ENABLED=false`
 - `OSM_COMMUNITY_APPROVED=false`
 - `OSM_API_BASE_URL=https://api.openstreetmap.org`
-- `OVERPASS_HOST`
+- `OVERPASS_HOST`（本番既定: `armd-01.sakura.ne.jp`。使用許可を得た最優先Overpass。スキームと`/api/interpreter`は付けない）
 - `CORS_ALLOWED_ORIGINS`
 
 再現開始時に`OSM_WRITES_ENABLED=true`へ変更しないでください。OSMのメールアドレス・パスワードはSecret Managerにもアプリにも保存せず、OAuthアクセストークンだけをアプリ管理画面経由で暗号化保存します。
