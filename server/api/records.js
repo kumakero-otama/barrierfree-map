@@ -50,15 +50,15 @@ function createRecordsHandler({ sendJson }) {
           ST_AsGeoJSON(sp.geom) AS geom_geojson,
           CASE WHEN s.user_id = ?
             THEN COALESCE(tag_info.all_tags,
-              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['点字ブロック']::text[] ELSE ARRAY[]::text[] END)
+              ARRAY['点字ブロック']::text[])
             ELSE COALESCE(tag_info.public_tags,
-              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['点字ブロック']::text[] ELSE ARRAY[]::text[] END)
+              ARRAY['点字ブロック']::text[])
           END AS tags,
           CASE WHEN s.user_id = ?
             THEN COALESCE(tag_info.all_tag_codes,
-              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['tactile_paving']::text[] ELSE ARRAY[]::text[] END)
+              ARRAY['tactile_paving']::text[])
             ELSE COALESCE(tag_info.public_tag_codes,
-              CASE WHEN migrated.record_id IS NOT NULL THEN ARRAY['tactile_paving']::text[] ELSE ARRAY[]::text[] END)
+              ARRAY['tactile_paving']::text[])
           END AS tag_codes,
           osm_link.osm_status,
           CASE WHEN COALESCE(tag_info.has_private,FALSE) AND NOT COALESCE(tag_info.has_public,FALSE)
