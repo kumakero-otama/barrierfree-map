@@ -48,6 +48,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 | GET | `/auth/osm/status` | 必要 | StepBy専用OSMアカウントによる公開準備状態を取得 |
 | GET | `/api/osm-walkable-network` | 必要 | 1km圏の歩行可能Wayを取得。`forceRefresh=1`で保存直前のキャッシュを回避 |
 | POST | `/api/osm/split-plan` | 必要 | 所有記録のWay分割・点字タグ変更案を追記保存 |
+| POST | `/api/osm/pending-review` | 必要 | 経路未確定の所有記録を最新OSMでの再マップマッチング待ちとして審査キューへ登録 |
 | GET | `/api/osm/records/:recordId` | 必要 | 所有記録と送信・取消changesetの状態を取得 |
 | POST | `/api/osm/records/:recordId/publish` | 必要 | 保存確認済みの1記録をStepBy専用OSMアカウントから送信 |
 | POST | `/api/osm/records/:recordId/revert` | 必要 | 本人の緑線削除確認に対応する反対changesetを送信 |
@@ -470,10 +471,12 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 - 主なレスポンス:
   - `200`: `ok`, `user`
   - `400`, `401`, `403` (`guest_profile_locked`), `404`, `405`, `500`
-# OSM公開審査API（2026-08-29更新）
+# OSM公開審査API（2026-11-06更新）
 
 - `GET /api/osm/reviews?status=pending&source=all&q=&from=&to=`: 管理者のGoogleメールを確認し、状態・新規／既存・記録者／ID・期間で絞り込んだ審査対象とGPS・経路・変更案を取得
-- `POST /api/osm/reviews/:reviewId/approve`: 承認を追記監査へ保存。旧記録は最新OSMで再フィッティングして変更案を生成し、安全条件が揃う場合だけ同じリクエスト内でOSMへ送信する。既に同一タグがある場合は重複送信せず`alreadyPresent: true`を返す
+- `POST /api/osm/pending-review`: ブラウザで経路を即時確定できなかった通常記録を、GPS生座標付きの再マップマッチング待ちとして審査キューへ登録
+- `POST /api/osm/reviews/:reviewId/refit`: 保存済みGPS生座標を最新OSM道路へ再マップマッチングし、変更案を差し替える。OSM送信なし
+- `POST /api/osm/reviews/:reviewId/approve`: 承認を追記監査へ保存。旧記録または再マップマッチング待ち記録は最新OSMで変更案を生成し、安全条件が揃う場合だけ同じリクエスト内でOSMへ送信する。既に同一タグがある場合は重複送信せず`alreadyPresent: true`を返す
 - `POST /api/osm/reviews/:reviewId/reject`: 却下理由を保存。OSM送信なし
 - `POST /api/osm/reviews/:reviewId/hold`: 管理者メモとともに保留
 - `POST /api/osm/reviews/:reviewId/memo`: 審査状態を変えず管理者メモを保存

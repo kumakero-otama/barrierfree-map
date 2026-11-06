@@ -218,7 +218,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     }
   }
 
-  async function prepareLegacyReviewPlan(req, review) {
+  async function prepareReviewRefitPlan(req, review) {
     const metadata = review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {};
     const points = (Array.isArray(metadata.rawPoints) ? metadata.rawPoints : [])
       .map((point) => ({ lat: Number(point.lat), lng: Number(point.lng) }))
@@ -239,12 +239,12 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     const refreshedWays = network.ways.map((way) => officialById.get(Number(way.id)) || way);
     const prepared = createLegacyReviewPlan(metadata, refreshedWays);
     const replacementPlanId = crypto.randomUUID();
-    const summary = `StepBy旧記録の点字ブロック公開（${metadata.startedAt || review.record_id}）`;
+    const summary = `StepBy点字ブロック記録の公開（${metadata.startedAt || review.record_id}）`;
     const context = {
       previewOnly: false,
       osmWriteRequested: true,
       reviewRequired: true,
-      planner: "legacy_browser_refit_v1",
+      planner: "browser_refit_v2",
       recordId: review.record_id,
       sourcePlanId: review.plan_id,
       fitting: {
@@ -259,6 +259,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     const updatedMetadata = {
       ...metadata,
       legacyNeedsRefit: false,
+      needsRefit: false,
+      matchingPending: false,
       refittedAt: new Date().toISOString(),
       refittedWayIds: prepared.fitting.wayIds,
     };
@@ -270,7 +272,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         VALUES(?,'merge',?,?,?,?,?::jsonb) RETURNING plan_id`, [replacementPlanId, review.created_by,
         review.plan_id, summary, JSON.stringify(prepared.splitPlan.operations), JSON.stringify(context)]);
       await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
-        VALUES(?,'legacy_refit_plan_created',?,?,?::jsonb) RETURNING event_id AS id`, [replacementPlanId,
+        VALUES(?,'review_refit_plan_created',?,?,?::jsonb) RETURNING event_id AS id`, [replacementPlanId,
         req.authUserId, req.securityRequestId || null, JSON.stringify({
           reviewId: review.review_id,
           recordId: review.record_id,
@@ -279,7 +281,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           splitSummary: prepared.splitPlan.summary,
         })]);
       await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
-        VALUES(?,'legacy_plan_superseded',?,?,?::jsonb) RETURNING event_id AS id`, [review.plan_id,
+        VALUES(?,'review_plan_superseded',?,?,?::jsonb) RETURNING event_id AS id`, [review.plan_id,
         req.authUserId, req.securityRequestId || null, JSON.stringify({ replacementPlanId, reviewId: review.review_id })]);
       await conn.query(`UPDATE osmchange.review_queue SET plan_id=?,source_metadata=?::jsonb,updated_at=NOW()
         WHERE review_id=?`, [replacementPlanId, JSON.stringify(updatedMetadata), review.review_id]);
@@ -287,7 +289,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
         VALUES(?,?,?,'draft') ON CONFLICT(record_id) DO UPDATE SET merge_plan_id=EXCLUDED.merge_plan_id,
         osm_status='draft',updated_at=NOW() RETURNING record_id`, [review.record_id, review.created_by, replacementPlanId]);
       await conn.query(`INSERT INTO osmchange.review_events(review_id,event_type,actor_user_id,details)
-        VALUES(?,'legacy_refitted',?,?::jsonb) RETURNING event_id AS id`, [review.review_id, req.authUserId,
+        VALUES(?,'review_refitted',?,?::jsonb) RETURNING event_id AS id`, [review.review_id, req.authUserId,
         JSON.stringify({ replacementPlanId, sourcePlanId: review.plan_id, wayIds: prepared.fitting.wayIds,
           splitSummary: prepared.splitPlan.summary })]);
       await conn.commit();
@@ -470,8 +472,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     try {
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       // HTTP body may start streaming immediately, so capture it before awaiting DB initialization.
-      const isExecutionRequest = req.method === "POST" && (/\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname) || /\/api\/osm\/records\/[^/]+\/(publish|revert)$/.test(url.pathname) || /\/api\/osm\/reviews\/[^/]+\/(approve|reject|reopen)$/.test(url.pathname));
-      const pendingBody = (["/api/osm/plans", "/api/osm/split-plan"].includes(url.pathname) || isExecutionRequest) && req.method === "POST"
+      const isExecutionRequest = req.method === "POST" && (/\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname) || /\/api\/osm\/records\/[^/]+\/(publish|revert)$/.test(url.pathname) || /\/api\/osm\/reviews\/[^/]+\/(approve|reject|reopen|refit)$/.test(url.pathname));
+      const pendingBody = (["/api/osm/plans", "/api/osm/split-plan", "/api/osm/pending-review"].includes(url.pathname) || isExecutionRequest) && req.method === "POST"
         ? readJson(req)
         : null;
       await ensureSchema();
@@ -492,6 +494,94 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           requiredSafeguards: ["server_feature_flag", "google_admin_allowlist", "administrator_review", "guest_exclusion", "service_account_oauth", "idempotency", "append_only_audit", "latest_osm_version"],
           reason: gate.enabled ? "Only administrator-approved non-guest records can be published" : "OSM write code is installed and locked by a server-side safeguard",
         });
+        return;
+      }
+
+      if (url.pathname === "/api/osm/pending-review" && req.method === "POST") {
+        const body = await pendingBody;
+        const recordId = await requireOwnedRecord(body.recordId, req.authUserId);
+        const [recordOwners] = await pool.query(`SELECT COALESCE(u.is_guest,FALSE) is_guest,s.started_at,s.ended_at,u.username
+          FROM tactile.sessions s LEFT JOIN login.users u ON u.user_id=s.user_id
+          WHERE s.session_id=? AND s.user_id=? LIMIT 1`, [recordId, req.authUserId]);
+        const owner = recordOwners[0];
+        if (owner && owner.is_guest) {
+          await pool.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+            VALUES(NULL,'guest_review_excluded',?,?,?::jsonb)`, [req.authUserId, req.securityRequestId || null,
+            JSON.stringify({ recordId, osmSent: false, reviewQueued: false, matchingPending: true })]);
+          sendJson(res, 200, { success: true, recordId, status: "guest_saved_stepby_only", reviewQueued: false, osmSent: false });
+          return;
+        }
+        const publication = await getRecordPublication(pool, recordId, req.authUserId);
+        if (!publication.osmEligible) {
+          sendJson(res, 409, { error: "record_is_stepby_only", osmEligible: false });
+          return;
+        }
+        const [existingLinks] = await pool.query(`SELECT l.merge_plan_id,l.osm_status,q.review_id,q.review_status
+          FROM osmchange.record_links l LEFT JOIN osmchange.review_queue q ON q.record_id=l.record_id
+          WHERE l.record_id=? AND l.created_by=? LIMIT 1`, [recordId, req.authUserId]);
+        if (existingLinks[0]) {
+          sendJson(res, 200, { success: true, recordId, planId: existingLinks[0].merge_plan_id,
+            status: existingLinks[0].review_status || existingLinks[0].osm_status,
+            reviewId: existingLinks[0].review_id || null, reviewQueued: Boolean(existingLinks[0].review_id),
+            osmSent: existingLinks[0].osm_status === "merged", idempotent: true });
+          return;
+        }
+        const [rawRows] = await pool.query(`SELECT ST_Y(geom::geometry) lat,ST_X(geom::geometry) lng,accuracy,ts
+          FROM tactile.gps_raw WHERE session_id=? ORDER BY ts`, [recordId]);
+        if (!Array.isArray(rawRows) || rawRows.length < 2) {
+          sendJson(res, 409, { error: "raw_points_not_available", reviewQueued: false, osmSent: false });
+          return;
+        }
+        const planId = crypto.randomUUID();
+        const metadata = {
+          username: owner?.username || null,
+          startedAt: owner?.started_at || null,
+          endedAt: owner?.ended_at || null,
+          rawPoints: rawRows.map((point) => ({
+            lat: Number(point.lat), lng: Number(point.lng),
+            accuracy: point.accuracy == null ? null : Number(point.accuracy), ts: point.ts || null,
+          })),
+          needsRefit: true,
+          matchingPending: true,
+          classification: "最新OSMで再マップマッチング待ち",
+        };
+        const context = {
+          previewOnly: false,
+          osmWriteRequested: false,
+          reviewRequired: true,
+          planner: "pending_browser_refit_v1",
+          recordId,
+          publication: { osmEligible: true, containsStepByOnlyData: publication.hasPrivateTag },
+          needsRefit: true,
+        };
+        const conn = await pool.getConnection();
+        let review;
+        try {
+          await conn.beginTransaction();
+          await conn.query(`INSERT INTO osmchange.change_plans
+            (plan_id,operation_type,created_by,source_plan_id,summary,elements,client_context)
+            VALUES(?,'merge',?,NULL,?,'[]'::jsonb,?::jsonb) RETURNING plan_id`,
+          [planId, req.authUserId, "StepBy点字ブロック記録（再マップマッチング待ち）", JSON.stringify(context)]);
+          await conn.query(`INSERT INTO osmchange.record_links(record_id,created_by,merge_plan_id,osm_status)
+            VALUES(?,?,?,'draft') RETURNING record_id`, [recordId, req.authUserId, planId]);
+          await conn.query(`INSERT INTO osmchange.audit_events(plan_id,event_type,actor_user_id,request_id,details)
+            VALUES(?,'pending_refit_plan_created',?,?,?::jsonb) RETURNING event_id`, [planId,
+            req.authUserId, req.securityRequestId || null, JSON.stringify({ recordId, osmSent: false, reviewQueued: true })]);
+          review = await enqueueReview(conn, { recordId, planId, actorUserId: req.authUserId, sourceType: "new_record" });
+          await conn.query("UPDATE osmchange.review_queue SET source_metadata=?::jsonb WHERE review_id=?",
+            [JSON.stringify(metadata), review.review_id]);
+          await conn.commit();
+        } catch (error) {
+          await conn.rollback();
+          throw error;
+        } finally {
+          conn.release();
+        }
+        const notification = await queueNotification(pool, review.review_id);
+        void deliverNotification(pool, { ...notification, reviewId: review.review_id })
+          .catch((notificationError) => console.error("[osm_review] notification_failed", notificationError.message));
+        sendJson(res, 201, { success: true, recordId, planId, reviewId: review.review_id,
+          status: "pending_review", reviewQueued: true, matchingPending: true, osmSent: false });
         return;
       }
 
@@ -701,6 +791,19 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
             reviewId, "reopened", req.authUserId);
             sendJson(res, 200, { success: true, reviewId, status: "pending", osmSent: false }); return;
           }
+          if (action === "refit") {
+            const refitResult = await withPlanLock(`review:${reviewId}`, async () => {
+              const [freshRows] = await pool.query(`SELECT q.*,cp.operation_type,cp.created_by,cp.summary,cp.elements,cp.client_context
+                FROM osmchange.review_queue q JOIN osmchange.change_plans cp ON cp.plan_id=q.plan_id
+                WHERE q.review_id=? LIMIT 1`, [reviewId]);
+              const freshReview = freshRows[0];
+              if (!freshReview) throw new Error("review_not_found");
+              if (freshReview.review_status === "merged") throw new Error("merged_review_cannot_be_refitted");
+              return prepareReviewRefitPlan(req, freshReview);
+            });
+            sendJson(res, 200, { success: true, reviewId, status: refitResult.review_status,
+              planId: refitResult.plan_id, refitted: true, osmSent: false }); return;
+          }
           if (action === "approve") {
             const approvalResult = await withPlanLock(`review:${reviewId}`, async () => {
               // 待機中に別リクエストが完了し得るため、ロック取得後の状態を必ず読み直す。
@@ -730,9 +833,10 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               try {
                 let executableReview = freshReview;
                 // 失敗後の再送でも、以前のVersionを持つ変更案は再利用せず必ず再計画する。
-                if (freshReview.source_type === "legacy_record" && freshReview.source_metadata) {
+                if (freshReview.source_metadata &&
+                    (freshReview.source_type === "legacy_record" || freshReview.source_metadata.needsRefit === true)) {
                   try {
-                    executableReview = await prepareLegacyReviewPlan(req, freshReview);
+                    executableReview = await prepareReviewRefitPlan(req, freshReview);
                   } catch (plannerError) {
                     if (plannerError.message === "tactile_tag_already_present") {
                       return await markLegacyAlreadyPresent(req, freshReview, plannerError);

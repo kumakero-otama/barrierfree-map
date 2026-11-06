@@ -55,8 +55,8 @@ assert.throws(() => createLegacyReviewPlan({ rawPoints: [{ lat: 34, lng: 134 }] 
 assert.match(changesSource, /preliminary\.fitting\.wayIds\.map\(fetchOfficialWay\)/,
   "legacy publishing must refresh every selected Way from the official OSM API before planning");
 assert.match(changesSource, /createLegacyReviewPlan\(metadata, refreshedWays\)/);
-assert.match(changesSource, /freshReview\.source_type === "legacy_record" && freshReview\.source_metadata\)/,
-  "a failed legacy publication retry must always rebuild its plan from current OSM data");
+assert.match(changesSource, /freshReview\.source_type === "legacy_record" \|\| freshReview\.source_metadata\.needsRefit === true/,
+  "legacy and pending raw publication retries must rebuild their plans from current OSM data");
 assert.equal(boundaryPosition({ kind: "node", index: 2 }), 2);
 assert.equal(boundaryPosition({ kind: "projection", segmentIndex: 1, fraction: 0.25 }), 1.25);
 
