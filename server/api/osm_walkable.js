@@ -1,9 +1,10 @@
 const https = require("https");
+const { BoundedCache } = require("../bounded_cache");
 
 const DEFAULT_RADIUS_METERS = 1000;
 const MAX_RADIUS_METERS = 1500;
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const cache = new Map();
+const cache = new BoundedCache({ maxEntries: 32, maxBytes: 8 * 1024 * 1024, ttlMs: CACHE_TTL_MS });
 
 function clearWalkableNetworkCache() {
   const clearedEntries = cache.size;

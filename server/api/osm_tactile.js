@@ -284,10 +284,11 @@ function createOsmTactileWaysHandler({ sendJson }) {
     "overpass.private.coffee",
   ].filter(Boolean))];
   const { pool } = createDbPool();
-  const responseCache = new Map();
+  const { BoundedCache } = require("../bounded_cache");
+  const responseCache = new BoundedCache({ maxEntries: 32, maxBytes: 4 * 1024 * 1024, ttlMs: CACHE_STALE_MS });
   const inFlightRequests = new Map();
   const hostFailures = new Map();
-  const tileMemoryCache = new Map();
+  const tileMemoryCache = new BoundedCache({ maxEntries: 128, maxBytes: 4 * 1024 * 1024, ttlMs: 30 * 60 * 1000 });
   const tileInFlightRequests = new Map();
   const tileFailures = new Map();
   const overpassQueue = [];
