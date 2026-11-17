@@ -80,6 +80,22 @@ function boundaryPosition(boundary) {
   return NaN;
 }
 
+function createFittedPath(segments) {
+  const path = [];
+  const append = coordinate => {
+    if (!Array.isArray(coordinate)) return;
+    const last = path.at(-1);
+    if (!last || last[0] !== coordinate[0] || last[1] !== coordinate[1]) path.push(coordinate);
+  };
+  for (const segment of segments) {
+    const from = boundaryPosition(segment.from), to = boundaryPosition(segment.to);
+    append(segment.from.coordinate);
+    const interior = segment.fullCoordinates.filter((_, i) => i > Math.min(from, to) && i < Math.max(from, to));
+    if (to < from) interior.reverse();
+    interior.forEach(append); append(segment.to.coordinate);
+  }
+  return path;
+}
 function createLegacyReviewPlan(metadata, ways) {
   const rawPoints = normalizeRawPoints(metadata || {});
   const recordedPath = parseRecordedPath(metadata || {});
@@ -121,7 +137,7 @@ function createLegacyReviewPlan(metadata, ways) {
   });
   if (!segments.length) throw new Error("zero_length_tactile_segment");
   const splitPlan = createSplitPlan({ segments }, { tactileValue: "yes" });
-  return { fitting, segments, splitPlan };
+  return { fitting, segments, splitPlan, fittedPath: createFittedPath(segments) };
 }
 
 module.exports = { createLegacyReviewPlan, parseRecordedPath, normalizeRawPoints, closestBoundary, sharedNodeBoundary, inferRoadSide, boundaryPosition };

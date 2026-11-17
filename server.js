@@ -433,7 +433,7 @@ function handleRequest(req, res) {
     handleCount(req, res);
     return;
   }
-  if (req.url && req.url.startsWith("/api/stats")) {
+  if (req.url && (req.url.startsWith("/api/stats") || new URL(req.url, "http://localhost").pathname === "/api/public/stats")) {
     handleStats(req, res);
     return;
   }
@@ -488,6 +488,19 @@ function handleRequest(req, res) {
   if (req.url && req.url.startsWith("/api/records")) {
     handleRecords(req, res);
     return;
+  }
+  if (req.url && new URL(req.url, "http://localhost").pathname === "/api/public/tactile-ranking") {
+    // 公開HPへは個人ID・画像・氏名・経路を返さず順位と距離だけを出す。
+    const publicRes = Object.create(res);
+    publicRes.writeHead = res.writeHead.bind(res);
+    publicRes.end = body => {
+      const payload = JSON.parse(body);
+      if (Array.isArray(payload.ranking)) payload.ranking = payload.ranking.map(row => ({
+        rank: row.rank, username: `参加者${row.rank}`, distanceMeters: row.distanceMeters,
+      }));
+      return res.end(JSON.stringify(payload));
+    };
+    handleTactileRanking(req, publicRes); return;
   }
   if (req.url && req.url.startsWith("/api/tactile-ranking")) {
     handleTactileRanking(req, res);

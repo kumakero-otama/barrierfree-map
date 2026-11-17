@@ -220,6 +220,11 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
 
   async function prepareLegacyReviewPlan(req, review) {
     const metadata = review.source_metadata && typeof review.source_metadata === "object" ? review.source_metadata : {};
+    if (!Array.isArray(metadata.rawPoints) || metadata.rawPoints.length < 2) {
+      const [gps] = await pool.query(`SELECT ST_Y(geom::geometry) lat,ST_X(geom::geometry) lng,accuracy
+        FROM tactile.gps_raw WHERE session_id=? ORDER BY ts`, [review.record_id]);
+      metadata.rawPoints = gps;
+    }
     const points = (Array.isArray(metadata.rawPoints) ? metadata.rawPoints : [])
       .map((point) => ({ lat: Number(point.lat), lng: Number(point.lng) }))
       .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
@@ -261,6 +266,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
       legacyNeedsRefit: false,
       refittedAt: new Date().toISOString(),
       refittedWayIds: prepared.fitting.wayIds,
+      refittedPathGeoJson: JSON.stringify({ type: "LineString", coordinates: prepared.fittedPath }),
     };
     const conn = await pool.getConnection();
     try {
@@ -470,7 +476,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     try {
       const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       // HTTP body may start streaming immediately, so capture it before awaiting DB initialization.
-      const isExecutionRequest = req.method === "POST" && (/\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname) || /\/api\/osm\/records\/[^/]+\/(publish|revert)$/.test(url.pathname) || /\/api\/osm\/reviews\/[^/]+\/(approve|reject|reopen)$/.test(url.pathname));
+      const isExecutionRequest = req.method === "POST" && (/\/api\/osm\/plans\/[^/]+\/(execute|execute-revert)$/.test(url.pathname) || /\/api\/osm\/records\/[^/]+\/(publish|revert)$/.test(url.pathname) || /\/api\/osm\/reviews\/[^/]+\/(approve|reject|reopen|refit)$/.test(url.pathname));
       const pendingBody = (["/api/osm/plans", "/api/osm/split-plan"].includes(url.pathname) || isExecutionRequest) && req.method === "POST"
         ? readJson(req)
         : null;
@@ -646,7 +652,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
           const [rows] = await pool.query(`SELECT q.review_id,q.record_id,q.plan_id,q.source_type,q.source_record_id,
               q.review_status,q.rejection_reason,q.admin_note,q.source_metadata,q.created_at,q.reviewed_at,
               COALESCE(q.source_metadata->>'username',u.username) username,
-              COALESCE(ST_AsGeoJSON(p.geom::geometry),q.source_metadata->>'pathGeoJson') path_geojson,cp.elements,cp.client_context,
+              COALESCE(q.source_metadata->>'refittedPathGeoJson',ST_AsGeoJSON(p.geom::geometry),q.source_metadata->>'pathGeoJson') path_geojson,cp.elements,cp.client_context,
               (SELECT details->>'error' FROM osmchange.review_events re WHERE re.review_id=q.review_id AND re.event_type='merge_failed' ORDER BY re.event_id DESC LIMIT 1) last_error,
               (SELECT status FROM osmchange.review_notifications rn WHERE rn.review_id=q.review_id ORDER BY rn.created_at DESC LIMIT 1) notification_status,
               COALESCE((SELECT jsonb_agg(jsonb_build_object('lat',ST_Y(g.geom::geometry),'lng',ST_X(g.geom::geometry),
@@ -700,6 +706,19 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               reviewer_user_id=NULL,reviewed_at=NULL,updated_at=NOW() WHERE review_id=?`, [reviewId],
             reviewId, "reopened", req.authUserId);
             sendJson(res, 200, { success: true, reviewId, status: "pending", osmSent: false }); return;
+          }
+          if (action === "refit") {
+            const result = await withPlanLock(`review:${reviewId}`, async () => {
+              const [freshRows] = await pool.query(`SELECT q.*,cp.operation_type,cp.created_by,cp.summary,cp.elements,cp.client_context
+                FROM osmchange.review_queue q JOIN osmchange.change_plans cp ON cp.plan_id=q.plan_id
+                WHERE q.review_id=? LIMIT 1`, [reviewId]);
+              const fresh = freshRows[0];
+              if (!fresh) throw new Error("review_not_found");
+              if (fresh.review_status === "merged") throw new Error("merged_review_cannot_be_refitted");
+              return prepareLegacyReviewPlan(req, fresh);
+            });
+            sendJson(res, 200, { success: true, reviewId, status: result.review_status,
+              planId: result.plan_id, refitted: true, osmSent: false }); return;
           }
           if (action === "approve") {
             const approvalResult = await withPlanLock(`review:${reviewId}`, async () => {

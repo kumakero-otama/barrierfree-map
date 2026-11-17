@@ -1,0 +1,14 @@
+const assert=require("assert"),fs=require("fs");
+const changes=fs.readFileSync("server/api/osm_changes.js","utf8");
+assert.match(changes,/if \(action === "refit"\)/);
+assert.match(changes,/approve\|reject\|reopen\|refit/);
+assert.match(changes,/refittedPathGeoJson/);
+const block=changes.slice(changes.indexOf('if (action === "refit")'),changes.indexOf('if (action === "approve")'));
+assert.doesNotMatch(block,/executeUserPlan|\.upload|changeset/);
+assert.match(block,/merged_review_cannot_be_refitted/);
+const guard=fs.readFileSync("server/security/dev_api_guard.js","utf8");
+assert.match(guard,/"\/api\/public\/stats", "\/api\/public\/tactile-ranking"/);
+assert.match(guard,/req.method === "GET"/);
+const server=fs.readFileSync("server.js","utf8");
+assert.match(server,/username: `参加者\$\{row.rank\}`/);
+console.log("public metrics disclose aggregates only; refit remains planning only");

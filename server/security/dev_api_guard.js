@@ -121,9 +121,10 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
       });
     }
 
-    const publicRoute = pathname === "/api/config" || pathname === "/auth/guest" || pathname === "/auth/google" || pathname === "/auth/google/signup" || pathname === "/auth/osm/callback";
+    const publicStats = ["/api/public/stats", "/api/public/tactile-ranking"].includes(pathname) && req.method === "GET";
+    const publicRoute = publicStats || pathname === "/api/config" || pathname === "/auth/guest" || pathname === "/auth/google" || pathname === "/auth/google/signup" || pathname === "/auth/osm/callback";
     if (publicRoute) {
-      const rate = consumeRateLimit(`public:${ip}:${pathname}`, pathname === "/api/config" ? 60 : 10);
+      const rate = consumeRateLimit(`public:${ip}:${pathname}`, publicStats ? 180 : pathname === "/api/config" ? 60 : 10);
       if (!rate.allowed) {
         res.setHeader("Retry-After", String(rate.retryAfterSeconds));
         log("RATE_LIMITED_PUBLIC", req);
