@@ -490,13 +490,13 @@ function handleRequest(req, res) {
     return;
   }
   if (req.url && new URL(req.url, "http://localhost").pathname === "/api/public/tactile-ranking") {
-    // 公開HPへは個人ID・画像・氏名・経路を返さず順位と距離だけを出す。
+    // 公開プロフィール名とアイコンは表示し、内部ID・メール・経路は返さない。
     const publicRes = Object.create(res);
     publicRes.writeHead = res.writeHead.bind(res);
     publicRes.end = body => {
       const payload = JSON.parse(body);
       if (Array.isArray(payload.ranking)) payload.ranking = payload.ranking.map(row => ({
-        rank: row.rank, username: `参加者${row.rank}`, distanceMeters: row.distanceMeters,
+        rank: row.rank, username: row.username, iconUrl: row.iconUrl, distanceMeters: row.distanceMeters,
       }));
       return res.end(JSON.stringify(payload));
     };

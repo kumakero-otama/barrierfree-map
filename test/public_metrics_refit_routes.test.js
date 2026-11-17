@@ -10,5 +10,5 @@ const guard=fs.readFileSync("server/security/dev_api_guard.js","utf8");
 assert.match(guard,/"\/api\/public\/stats", "\/api\/public\/tactile-ranking"/);
 assert.match(guard,/req.method === "GET"/);
 const server=fs.readFileSync("server.js","utf8");
-assert.match(server,/username: `参加者\$\{row.rank\}`/);
+assert.match(server,/username: row.username, iconUrl: row.iconUrl/);
 console.log("public metrics disclose aggregates only; refit remains planning only");
