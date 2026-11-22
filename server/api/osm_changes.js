@@ -264,6 +264,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     const updatedMetadata = {
       ...metadata,
       legacyNeedsRefit: false,
+      recoveryNeedsRefit: false,
       refittedAt: new Date().toISOString(),
       refittedWayIds: prepared.fitting.wayIds,
       refittedPathGeoJson: JSON.stringify({ type: "LineString", coordinates: prepared.fittedPath }),
@@ -352,6 +353,13 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
 
   async function executeUserPlan(req, plan, action) {
     const planId = plan.plan_id;
+    // 復旧時は経路を失わず確認リストへ収集するだけ。空の案をOSMへ送信しない。
+    if (plan.client_context?.recoveryNeedsRefit || !Array.isArray(plan.elements) || !plan.elements.length) {
+      await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: "record_requires_refit" });
+      const error = new Error("record_requires_refit");
+      error.status = 409;
+      throw error;
+    }
     const gate = await writeGate();
     if (!gate.enabled) {
       await appendAudit(planId, "execution_blocked", req, { requestedAction: action, reason: gate.reason, authorization: "user_save_or_delete", editorMode: "stepby_service_account" });
@@ -749,7 +757,8 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
               try {
                 let executableReview = freshReview;
                 // 失敗後の再送でも、以前のVersionを持つ変更案は再利用せず必ず再計画する。
-                if (freshReview.source_type === "legacy_record" && freshReview.source_metadata) {
+                if ((freshReview.source_type === "legacy_record" && freshReview.source_metadata) ||
+                    freshReview.source_metadata?.recoveryNeedsRefit) {
                   try {
                     executableReview = await prepareLegacyReviewPlan(req, freshReview);
                   } catch (plannerError) {

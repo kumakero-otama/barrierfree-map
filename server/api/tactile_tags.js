@@ -403,11 +403,6 @@ function createTactileTagsHandler({ sendJson }) {
         sendLoggedJson(res, 404, { error: "session_not_found_or_forbidden" }, logContext);
         return;
       }
-      if (!Boolean(sessionRows[0].is_pro)) {
-        sendLoggedJson(res, 403, { error: "pro_required" }, logContext);
-        return;
-      }
-
       const tagLookupSql = Number.isInteger(tagId)
         ? `SELECT id, code, label_ja, sort_order, is_active
            FROM tactile.tags
@@ -425,6 +420,12 @@ function createTactileTagsHandler({ sendJson }) {
       }
 
       const targetTag = tagRows[0];
+      // 通常ユーザーも自分の記録へ標準タグを保存できる。ID 指定でも
+      // 実際に解決したタグを確認し、Pro 専用タグへの迂回を防ぐ。
+      if (!Boolean(sessionRows[0].is_pro) && targetTag.code !== "tactile_paving") {
+        sendLoggedJson(res, 403, { error: "pro_required" }, logContext);
+        return;
+      }
       const [existingRows] = await pool.query(
         `SELECT st.session_id, st.tag_id, t.code, t.label_ja, t.sort_order, t.is_active
          FROM tactile.session_tags st
