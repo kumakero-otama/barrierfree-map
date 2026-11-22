@@ -4,6 +4,7 @@ function startSavedRecordReconciler({ pool, ensureSchema, recover, recoverReview
   intervalMs = 60000, initialDelayMs = 5000, log = console }) {
   let running = false;
   let stopped = false;
+  let firstCycle = true;
   let timer;
   async function run() {
     if (running || stopped) return;
@@ -22,9 +23,10 @@ function startSavedRecordReconciler({ pool, ensureSchema, recover, recoverReview
       for (const row of pending) {
         await deliverNotification(pool, { notificationId: row.notification_id, reviewId: row.review_id, recipient: row.recipient });
       }
-      if (tags.recovered || reviews.queued || pending.length) log.info("[saved_record_reconciler]", JSON.stringify({
+      if (firstCycle || tags.recovered || reviews.queued || pending.length) log.info("[saved_record_reconciler]", JSON.stringify({
         tagsRecovered: tags.recovered, reviewsQueued: reviews.queued, notificationAttempts: pending.length, osmSent: false,
       }));
+      firstCycle = false;
     } catch (error) {
       // 原データは保持。次周期に再試行し、保存APIの応答は巻き込まない。
       log.error("[saved_record_reconciler] retry_pending", error.message);
