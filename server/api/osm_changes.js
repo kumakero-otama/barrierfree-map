@@ -81,9 +81,21 @@ function validateElements(value) {
   return elements;
 }
 
-function createOsmChangesHandler({ sendJson, serviceClientFactory = createServiceAccountOsmClient }) {
+function createOsmChangesHandler({ sendJson, serviceClientFactory = createServiceAccountOsmClient, reconcileSavedRecords = false }) {
   const { pool, error: dbError } = createDbPool();
   let initialized = false;
+  let schemaPromise = null;
+
+  function ensureSchema() {
+    if (!schemaPromise) schemaPromise = initializeSchema().catch(error => { schemaPromise = null; throw error; });
+    return schemaPromise;
+  }
+
+  if (reconcileSavedRecords && pool) {
+    const { recover, recoverReviews } = require("../../tools/recover_saved_record_tags");
+    const { startSavedRecordReconciler } = require("../osm/saved_record_reconciler");
+    startSavedRecordReconciler({ pool, ensureSchema, recover, recoverReviews, deliverNotification });
+  }
 
   async function saveReviewTransition(updateSql, updateParams, reviewId, eventType, actorUserId, details = {}) {
     const conn = await pool.getConnection();
@@ -101,7 +113,7 @@ function createOsmChangesHandler({ sendJson, serviceClientFactory = createServic
     }
   }
 
-  async function ensureSchema() {
+  async function initializeSchema() {
     if (initialized) return;
     if (!pool) throw dbError || new Error("database_unavailable");
     await pool.query("CREATE SCHEMA IF NOT EXISTS osmchange");

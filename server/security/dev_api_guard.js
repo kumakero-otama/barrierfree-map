@@ -221,8 +221,12 @@ function createDevApiGuard({ sendJson, logDir, allowedOrigins, verifyAdminSessio
       return false;
     }
 
-    const heavyRoute = pathname === "/api/osm-walkable-network" || pathname === "/api/osm-tactile-ways" || pathname === "/api/trace";
-    const ipLimit = consumeRateLimit(`protected-ip:${ip}`, heavyRoute ? 30 : 180);
+    // 同じカウンタへ異なる上限を適用しない。地図読込の増加で記録保存を塞がない。
+    const networkRoute = pathname === "/api/osm-walkable-network" || pathname === "/api/osm-tactile-ways";
+    const traceWriteRoute = pathname === "/api/trace" && req.method !== "GET";
+    const policyGroup = networkRoute ? "network" : traceWriteRoute ? "trace-write" : "ordinary";
+    const heavyRoute = networkRoute || traceWriteRoute;
+    const ipLimit = consumeRateLimit(`protected-ip:${policyGroup}:${ip}`, heavyRoute ? 30 : 180);
     if (!ipLimit.allowed) {
       res.setHeader("Retry-After", String(ipLimit.retryAfterSeconds));
       log("RATE_LIMITED_IP", req, { heavyRoute });

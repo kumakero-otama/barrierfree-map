@@ -286,6 +286,7 @@ function applyCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
   res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Expose-Headers", "Retry-After, X-Request-Id, X-RateLimit-Remaining");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", allowHeaders);
   res.setHeader("Access-Control-Max-Age", "86400");
@@ -359,6 +360,7 @@ const handleFittingComparisons = createFittingComparisonsHandler({
 });
 
 const handleOsmChanges = createOsmChangesHandler({
+  reconcileSavedRecords: true,
   sendJson,
 });
 const handleFittingDetails = createFittingDetailsHandler({ sendJson });

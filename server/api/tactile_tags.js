@@ -481,6 +481,17 @@ function createTactileTagsHandler({ sendJson }) {
                 COALESCE(u.username,m.original_username) AS username,
                 u.icon_url,
                 sp.created_at,
+                EXISTS (
+                  SELECT 1 FROM tactile.session_tags visible_st
+                  JOIN tactile.tags visible_t ON visible_t.id = visible_st.tag_id
+                  WHERE visible_st.session_id = s.session_id AND visible_t.osm_exportable
+                ) AS has_public_tags,
+                EXISTS (
+                  SELECT 1 FROM tactile.session_tags private_st
+                  JOIN tactile.tags private_t ON private_t.id = private_st.tag_id
+                  WHERE private_st.session_id = s.session_id AND NOT private_t.osm_exportable
+                ) AS has_private_tags,
+                m.record_id AS legacy_record_id,
                 CASE WHEN s.user_id = ? THEN s.memo ELSE NULL END AS memo,
                 CASE
                   WHEN s.user_id = ? OR COALESCE(t.osm_exportable, FALSE)
@@ -497,6 +508,13 @@ function createTactileTagsHandler({ sendJson }) {
          ORDER BY t.sort_order ASC, t.id ASC`,
         [req.authUserId, req.authUserId, sessionId]
       );
+      // 詳細APIでも非公開記録の存在・所有者情報を他人へ漏らさない。
+      const first = rows[0];
+      if (first && Number(first.user_id) !== Number(req.authUserId)
+          && !first.has_public_tags && !(first.legacy_record_id && !first.has_private_tags)) {
+        sendJson(res, 404, { error: "session_not_found" });
+        return;
+      }
       const payload = buildSessionInfoPayload(rows, sessionId);
       if (!payload) {
         sendJson(res, 404, { error: "session_not_found" });

@@ -91,6 +91,9 @@ async function deliverNotification(pool, { notificationId, reviewId, recipient }
       host,
       port: Number(process.env.SMTP_PORT || 465),
       secure: String(process.env.SMTP_SECURE || "true") !== "false",
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
       auth: { user, pass },
     });
     await transport.sendMail({

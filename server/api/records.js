@@ -86,6 +86,11 @@ function createRecordsHandler({ sendJson }) {
       const whereClauses = [];
 
       whereClauses.push("s.is_active = true");
+      // 非公開タグだけの経路は、座標も含め所有者以外へ返さない。
+      // 旧記録の公開扱いは、移行元が明示され、非公開タグがない場合だけ許可する。
+      whereClauses.push(`(s.user_id = ? OR COALESCE(tag_info.has_public, FALSE)
+        OR (migrated.record_id IS NOT NULL AND NOT COALESCE(tag_info.has_private, FALSE)))`);
+      params.push(currentUserId);
 
       // 中心点と半径が揃っている場合だけ、PostGIS の距離検索を有効にする。
       if (Number.isFinite(centerLat) && Number.isFinite(centerLng) && Number.isFinite(radiusKm) && radiusKm > 0) {
