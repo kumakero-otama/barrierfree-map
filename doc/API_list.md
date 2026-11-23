@@ -15,7 +15,7 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
 | --- | --- | --- | --- |
 | GET | `/api/config` | 不要 | クライアント初期化用設定を取得 |
 | GET | `/api/count` | 不要 | マップマッチング月次カウントを取得 |
-| GET | `/api/stats` | 不要 | 総ユーザー数・総点字ブロック記録距離・総道情報件数を取得 |
+| GET | `/api/stats` / `/api/public/stats` | publicのみ不要 | 日本時間で総ユーザー数・総点字ブロック記録距離・総道情報件数を取得 |
 | GET | `/api/match` | 不要 | 1点マップマッチング（Valhalla locate） |
 | POST | `/api/session/start` | 必要 | セッション開始 |
 | POST | `/api/session/end` | 必要 | セッション終了 |
@@ -76,18 +76,18 @@ API version: `1.27.2`（OSM公開仕様更新: 2026-08-17）
   - `200`: `count`, `max`, `month`, `allMonths`
   - `405`: `method_not_allowed`
 
-#### `GET /api/stats`
+#### `GET /api/stats` / `GET /api/public/stats`
 - 概要: 指定日までの総ユーザー数、総点字ブロック記録距離、総道情報件数を取得
-- 認証: 不要
+- 認証: `/api/stats` は必要。HP用の集計値だけを返す `/api/public/stats` は不要
 - 主なクエリ:
-  - 任意: `date`（`YYYY-MM-DD`。未指定時は今日）
+  - 任意: `date`（日本時間の `YYYY-MM-DD`。未指定時は日本時間の今日）
 - 補足:
-  - 集計は指定日の終了時点までを対象にし、SQL上は `< date + 1 day` で判定
+  - 集計は日本時間の指定日終了時点までを対象にする。翌日0時をUTCへ換算した排他的上限と比較し、DB保存日時・DBのUTC設定は変更しない（2026-11-23修正）
   - 総ユーザー数は `login.users.is_active = true` かつ `created_at` が指定日以前の件数
   - 総点字ブロック記録距離は `tactile.sessions.started_at` が指定日以前、かつ `tactile.sessions.is_active = true` と `login.users.is_active = true` の記録をメートル合計して返却
   - 総道情報件数は `roadinfo.road_info_point.status IN ('active', 'hidden')` かつ `created_at` が指定日以前の件数
 - 主なレスポンス:
-  - `200`: `success`, `targetDate`, `totalUsers`, `totalTactileLengthMeters`, `totalRoadInfoPosts`
+  - `200`: `success`, `targetDate`, `timeZone: "Asia/Tokyo"`, `totalUsers`, `totalTactileLengthMeters`, `totalRoadInfoPosts`
   - `400`: `invalid_date`
   - `405`, `500`, `503`
 

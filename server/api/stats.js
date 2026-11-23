@@ -1,12 +1,8 @@
 const { createDbPool } = require("../db");
 
-function parseTargetDate(rawValue) {
+function parseTargetDate(rawValue, now = new Date()) {
   if (rawValue == null || rawValue === "") {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
@@ -28,6 +24,11 @@ function parseTargetDate(rawValue) {
   }
 
   return rawValue;
+}
+
+// DBのUTC日時は変更せず、日本時間の翌日0時をUTCの排他的上限に変換する。
+function jstExclusiveEnd(targetDate) {
+  return new Date(Date.parse(`${targetDate}T00:00:00+09:00`) + 24 * 60 * 60 * 1000).toISOString();
 }
 
 function createStatsHandler({ sendJson }) {
@@ -65,7 +66,7 @@ function createStatsHandler({ sendJson }) {
            (SELECT COUNT(*)
               FROM login.users
              WHERE is_active = true
-               AND created_at < (?::date + INTERVAL '1 day')) AS total_users,
+               AND created_at < (?::timestamptz AT TIME ZONE 'UTC')) AS total_users,
            (SELECT COALESCE(SUM(ST_Length(sp.geom)), 0)
               FROM tactile.sessions s
               JOIN tactile.session_paths sp
@@ -74,12 +75,12 @@ function createStatsHandler({ sendJson }) {
                 ON u.user_id = s.user_id
              WHERE s.is_active = true
                AND u.is_active = true
-               AND s.started_at < (?::date + INTERVAL '1 day')) AS total_tactile_length_meters,
+               AND s.started_at < (?::timestamptz AT TIME ZONE 'UTC')) AS total_tactile_length_meters,
            (SELECT COUNT(*)
               FROM roadinfo.road_info_point
              WHERE status IN ('active', 'hidden')
-               AND created_at < (?::date + INTERVAL '1 day')) AS total_road_info_posts`,
-        [targetDate, targetDate, targetDate]
+               AND created_at < ?::timestamptz) AS total_road_info_posts`,
+        [jstExclusiveEnd(targetDate), jstExclusiveEnd(targetDate), jstExclusiveEnd(targetDate)]
       );
 
       const first = Array.isArray(rows) && rows.length > 0 ? rows[0] : {};
@@ -87,6 +88,7 @@ function createStatsHandler({ sendJson }) {
       sendJson(res, 200, {
         success: true,
         targetDate,
+        timeZone: "Asia/Tokyo",
         totalUsers: Number(first.total_users || 0),
         totalTactileLengthMeters: Math.round(Number(first.total_tactile_length_meters) || 0),
         totalRoadInfoPosts: Number(first.total_road_info_posts || 0),
@@ -99,3 +101,5 @@ function createStatsHandler({ sendJson }) {
 }
 
 module.exports = createStatsHandler;
+module.exports.parseTargetDate = parseTargetDate;
+module.exports.jstExclusiveEnd = jstExclusiveEnd;
